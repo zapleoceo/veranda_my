@@ -996,6 +996,36 @@
     });
     const confirmCapacity = (maxCap, guests) => confirmModal(fmtVars(t('confirm_capacity'), { max: maxCap, guests }));
 
+    // Final review popup before a booking is submitted. Reuses capModal, so its
+    // Yes/No + backdrop/Escape cancel wiring (via capConfirmResolve) all apply.
+    // The TIME is deliberately enlarged/highlighted — guests often mis-pick it.
+    const confirmBookingSummary = (info) => new Promise((resolve) => {
+      capConfirmResolve = resolve;
+      const bcEsc = (s) => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+      const d = parseIsoLocal(info.start);
+      const dateStr = d
+        ? new Intl.DateTimeFormat(UI_LOCALE, { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' }).format(d)
+        : String(info.start || '');
+      const timeStr = d
+        ? (String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'))
+        : '';
+      if (capModalNo)  { capModalNo.style.display = '';  capModalNo.textContent  = t('confirm_booking_edit'); }
+      if (capModalYes) capModalYes.textContent = t('confirm_booking_yes');
+      if (capModalText) {
+        capModalText.innerHTML =
+          '<div class="bc-summary">' +
+            '<div class="bc-row"><span class="bc-label">' + bcEsc(t('tg_table'))  + '</span><span class="bc-val">' + bcEsc(info.table) + '</span></div>' +
+            '<div class="bc-row"><span class="bc-label">' + bcEsc(t('tg_date'))   + '</span><span class="bc-val">' + bcEsc(dateStr) + '</span></div>' +
+            '<div class="bc-row bc-row-time"><span class="bc-label">' + bcEsc(t('tg_time')) + '</span><span class="bc-val bc-time">' + bcEsc(timeStr) + '</span></div>' +
+            '<div class="bc-row"><span class="bc-label">' + bcEsc(t('tg_guests')) + '</span><span class="bc-val">' + bcEsc(String(info.guests)) + '</span></div>' +
+            '<div class="bc-row"><span class="bc-label">' + bcEsc(t('tg_name'))   + '</span><span class="bc-val">' + bcEsc(info.name) + '</span></div>' +
+            '<div class="bc-row"><span class="bc-label">' + bcEsc(t('tg_phone'))  + '</span><span class="bc-val">' + bcEsc(info.phone) + '</span></div>' +
+          '</div>' +
+          '<div class="bc-note">' + bcEsc(t('confirm_booking_note')) + '</div>';
+      }
+      setModal(capModal, true);
+    });
+
     const showSystemModal = (text) => {
       if (capModalNo) capModalNo.style.display = 'none';
       if (capModalYes) capModalYes.textContent = t('ok') || 'OK';
@@ -2181,6 +2211,12 @@
             return;
           }
           totalAmount = getTotalPreorderAmount();
+
+          // Final review popup before anything is booked. The time is highlighted
+          // because guests frequently pick the wrong slot. Nothing is sent until
+          // they confirm here; "Изменить" just closes back to the open form.
+          const bookingConfirmed = await confirmBookingSummary({ table: tableLabel, start, guests, name, phone });
+          if (!bookingConfirmed) return;
 
           submitBusy = true;
           if (reqSubmit) {
