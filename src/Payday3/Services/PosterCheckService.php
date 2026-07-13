@@ -348,9 +348,14 @@ final class PosterCheckService implements PosterCheckServiceInterface
     }
 
     /**
-     * Replace every money-shaped field on a transaction row with its
-     * VND-converted equivalent. Operating on a flat list keeps this
-     * deterministic and avoids hitting nested arrays we don't own.
+     * Normalise money fields on a transaction row returned by
+     * transactions.getTransactions (v3 REST endpoint).
+     *
+     * Unlike dash.getTransactions (v2), the v3 endpoint returns money
+     * as VND with decimal strings ("35000.00" for a 35 000 VND check),
+     * not kopecks/cents. Money::posterMinorToVnd would divide by 100
+     * again → we saw check 23672's 35 000 VND rendered as 350. So parse
+     * the value as-is instead of running it through fromPosterCents().
      *
      * @param array<string,mixed> $row
      */
@@ -360,7 +365,7 @@ final class PosterCheckService implements PosterCheckServiceInterface
                   'payed_third_party', 'payed_cert', 'payed_bonus',
                   'tip_sum', 'discount', 'round_sum', 'pay_sum'] as $k) {
             if (array_key_exists($k, $row)) {
-                $row[$k] = Money::posterMinorToVnd($row[$k]);
+                $row[$k] = self::vndFromV3($row[$k]);
             }
         }
         return $row;
@@ -374,13 +379,31 @@ final class PosterCheckService implements PosterCheckServiceInterface
     {
         return array_map(static function ($p) {
             if (!is_array($p)) return $p;
-            foreach (['product_sum', 'unit_price', 'total', 'price'] as $k) {
+            foreach (['product_sum', 'payed_sum', 'unit_price', 'total', 'price'] as $k) {
                 if (array_key_exists($k, $p)) {
-                    $p[$k] = Money::posterMinorToVnd($p[$k]);
+                    $p[$k] = self::vndFromV3($p[$k]);
                 }
             }
             return $p;
         }, $products);
+    }
+
+    /**
+     * Parse a v3-endpoint money field (VND with decimals, e.g. "35000.00")
+     * into an integer VND amount. Does NOT divide by 100 — the v3 endpoint
+     * is not in kopecks.
+     */
+    private static function vndFromV3(mixed $raw): int
+    {
+        if ($raw === null || $raw === '') return 0;
+        if (is_int($raw))   return $raw;
+        if (is_float($raw)) return (int)round($raw);
+        if (is_string($raw)) {
+            $t = str_replace(',', '.', trim($raw));
+            if ($t === '' || !is_numeric($t)) return 0;
+            return (int)round((float)$t);
+        }
+        return 0;
     }
 
     public function remove(int $transactionId, string $byLabel): array
