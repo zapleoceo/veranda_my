@@ -1147,15 +1147,26 @@
       });
       return out;
     };
+    // Inverse of getPreorderText: \u00ab- \u0412\u043e\u0434\u0430 Aquafina x2 \u2014 30 000 \u20ab\u00bb \u2192 {\u0412\u043e\u0434\u0430 Aquafina: 2}.
+    // Must stay in sync with its format: strip the \u00ab \u2014 <money> \u20ab\u00bb suffix BEFORE
+    // reading the xN qty (the suffix follows it), and skip the non-bullet
+    // \u00ab\u0421\u0443\u043c\u043c\u0430 \u043f\u0440\u0435\u0434\u0437\u0430\u043a\u0430\u0437\u0430: \u2026\u00bb footer \u2014 otherwise restored keys get the price glued
+    // in (\u00ab\u0421\u0430\u043b\u0430\u0442 \u0433\u0440\u0435\u0447\u0435\u0441\u043a\u0438\u0439 \u2014 100 000 \u20ab\u00bb), price lookup fails and lines show 0 \u20ab.
     const parsePreorderTextToCounts = (text) => {
       const out = {};
       String(text || '').split('\n').forEach((raw) => {
-        const line = String(raw || '').trim();
+        let line = String(raw || '').trim();
         if (!line) return;
-        const m = line.match(/^\-\s*(.+?)(?:\s*x\s*(\d+))?\s*$/i);
-        const title = (m && m[1]) ? String(m[1]).trim() : line.replace(/^[\-\*\u2022]\s*/, '').trim();
+        if (!/^[\-\*\u2022]/.test(line)) return;
+        line = line.replace(/^[\-\*\u2022]\s*/, '').trim();
+        // Money suffixes can be stacked after an earlier corrupted round-trip:
+        // \u00ab\u0421\u0430\u043b\u0430\u0442 \u0433\u0440\u0435\u0447\u0435\u0441\u043a\u0438\u0439 \u2014 100 000 \u20ab \u2014 0 \u20ab\u00bb \u2192 \u00ab\u0421\u0430\u043b\u0430\u0442 \u0433\u0440\u0435\u0447\u0435\u0441\u043a\u0438\u0439\u00bb.
+        line = line.replace(/(\s*[\u2014\u2013-]\s*[\d\s.,]+\u20ab)+\s*$/u, '').trim();
+        if (!line || line.indexOf('\u20ab') !== -1) return;
+        const m = line.match(/^(.+?)\s*x\s*(\d+)$/i);
+        const title = m ? String(m[1]).trim() : line;
+        const qty = m ? (Number(m[2]) || 1) : 1;
         if (!title) return;
-        const qty = (m && m[2]) ? (Number(m[2]) || 1) : 1;
         out[title] = (Number(out[title] || 0) || 0) + Math.max(1, qty);
       });
       return normalizePreorder(out);
