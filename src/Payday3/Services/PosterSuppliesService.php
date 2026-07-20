@@ -31,8 +31,23 @@ final class PosterSuppliesService implements PosterSuppliesServiceInterface
             'dateTo'   => str_replace('-', '', $range->to),
         ]);
         $accounts = $api->request('finance.getAccounts', []);
+
+        // storage.getSupplies has no filter parameter — it returns
+        // deleted supplies alongside active ones (marked with
+        // `"delete": "1"`, see https://dev.joinposter.com/docs/v3/web/storage/getSupplies).
+        // Drop them here so the operator never sees a supply that was
+        // deleted on the Poster side.
+        $suppliesOut = [];
+        if (is_array($supplies)) {
+            foreach ($supplies as $row) {
+                if (!is_array($row)) continue;
+                if ((int)($row['delete'] ?? 0) === 1) continue;
+                $suppliesOut[] = self::normaliseSupply($row);
+            }
+        }
+
         return [
-            'supplies' => is_array($supplies) ? array_map([self::class, 'normaliseSupply'], $supplies) : [],
+            'supplies' => $suppliesOut,
             'accounts' => is_array($accounts) ? array_map([self::class, 'normaliseAccount'], $accounts) : [],
         ];
     }
