@@ -26,6 +26,10 @@ jobs:
 
       - uses: github/codeql-action/init@v3
         with:
-          languages: javascript-typescript,actions,php
+          # Keep this list to languages CodeQL actually supports. PHP has no
+          # extractor: naming it made init abort ("did not recognize"), which
+          # killed the whole job — so JS/TS and Actions were never scanned
+          # either. PHP static analysis needs a separate tool (PHPStan/Psalm).
+          languages: javascript-typescript,actions
 
       - uses: github/codeql-action/analyze@v3
