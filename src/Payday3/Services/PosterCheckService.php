@@ -209,8 +209,17 @@ final class PosterCheckService implements PosterCheckServiceInterface
                     'transaction_id' => (int)($row['transaction_id'] ?? 0),
                     'receipt_number' => (int)($row['receipt_number'] ?? $row['transaction_id'] ?? 0),
                     'date_close'     => (string)($row['date_close'] ?? $row['date_close_date'] ?? ''),
-                    'sum'            => Money::posterMinorToVnd($sumRaw),
-                    'payed_sum'      => Money::posterMinorToVnd($sumRaw),
+                    // vndFromV3, НЕ posterMinorToVnd: этот метод читает
+                    // transactions.getTransactions, а он отдаёт донги строкой с
+                    // копейками в дробной части ("495000.00" = 495 000 ₫), тогда
+                    // как dash.* отдаёт минорные единицы (49500000). Деление на
+                    // 100 здесь занижало чеки ровно в 100 раз: 495 000 ₫ → 4 950.
+                    // Сверено на живом проде, чек 24821: dash=49500000,
+                    // transactions.getTransactions="495000.00" — обе ветки должны
+                    // давать 495000. То же самое уже чинили в find() (строка 60),
+                    // до этой ветки правка не доехала.
+                    'sum'            => self::vndFromV3($sumRaw),
+                    'payed_sum'      => self::vndFromV3($sumRaw),
                     'pay_type'       => (int)($row['pay_type'] ?? 0),
                     'status'         => 2,
                     'spot_id'        => (int)($row['spot_id'] ?? 0),
