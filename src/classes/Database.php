@@ -75,7 +75,17 @@ class Database {
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             UNIQUE KEY unique_dish_tx (transaction_id, dish_id, item_seq),
             KEY idx_ks_date (transaction_date),
-            KEY idx_ks_ticket (ticket_sent_at)
+            KEY idx_ks_ticket (ticket_sent_at),
+            -- Индексы ниже — под конкретные горячие запросы. Прод ушёл вперёд
+            -- этого CREATE TABLE (он срабатывает только на пустой БД), поэтому
+            -- держим здесь хотя бы те, без которых всё встаёт.
+            KEY idx_ks_date_status_sent (transaction_date, status, ticket_sent_at),
+            KEY idx_ks_date_station_sent (transaction_date, station, ticket_sent_at),
+            -- TelegramAlertService::_fetchOverdueRows ищет просроченные блюда
+            -- БЕЗ фильтра по дате (алерт живёт дольше календарного дня), поэтому
+            -- date-first индексы ему не подходят. Без этого — full scan всей
+            -- таблицы каждую минуту (на проде было 50k строк вместо 1).
+            KEY idx_ks_status_sent (status, ticket_sent_at)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;";
         
         $this->pdo->exec($sql);
