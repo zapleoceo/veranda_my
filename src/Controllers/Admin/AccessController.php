@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Controllers\Admin;
 
 use App\Infrastructure\Database;
+use App\Infrastructure\Permissions;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
 
@@ -33,6 +34,16 @@ class AccessController
 
     public function index(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
     {
+        // Гейт по праву `admin`. Раньше страница была закрыта только
+        // AuthMiddleware (=любой залогиненный), а _handlePost пишет права
+        // ЛЮБОМУ email из формы. То есть сотрудник с одним лишь `dashboard`
+        // мог отправить save_user_permissions с perm_email=<свой> и
+        // perm_admin=1 — и стать админом. Это escalation of privilege,
+        // а не просто лишняя видимость страницы.
+        if (!Permissions::can('admin')) {
+            return Permissions::denyHtml($response);
+        }
+
         $userEmail = $request->getAttribute('user_email', '');
         $flash = ['ok' => '', 'err' => ''];
         $body  = $request->getParsedBody() ?? [];

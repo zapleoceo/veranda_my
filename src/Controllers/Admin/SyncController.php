@@ -109,7 +109,9 @@ class SyncController
         $dateFrom = preg_match('/^\d{4}-\d{2}-\d{2}$/', $body['date_from'] ?? '') ? $body['date_from'] : date('Y-m-d');
         $dateTo   = preg_match('/^\d{4}-\d{2}-\d{2}$/', $body['date_to'] ?? '')   ? $body['date_to']   : date('Y-m-d');
 
-        $php  = '/opt/php82/bin/php';
+        // Через хелпер, а не хардкодом: под FPM PHP_BINARY указывал бы на
+        // php-fpm (он печатает usage вместо запуска скрипта).
+        $php  = \App\Infrastructure\PhpCli::binary();
         $base = dirname(__DIR__, 3);
 
         $cmds = [

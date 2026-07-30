@@ -70,7 +70,10 @@ class RawdataService
 
         if ($pid > 0) return $pid;
 
-        $php    = PHP_BINARY;
+        // НЕ PHP_BINARY: под PHP-FPM это php-fpm, он не принимает путь к
+        // скрипту — печатает usage и выходит с кодом 0, из-за чего пересинк
+        // «запускался» и молча ничего не делал. См. App\Infrastructure\PhpCli.
+        $php    = \App\Infrastructure\PhpCli::binary();
         $script = escapeshellarg(dirname(__DIR__, 2) . '/scripts/kitchen/resync_range.php');
         $log    = escapeshellarg(dirname(__DIR__, 2) . '/resync_range.log');
         $jobId  = date('Ymd_His');
