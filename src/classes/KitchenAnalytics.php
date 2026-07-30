@@ -266,6 +266,35 @@ class KitchenAnalytics {
     /**
      * Извлечение времени из истории событий по каждому продукту
      */
+    /**
+     * Достаёт список отправленных на кухню позиций из `sendtokitchen.value_text`.
+     *
+     * Poster сменил форму этого поля: раньше приходил плоский список позиций
+     *     [{"product_id":128,"count":1}, ...]
+     * теперь — объект с позициями под ключом `products`:
+     *     {"products":[{"product_id":128,"count":1,"guestNumber":0}],"deviceId":"..."}
+     *
+     * Старый код итерировал value_text напрямую, поэтому на новом формате
+     * перебирал ключи `products`/`deviceId` (у них нет product_id) и молча
+     * терял ВСЕ отправки: ticket_sent_at оставался NULL, а значит переставали
+     * считаться «В очереди» / «Долгих блюд» / «В тайминге» и не срабатывал ни
+     * один алерт о задержке.
+     *
+     * Понимаем обе формы (и JSON-строку на всякий случай), чтобы разбирались и
+     * исторические данные, и любые точки, ещё отдающие старый формат.
+     */
+    private function extractSentProducts(mixed $valueText): array {
+        if (is_string($valueText)) {
+            $decoded = json_decode($valueText, true);
+            $valueText = is_array($decoded) ? $decoded : [];
+        }
+        if (!is_array($valueText)) return [];
+        if (isset($valueText['products']) && is_array($valueText['products'])) {
+            return $valueText['products'];
+        }
+        return $valueText;
+    }
+
     private function extractProductKitchenInstances(array $history, array $productQtyById): array {
         $sendTimesById = [];
         $firstSendById = [];
@@ -279,9 +308,9 @@ class KitchenAnalytics {
             $time = isset($event['time']) ? $this->formatTimestamp((int)$event['time']) : null;
 
             if ($type === 'sendtokitchen') {
-                $items = $event['value_text'] ?? [];
-                if (!is_array($items)) continue;
+                $items = $this->extractSentProducts($event['value_text'] ?? []);
                 foreach ($items as $item) {
+                    if (!is_array($item)) continue;
                     $pId = (int)($item['product_id'] ?? 0);
                     if ($pId <= 0) continue;
                     $count = array_key_exists('count', $item) ? (int)$item['count'] : 1;
