@@ -76,6 +76,7 @@ use App\Controllers\MenuPublicController;
 use App\Controllers\Tr3Controller;
 use App\Controllers\ReservationsController;
 use App\Middleware\AuthMiddleware;
+use App\Middleware\RequirePermission;
 use App\Middleware\WebhookSecretMiddleware;
 use Slim\App;
 use Slim\Routing\RouteCollectorProxy;
@@ -271,7 +272,16 @@ $app->group('/payday3', function (RouteCollectorProxy $g) {
         $api->get(   '/finance/transfers',                           FinanceTransfersAction::class);
         $api->post(  '/finance/transfers/create',                    \App\Payday3\Http\Actions\FinanceTransferCreateAction::class);
     });
-})->add(AuthMiddleware::class);
+})
+    // Право `payday` проверялось ТОЛЬКО при рендере страницы, а все 38
+    // эндпоинтов /payday3/api/* оставались открытыми любому залогиненному
+    // сотруднику — включая POST /api/poster/finance/transactions, который
+    // создаёт реальную проводку в Poster, и /day/clear. Гейт на всю группу
+    // закрывает их разом и не даст забыть проверку в новом action'е.
+    // Легитимного доступа никто не теряет: страница payday3 и так требует
+    // это право, то есть все её пользователи им уже обладают.
+    ->add(RequirePermission::for('payday'))
+    ->add(AuthMiddleware::class);
 
 // /neworder — operator-facing order page (live Poster menu, create
 // new order or append to an open check). Public (no auth yet) but
