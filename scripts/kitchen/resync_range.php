@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 // Только из консоли. Каталоги scripts/ и cron/ лежат внутри docroot и
 // отдаются nginx'ом напрямую (проверено: GET /scripts/kitchen/cron.php
 // возвращает 500, то есть файл ИСПОЛНЯЕТСЯ, а не отдаётся как текст).
@@ -10,308 +12,113 @@ if (PHP_SAPI !== 'cli') {
     header('Content-Type: text/plain; charset=utf-8');
     exit("Forbidden: скрипт запускается только из консоли.\n");
 }
-require_once __DIR__ . '/../../src/classes/Database.php';
-require_once __DIR__ . '/../../src/classes/PosterAPI.php';
-require_once __DIR__ . '/../../src/classes/KitchenAnalytics.php';
 
-function loadEnv(string $path): void {
-    if (file_exists($path)) {
-        $lines = file($path, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
-        foreach ($lines as $line) {
-            $t = trim($line);
-            if ($t === '' || $t[0] === '#') continue;
-            if (strpos($t, '=') === false) continue;
-            [$k, $v] = explode('=', $t, 2);
-            $_ENV[$k] = trim($v);
-        }
-    }
-}
+/**
+ * Пересинк кухонной статистики за диапазон дат.
+ *
+ * Использование: php resync_range.php [ГГГГ-ММ-ДД] [ГГГГ-ММ-ДД] [job_id]
+ *
+ * Раньше здесь лежала СВОЯ копия шагов синхронизации (computeProbCloseAt,
+ * autoExclude, обновление close-метаданных) — вторая из трёх в проекте.
+ * Копии успели разъехаться: ключи результата отличались ('hookah' против
+ * 'set_hookah'), категория кальяна была захардкожена вместо константы, а
+ * шага _reconcileOpenStatus (добор реальных статусов из Poster) тут не было
+ * вовсе. Из-за этого цифры после ручного пересинка отличались от цифр после
+ * ночного крона — молча, без единой ошибки.
+ *
+ * Теперь скрипт — тонкая обёртка над KitchenSyncService::runForDate():
+ * один и тот же код и для крона, и для пересинка.
+ */
 
-loadEnv(__DIR__ . '/../../.env');
+require_once __DIR__ . '/../../vendor/autoload.php';
 
-$spotTzName = trim((string)($_ENV['POSTER_SPOT_TIMEZONE'] ?? ''));
-if ($spotTzName === '' || !in_array($spotTzName, timezone_identifiers_list(), true)) {
-    $spotTzName = 'Asia/Ho_Chi_Minh';
-}
-$apiTzName = trim((string)($_ENV['POSTER_API_TIMEZONE'] ?? ''));
-if ($apiTzName === '' || !in_array($apiTzName, timezone_identifiers_list(), true)) {
-    $apiTzName = $spotTzName;
-}
+use App\Infrastructure\Config;
+use App\Infrastructure\Database;
+use App\Infrastructure\HttpClient;
+use App\Infrastructure\Logger;
+use App\Infrastructure\PosterApiClient;
+use App\Repositories\MetaRepository;
+use App\Services\KitchenSyncService;
+
+Config::load(__DIR__ . '/../../.env');
+Logger::init(Config::get('LOG_LEVEL', 'info'));
+
+$spotTzName = Config::get('POSTER_SPOT_TIMEZONE', 'Asia/Ho_Chi_Minh');
+$apiTzName  = Config::get('POSTER_API_TIMEZONE') ?: $spotTzName;
 date_default_timezone_set($apiTzName);
-$spotTz = new DateTimeZone($spotTzName);
 
-$dbHost = $_ENV['DB_HOST'] ?? 'localhost';
-$dbName = $_ENV['DB_NAME'] ?? 'veranda_my';
-$dbUser = $_ENV['DB_USER'] ?? 'veranda_my';
-$dbPass = $_ENV['DB_PASS'] ?? '';
-$token  = $_ENV['POSTER_API_TOKEN'] ?? '';
-
-$from = $argv[1] ?? date('Y-m-01');
-$to   = $argv[2] ?? date('Y-m-d');
+$from  = $argv[1] ?? date('Y-m-01');
+$to    = $argv[2] ?? date('Y-m-d');
+$jobId = (string) ($argv[3] ?? '');
 
 $fromTs = strtotime($from);
 $toTs   = strtotime($to);
 if ($fromTs === false || $toTs === false || $fromTs > $toTs) {
-    fwrite(STDERR, "Invalid date range\n");
+    fwrite(STDERR, "Некорректный диапазон: ожидается ГГГГ-ММ-ДД ГГГГ-ММ-ДД\n");
     exit(2);
 }
 
-$tableSuffix = (string)($_ENV['DB_TABLE_SUFFIX'] ?? '');
-$db = new \App\Classes\Database($dbHost, $dbName, $dbUser, $dbPass, $tableSuffix);
-$ks = $db->t('kitchen_stats');
-$api = new \App\Classes\PosterAPI($token);
-$analytics = new \App\Classes\KitchenAnalytics($api);
-$jobId = (string)($argv[3] ?? '');
-$metaTable = $db->t('system_meta');
-$setMeta = function (string $key, string $value) use ($db, $metaTable): void {
-    try {
-        $db->query(
-            "INSERT INTO {$metaTable} (meta_key, meta_value) VALUES (?, ?)
-             ON DUPLICATE KEY UPDATE meta_value = VALUES(meta_value), updated_at = CURRENT_TIMESTAMP",
-            [$key, $value]
-        );
-    } catch (\Throwable $e) {
-    }
-};
-if ($jobId !== '') {
-    $setMeta('kitchen_resync_job_id', $jobId);
-    $setMeta('kitchen_resync_job_from', $from);
-    $setMeta('kitchen_resync_job_to', $to);
-    $setMeta('kitchen_resync_job_status', 'running');
-    $setMeta('kitchen_resync_job_started_at', date('Y-m-d H:i:s'));
-    $setMeta('kitchen_resync_job_last_update_at', date('Y-m-d H:i:s'));
-}
-
-function computeProbCloseAt(\App\Classes\Database $db, string $date): array {
-    $ks = $db->t('kitchen_stats');
-    $readyRows = $db->query(
-        "SELECT receipt_number, station, ready_pressed_at
-         FROM {$ks}
-         WHERE transaction_date = ?
-           AND receipt_number REGEXP '^[0-9]+$'
-           AND COALESCE(was_deleted, 0) = 0
-           AND NOT (COALESCE(dish_category_id, 0) = 47 OR COALESCE(dish_sub_category_id, 0) = 47)
-           AND ready_pressed_at IS NOT NULL",
-        [$date]
-    )->fetchAll();
-
-    $byReceiptStation = [];
-    foreach ($readyRows as $r) {
-        $receipt = (int)($r['receipt_number'] ?? 0);
-        $station = (string)($r['station'] ?? '');
-        if ($receipt <= 0 || $station === '') continue;
-        $end = $r['ready_pressed_at'] ?? null;
-        if ($end === null) continue;
-        if (!isset($byReceiptStation[$receipt][$station])) {
-            $byReceiptStation[$receipt][$station] = $end;
-        } else {
-            if (strtotime($end) < strtotime($byReceiptStation[$receipt][$station])) {
-                $byReceiptStation[$receipt][$station] = $end;
-            }
-        }
-    }
-
-    $targets = $db->query(
-        "SELECT id, receipt_number, station, prob_close_at, ticket_sent_at
-         FROM {$ks}
-         WHERE transaction_date = ?
-           AND receipt_number REGEXP '^[0-9]+$'
-           AND COALESCE(was_deleted, 0) = 0
-           AND NOT (COALESCE(dish_category_id, 0) = 47 OR COALESCE(dish_sub_category_id, 0) = 47)
-           AND ticket_sent_at IS NOT NULL
-           AND ready_pressed_at IS NULL",
-        [$date]
-    )->fetchAll();
-
-    $upd = $db->getPdo()->prepare("UPDATE {$ks} SET prob_close_at = ? WHERE id = ?");
-    $setCount = 0; $clearCount = 0;
-    foreach ($targets as $t) {
-        $id = (int)($t['id'] ?? 0);
-        $receipt = (int)($t['receipt_number'] ?? 0);
-        $station = (string)($t['station'] ?? '');
-        if ($id <= 0 || $receipt <= 0 || $station === '') continue;
-        $sentAt = (string)($t['ticket_sent_at'] ?? '');
-        $sentTs = $sentAt !== '' ? strtotime($sentAt) : false;
-        if ($sentTs === false || $sentTs <= 0) continue;
-        $candidate = null;
-        $next1 = $receipt + 1;
-        $next2 = $receipt + 2;
-        if (isset($byReceiptStation[$next1][$station]) && isset($byReceiptStation[$next2][$station])) {
-            $candidate = $byReceiptStation[$next1][$station];
-        }
-        if ($candidate !== null) {
-            $candTs = strtotime($candidate);
-            if ($candTs === false || $candTs < $sentTs) {
-                $candidate = null;
-            }
-        }
-        $current = $t['prob_close_at'] ?? null;
-        if (($current === null || $current === '') && $candidate === null) continue;
-        if ($candidate !== null && (string)$candidate === (string)$current) continue;
-        if ($candidate === null && ($current === null || $current === '')) continue;
-        $upd->execute([$candidate, $id]);
-        if ($candidate !== null) $setCount++; else $clearCount++;
-    }
-    return ['set' => $setCount, 'cleared' => $clearCount];
-}
-
-function autoExclude(\App\Classes\Database $db, string $date): array {
-    $ks = $db->t('kitchen_stats');
-    $setHookah = $db->query(
-        "UPDATE {$ks}
-         SET exclude_from_dashboard = 1,
-             exclude_auto = 1
-         WHERE transaction_date = ?
-           AND (COALESCE(dish_category_id, 0) = 47 OR COALESCE(dish_sub_category_id, 0) = 47)",
-        [$date]
-    )->rowCount();
-    $set1 = $db->query(
-        "UPDATE {$ks}
-         SET exclude_from_dashboard = 1,
-             exclude_auto = 1
-         WHERE transaction_date = ?
-           AND COALESCE(was_deleted, 0) = 0
-           AND COALESCE(exclude_from_dashboard, 0) = 0
-           AND NOT (COALESCE(dish_category_id, 0) = 47 OR COALESCE(dish_sub_category_id, 0) = 47)
-           AND ready_pressed_at IS NULL
-           AND prob_close_at IS NOT NULL",
-        [$date]
-    )->rowCount();
-    $set2 = $db->query(
-        "UPDATE {$ks}
-         SET exclude_from_dashboard = 1,
-             exclude_auto = 1
-         WHERE transaction_date = ?
-           AND COALESCE(was_deleted, 0) = 0
-           AND COALESCE(exclude_from_dashboard, 0) = 0
-           AND NOT (COALESCE(dish_category_id, 0) = 47 OR COALESCE(dish_sub_category_id, 0) = 47)
-           AND ready_pressed_at IS NULL
-           AND prob_close_at IS NULL
-           AND ticket_sent_at IS NOT NULL
-           AND status > 1
-           AND transaction_closed_at IS NOT NULL
-           AND transaction_closed_at > '2000-01-01 00:00:00'",
-        [$date]
-    )->rowCount();
-    $unset1 = $db->query(
-        "UPDATE {$ks}
-         SET exclude_from_dashboard = 0,
-             exclude_auto = 0
-         WHERE transaction_date = ?
-           AND exclude_auto = 1
-           AND NOT (COALESCE(dish_category_id, 0) = 47 OR COALESCE(dish_sub_category_id, 0) = 47)
-           AND ready_pressed_at IS NOT NULL",
-        [$date]
-    )->rowCount();
-    $unset2 = $db->query(
-        "UPDATE {$ks}
-         SET exclude_from_dashboard = 0,
-             exclude_auto = 0
-         WHERE transaction_date = ?
-           AND exclude_auto = 1
-           AND NOT (COALESCE(dish_category_id, 0) = 47 OR COALESCE(dish_sub_category_id, 0) = 47)
-           AND ready_pressed_at IS NULL
-           AND prob_close_at IS NULL
-           AND NOT (
-                ticket_sent_at IS NOT NULL
-            AND status > 1
-            AND transaction_closed_at IS NOT NULL
-            AND transaction_closed_at > '2000-01-01 00:00:00'
-           )",
-        [$date]
-    )->rowCount();
-    return ['set_hookah' => (int)$setHookah, 'set_prob' => (int)$set1, 'set_close' => (int)$set2, 'unset_fact' => (int)$unset1, 'unset_lost' => (int)$unset2];
-}
+$db      = Database::getInstance();
+$http    = new HttpClient(timeoutSeconds: 15);
+$poster  = new PosterApiClient(Config::require('POSTER_API_TOKEN'), $http);
+$meta    = new MetaRepository($db);
+$service = new KitchenSyncService($db, $poster, $meta, new DateTimeZone($spotTzName));
 
 $totalDays = 0;
-for ($tmp = $fromTs; $tmp <= $toTs; $tmp = strtotime('+1 day', $tmp)) $totalDays++;
-$idx = 0;
+for ($t = $fromTs; $t <= $toTs; $t = strtotime('+1 day', $t)) {
+    $totalDays++;
+}
 
-for ($d = $fromTs; $d <= $toTs; $d = strtotime('+1 day', $d)) {
-    $date = date('Y-m-d', $d);
-    $idx++;
-    echo "[" . date('Y-m-d H:i:s') . "] Syncing {$date}...\n";
-    if ($jobId !== '') {
-        $setMeta('kitchen_resync_job_last_date', $date);
-        $setMeta('kitchen_resync_job_progress', (string)$idx . '/' . (string)$totalDays);
-        $setMeta('kitchen_resync_job_last_update_at', date('Y-m-d H:i:s'));
+/** Прогресс для панели /admin/sync. Без job_id его никто не читает. */
+$setJobMeta = static function (array $pairs) use ($meta, $jobId): void {
+    if ($jobId === '') {
+        return;
     }
     try {
-        $stats = $analytics->getStatsForPeriod($date, $date);
-        if (!empty($stats)) {
-            $db->saveStats($stats);
-            echo "  Saved " . count($stats) . " rows\n";
-        } else {
-            echo "  No rows\n";
-        }
-        // Refresh close metadata from Poster for all closed transactions of the day
-        $txRows = $db->query(
-            "SELECT DISTINCT transaction_id
-             FROM {$ks}
-             WHERE transaction_date = ?
-               AND status > 1",
-            [$date]
-        )->fetchAll();
-        $refreshed = 0;
-        foreach ($txRows as $row) {
-            $txId = (int)$row['transaction_id'];
-            if ($txId <= 0) continue;
-            try {
-                $txRes = $api->request('dash.getTransaction', ['transaction_id' => $txId]);
-                $tx = $txRes[0] ?? $txRes;
-                $status = (int)($tx['status'] ?? 2);
-                if ($status <= 1) {
-                    continue;
-                }
-                $payType = isset($tx['pay_type']) ? (int)$tx['pay_type'] : null;
-                $closeReason = isset($tx['reason']) && $tx['reason'] !== '' ? (int)$tx['reason'] : null;
-                $closedAt = null;
-                if (!empty($tx['date_close']) && (int)$tx['date_close'] > 0) {
-                    $candidate = new DateTime('@' . round(((int)$tx['date_close']) / 1000));
-                    $candidate->setTimezone($spotTz);
-                    if ((int)$candidate->format('Y') >= 2000) {
-                        $closedAt = $candidate->format('Y-m-d H:i:s');
-                    }
-                }
-                if ($closedAt === null && !empty($tx['date_close_date']) && $tx['date_close_date'] !== '0000-00-00 00:00:00') {
-                    $ts = strtotime($tx['date_close_date']);
-                    if ($ts !== false && $ts > 0 && (int)date('Y', $ts) >= 2000) {
-                        $closedAt = date('Y-m-d H:i:s', $ts);
-                    }
-                }
-                $db->query(
-                    "UPDATE {$ks}
-                     SET status = ?, pay_type = ?, close_reason = ?, transaction_closed_at = ?
-                     WHERE transaction_id = ?",
-                    [$status, $payType, $closeReason, $closedAt, $txId]
-                );
-                $refreshed++;
-            } catch (\Exception $e) {
-                // ignore per-transaction errors
-            }
-        }
-        if ($refreshed > 0) {
-            echo "  Refreshed close metadata for {$refreshed} transactions\n";
-        }
-        $prob = computeProbCloseAt($db, $date);
-        echo "  ProbCloseTime: set {$prob['set']}, cleared {$prob['cleared']}\n";
-        $auto = autoExclude($db, $date);
-        echo "  AutoExclude: set_prob={$auto['set_prob']} set_close={$auto['set_close']} unset_fact={$auto['unset_fact']} unset_lost={$auto['unset_lost']}\n";
-    } catch (\Exception $e) {
-        echo "  ERROR: " . $e->getMessage() . "\n";
-        if ($jobId !== '') {
-            $setMeta('kitchen_resync_job_status', 'error');
-            $setMeta('kitchen_resync_job_error', $e->getMessage());
-            $setMeta('kitchen_resync_job_last_update_at', date('Y-m-d H:i:s'));
-        }
+        $meta->setMany($pairs);
+    } catch (\Throwable) {
+        // Прогресс вспомогательный — ронять из-за него пересинк нельзя.
+    }
+};
+
+$setJobMeta([
+    'kitchen_resync_job_id'             => $jobId,
+    'kitchen_resync_job_from'           => $from,
+    'kitchen_resync_job_to'             => $to,
+    'kitchen_resync_job_status'         => 'running',
+    'kitchen_resync_job_started_at'     => date('Y-m-d H:i:s'),
+    'kitchen_resync_job_last_update_at' => date('Y-m-d H:i:s'),
+]);
+
+$index = 0;
+for ($t = $fromTs; $t <= $toTs; $t = strtotime('+1 day', $t)) {
+    $date = date('Y-m-d', $t);
+    $index++;
+
+    echo '[' . date('Y-m-d H:i:s') . "] Синхронизирую {$date} ({$index}/{$totalDays})...\n";
+    $setJobMeta([
+        'kitchen_resync_job_last_date'      => $date,
+        'kitchen_resync_job_progress'       => $index . '/' . $totalDays,
+        'kitchen_resync_job_last_update_at' => date('Y-m-d H:i:s'),
+    ]);
+
+    try {
+        $service->runForDate($date);
+        echo "  готово\n";
+    } catch (\Throwable $e) {
+        echo '  ОШИБКА: ' . $e->getMessage() . "\n";
+        $setJobMeta([
+            'kitchen_resync_job_status'         => 'error',
+            'kitchen_resync_job_error'          => $e->getMessage(),
+            'kitchen_resync_job_last_update_at' => date('Y-m-d H:i:s'),
+        ]);
         exit(2);
     }
 }
 
-echo "[" . date('Y-m-d H:i:s') . "] DONE\n";
-if ($jobId !== '') {
-    $setMeta('kitchen_resync_job_status', 'done');
-    $setMeta('kitchen_resync_job_done_at', date('Y-m-d H:i:s'));
-    $setMeta('kitchen_resync_job_last_update_at', date('Y-m-d H:i:s'));
-}
-?>
+echo '[' . date('Y-m-d H:i:s') . "] ГОТОВО\n";
+$setJobMeta([
+    'kitchen_resync_job_status'         => 'done',
+    'kitchen_resync_job_done_at'        => date('Y-m-d H:i:s'),
+    'kitchen_resync_job_last_update_at' => date('Y-m-d H:i:s'),
+]);
