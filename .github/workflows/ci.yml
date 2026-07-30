@@ -1,0 +1,61 @@
+name: CI
+
+# Гоняем на КАЖДОМ пуше в любую ветку и на PR — чтобы поломка была видна
+# до того, как ветка доедет до main. Деплой прода (deploy.yml) имеет
+# собственный, обязательный прогон тестов: зелёный CI здесь не даёт
+# деплою права проехать без проверки.
+on:
+  push:
+  pull_request:
+
+# Новый пуш в ту же ветку отменяет предыдущий прогон — экономит минуты
+# и убирает гонку «старый прогон дозелёнел позже нового».
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tests:
+    name: Lint + PHPUnit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      # PHP 8.2 — ровно та версия, что стоит на проде (/opt/php82, 8.2.27).
+      # Не берём преднастроенный PHP раннера: он опережает прод и тесты
+      # могут зеленеть на поведении, которого в бою нет.
+      - name: Setup PHP 8.2
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: mbstring, dom, xml, curl, tokenizer, pdo_mysql
+          coverage: none
+          tools: composer:v2
+
+      - name: Validate composer.json/lock
+        run: composer validate --no-check-publish
+
+      - name: Cache composer packages
+        uses: actions/cache@v4
+        with:
+          path: vendor
+          key: composer-${{ runner.os }}-php82-${{ hashFiles('composer.lock') }}
+          restore-keys: composer-${{ runner.os }}-php82-
+
+      - name: Install dependencies (с dev — нужен phpunit)
+        run: composer install --prefer-dist --no-progress --no-interaction
+
+      # Синтаксис всего дерева. Ловит опечатку в любом легаси-файле,
+      # который не покрыт тестами и не подключается автозагрузчиком.
+      - name: PHP syntax check
+        run: |
+          set -euo pipefail
+          find . \
+            -path ./vendor -prune -o \
+            -path ./node_modules -prune -o \
+            -path ./wa_listener/node_modules -prune -o \
+            -name '*.php' -print0 \
+          | xargs -0 -P4 -n1 php -l > /dev/null
+
+      - name: PHPUnit
+        run: vendor/bin/phpunit --testdox --colors=never
