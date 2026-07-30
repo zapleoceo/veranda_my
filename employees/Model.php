@@ -6,6 +6,28 @@ class EmployeesModel {
     private $posterToken;
     private $ratesTable;
 
+    /**
+     * Отработанные минуты из строки dash.getWaitersSales.
+     *
+     * ВАЖНО: middle_time сюда НЕ подставляется, хотя раньше подставлялся.
+     * Poster отдаёт worked_time = null, пока смена не закрыта, и код падал
+     * на middle_time, трактуя его как минуты. Но middle_time — это средняя
+     * длительность обслуживания чека В СЕКУНДАХ, к отработанному времени
+     * отношения не имеющая: на закрытом дне у одного и того же сотрудника
+     * одновременно worked_time=806 (мин) и middle_time=1814.
+     *
+     * Из-за подстановки табель за текущий день показывал выдуманные часы —
+     * проверено на живых данных 2026-07-30: middle_time=1294.76 превращался
+     * в 21.58 отработанных часа. Числа выглядели правдоподобно и никакой
+     * ошибки не возникало, поэтому баг жил незамеченным.
+     *
+     * Теперь незакрытая смена честно даёт 0 («часов ещё нет»), а не фантом.
+     */
+    public static function workedMinutesFromRow(array $row): int {
+        $worked = $row['worked_time'] ?? ($row['workedTime'] ?? null);
+        return is_numeric($worked) ? (int)round((float)$worked) : 0;
+    }
+
     public function __construct($db, $posterToken) {
         $this->db = $db;
         $this->posterToken = $posterToken;
@@ -114,10 +136,7 @@ class EmployeesModel {
             if ($uid <= 0) continue;
             $name = (string)($r['name'] ?? '');
             $clients = (int)($r['clients'] ?? 0);
-            $worked = $r['worked_time'] ?? null;
-            if ($worked === null) $worked = $r['workedTime'] ?? null;
-            if ($worked === null) $worked = $r['middle_time'] ?? null;
-            $workedMin = is_numeric($worked) ? (int)round((float)$worked) : 0;
+            $workedMin = self::workedMinutesFromRow($r);
             $workedHours = $workedMin > 0 ? round($workedMin / 60, 2) : 0;
             $byUid[$uid] = [
                 'user_id' => $uid,
@@ -277,8 +296,7 @@ class EmployeesModel {
                     if (!is_array($row)) continue;
                     $uid = (int)($row['user_id'] ?? 0);
                     if ($uid <= 0) continue;
-                    $worked = $row['worked_time'] ?? ($row['workedTime'] ?? ($row['middle_time'] ?? null));
-                    $workedMin = is_numeric($worked) ? (int)round((float)$worked) : 0;
+                    $workedMin = self::workedMinutesFromRow($row);
                     if ($workedMin <= 0) continue;
                     $h = round($workedMin / 60, 2);
                     $hoursByUserDay[$uid][$iso] = ($hoursByUserDay[$uid][$iso] ?? 0) + $h;
@@ -450,10 +468,7 @@ class EmployeesModel {
                 if (!is_array($r)) continue;
                 $uid = (int)($r['user_id'] ?? 0);
                 if ($uid !== $userId) continue;
-                $worked = $r['worked_time'] ?? null;
-                if ($worked === null) $worked = $r['workedTime'] ?? null;
-                if ($worked === null) $worked = $r['middle_time'] ?? null;
-                $workedMin = is_numeric($worked) ? (int)round((float)$worked) : 0;
+                $workedMin = self::workedMinutesFromRow($r);
                 break;
             }
             $h = $workedMin > 0 ? round($workedMin / 60, 2) : 0;
