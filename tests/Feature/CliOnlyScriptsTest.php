@@ -28,6 +28,9 @@ final class CliOnlyScriptsTest extends TestCase
 {
     private const GUARDED_DIRS = ['scripts', 'cron'];
 
+    /** Cron-скрипты, лежащие в корне docroot. */
+    private const GUARDED_ROOT_FILES = ['daily_summary.php', 'set_tg_webhook.php'];
+
     /** @return list<string> */
     private function phpFiles(): array
     {
@@ -43,6 +46,16 @@ final class CliOnlyScriptsTest extends TestCase
                 }
             }
         }
+        // Cron-скрипты в корне docroot: они отдаются по HTTP наравне с
+        // публичными страницами. daily_summary.php по GET запускал
+        // exec('pm2 jlist') и слал выдержки из серверных логов в Telegram.
+        foreach (self::GUARDED_ROOT_FILES as $name) {
+            $path = $root . '/' . $name;
+            if (is_file($path)) {
+                $found[] = str_replace('\\', '/', $path);
+            }
+        }
+
         sort($found);
         return $found;
     }
