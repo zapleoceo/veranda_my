@@ -2,6 +2,16 @@ DirectorySlash Off
 
 RewriteEngine On
 
+# ─── Безопасность: docroot = корень деплоя, поэтому рядом с публичными
+# папками лежат .env и *.log. Без этих правил они отдаются как обычные файлы
+# (боевой .env со всеми токенами скачивался по https://veranda.my/.env).
+# Держим правила ПЕРВЫМИ, до всех rewrite'ов и catch-all.
+# ВНИМАНИЕ: статику может отдавать nginx в обход .htaccess — это defense in
+# depth, а не замена запрету на стороне nginx / переносу docroot в public/.
+RewriteRule (^|/)\.(?!well-known/) - [F,L]
+RewriteRule \.(log|sql|sqlite|db|bak|old|ini)$ - [F,L]
+RewriteRule ^composer\.(json|lock)$ - [F,L]
+
 RewriteRule ^home/?$ home/index.php [L,QSA]
 RewriteRule ^links/?$ links/index.php [L,QSA]
 RewriteRule ^sepay/?$ sepay/index.php [L,QSA]
