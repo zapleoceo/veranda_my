@@ -131,16 +131,40 @@ $app->map(['GET', 'POST'], '/telegram_webhook.php', [WebhookController::class, '
 // same controller.
 $app->get('/admin/', [DashboardController::class, 'index'])
     ->add(AuthMiddleware::class);
+// Права на страницы админки. До этого вся группа была закрыта ТОЛЬКО
+// AuthMiddleware (=любой залогиненный сотрудник), а проверка прав была лишь
+// в одном контроллере из восьми — BloggersController. В проде это означало,
+// что все 8 обычных сотрудников имели доступ к запуску скриптов (/admin/sync),
+// чтению логов и настройкам Telegram-бота.
+//
+// Ключ выбираем по смыслу страницы, а не «admin на всё подряд»:
+//   • sync / telegram / menu / logs — чисто административные операции;
+//   • reservations — рабочий инструмент, у него есть свой ключ `reservations`;
+//   • bloggers — гейт уже стоит внутри контроллера;
+//   • access — гейт внутри контроллера (там же правится выдача прав).
+//
+// Дашборд намеренно БЕЗ гейта: это страница приземления после логина
+// (CallbackController: $next = '/admin'), а права `dashboard` в проде нет у
+// 5 сотрудников из 10. Гейт здесь означал бы 403 сразу после входа для
+// половины персонала — при том, что сама страница лишь показывает сводку,
+// а опасные действия закрыты выше. Ссылки, на которые прав нет, сайдбар и
+// так не показывает.
 $app->group('/admin', function (RouteCollectorProxy $group) {
     $group->get('', [DashboardController::class, 'index']);
-    $group->map(['GET', 'POST'], '/sync', [SyncController::class, 'index']);
-    $group->post('/sync/start', [SyncController::class, 'start']);
-    $group->map(['GET', 'POST'], '/telegram', [TelegramAdminController::class, 'index']);
-    $group->map(['GET', 'POST'], '/menu', [MenuController::class, 'index']);
+    $group->map(['GET', 'POST'], '/sync', [SyncController::class, 'index'])
+        ->add(RequirePermission::for('admin'));
+    $group->post('/sync/start', [SyncController::class, 'start'])
+        ->add(RequirePermission::for('admin'));
+    $group->map(['GET', 'POST'], '/telegram', [TelegramAdminController::class, 'index'])
+        ->add(RequirePermission::for('admin'));
+    $group->map(['GET', 'POST'], '/menu', [MenuController::class, 'index'])
+        ->add(RequirePermission::for('admin'));
     $group->map(['GET', 'POST'], '/access', [AccessController::class, 'index']);
     $group->map(['GET', 'POST'], '/bloggers', [BloggersController::class, 'index']);
-    $group->map(['GET', 'POST'], '/reservations', [ReservationsAdminController::class, 'index']);
-    $group->map(['GET', 'POST'], '/logs', [LogsController::class, 'index']);
+    $group->map(['GET', 'POST'], '/reservations', [ReservationsAdminController::class, 'index'])
+        ->add(RequirePermission::for('reservations'));
+    $group->map(['GET', 'POST'], '/logs', [LogsController::class, 'index'])
+        ->add(RequirePermission::for('admin'));
 })->add(AuthMiddleware::class);
 
 // Phase 4: staff-facing modules (auth-protected). Patterns accept the
