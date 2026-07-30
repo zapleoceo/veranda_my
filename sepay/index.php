@@ -15,6 +15,42 @@ if (file_exists(__DIR__ . '/../.env')) {
     }
 }
 
+/**
+ * Аутентификация вебхука.
+ *
+ * До этой проверки эндпоинт принимал что угодно от кого угодно: POST с
+ * произвольным телом вставлял строку в sepay_transactions, а payday3 затем
+ * сверяет эти строки с чеками Poster. То есть посторонний мог «нарисовать»
+ * банковские поступления и исказить финансовую сверку.
+ *
+ * SePay умеет слать заголовок `Authorization: Apikey <ключ>` (настраивается
+ * в их панели, раздел вебхуков). Ключ кладём в .env как SEPAY_WEBHOOK_API_KEY.
+ *
+ * Пока ключ не настроен, запрос НЕ отклоняем — иначе оплаты перестанут
+ * записываться в тот же миг, как это выедет на прод. Вместо этого поднимаем
+ * заметный флаг в system_meta (виден в payday3) и пишем в лог. Как только
+ * ключ появится в .env и в панели SePay — эндпоинт станет fail-closed.
+ */
+$sepayApiKey = trim((string)($_ENV['SEPAY_WEBHOOK_API_KEY'] ?? ''));
+$authHeader  = (string)($_SERVER['HTTP_AUTHORIZATION'] ?? $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ?? '');
+$sepayAuthOk = true;
+$sepayAuthMode = 'disabled';
+
+if ($sepayApiKey !== '') {
+    $sepayAuthMode = 'enforced';
+    $presented = '';
+    if (preg_match('/^\s*(?:Apikey|ApiKey|Bearer)\s+(.+)$/i', $authHeader, $m)) {
+        $presented = trim($m[1]);
+    }
+    $sepayAuthOk = $presented !== '' && hash_equals($sepayApiKey, $presented);
+
+    if (!$sepayAuthOk) {
+        http_response_code(401);
+        echo json_encode(['success' => false, 'error' => 'unauthorized'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+}
+
 $dbHost = $_ENV['DB_HOST'] ?? 'localhost';
 $dbName = $_ENV['DB_NAME'] ?? 'veranda_my';
 $dbUser = $_ENV['DB_USER'] ?? 'veranda_my';
@@ -55,6 +91,13 @@ try {
             "INSERT INTO {$meta} (meta_key, meta_value) VALUES (?, ?)
              ON DUPLICATE KEY UPDATE meta_value = VALUES(meta_value)",
             ['sepay_webhook_last_ip', $remoteIp]
+        );
+        // Режим аутентификации виден в payday3: пока здесь 'disabled',
+        // эндпоинт принимает поступления от кого угодно.
+        $db->query(
+            "INSERT INTO {$meta} (meta_key, meta_value) VALUES (?, ?)
+             ON DUPLICATE KEY UPDATE meta_value = VALUES(meta_value)",
+            ['sepay_webhook_auth_mode', $sepayAuthMode]
         );
         $db->query(
             "INSERT INTO {$meta} (meta_key, meta_value) VALUES (?, ?)

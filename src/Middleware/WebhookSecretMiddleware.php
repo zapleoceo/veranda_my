@@ -19,28 +19,38 @@ class WebhookSecretMiddleware implements MiddlewareInterface
 
     public function process(ServerRequestInterface $request, RequestHandlerInterface $handler): ResponseInterface
     {
-        // WA bridge events authenticate themselves inside the controller
+        // События WA-моста проверяют себя сами: WaEventHandler сверяет
+        // WA_NODE_SECRET/WA_BRIDGE_SECRET через hash_equals и отдаёт 403 при
+        // пустом или неверном значении (см. WaEventHandler::_authorised).
+        // Поэтому пропуск здесь — не дыра, а передача проверки владельцу.
         if (isset($request->getQueryParams()['wa_event'])) {
             return $handler->handle($request);
         }
 
         $expected = Config::get('TELEGRAM_WEBHOOK_SECRET');
 
-        // If no secret is configured — allow all (dev/testing)
+        // Пустой секрет = отказ, а НЕ «пропустить всё».
+        //
+        // Раньше здесь стоял allow-all «для dev/testing». Цена такого
+        // удобства: стоит секрету исчезнуть из .env (опечатка, неполный
+        // деплой, откат конфига) — и вебхук молча становится открытым.
+        // А авторизация действий внутри идёт по username из тела запроса,
+        // то есть подделать callback от админа тривиально: кнопки
+        // vposter/vdecline/vrestore и игноры выполнятся от его имени.
+        // Лучше видимо сломать доставку вебхука, чем незаметно её открыть.
         if ($expected === '') {
-            return $handler->handle($request);
+            $response = $this->responseFactory->createResponse(503);
+            $response->getBody()->write('Webhook secret is not configured');
+            return $response;
         }
 
-        // Prefer X-Telegram-Bot-Api-Secret-Token header (official Telegram approach)
+        // Только официальный заголовок Telegram. Legacy-фолбэк на ?secret=
+        // убран: секрет в query-строке оседает в access-логах nginx и в
+        // Referer, а текущая регистрация вебхука его не использует
+        // (проверено через getWebhookInfo: url без query-параметров).
         $provided = $request->getHeaderLine('X-Telegram-Bot-Api-Secret-Token');
 
-        // Fallback: legacy ?secret= query param
-        if ($provided === '') {
-            $params   = $request->getQueryParams();
-            $provided = trim((string) ($params['secret'] ?? ''));
-        }
-
-        if (!hash_equals($expected, $provided)) {
+        if ($provided === '' || !hash_equals($expected, $provided)) {
             $response = $this->responseFactory->createResponse(403);
             $response->getBody()->write('Forbidden');
             return $response;
