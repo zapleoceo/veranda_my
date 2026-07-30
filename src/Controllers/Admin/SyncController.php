@@ -115,8 +115,18 @@ class SyncController
         $cmds = [
             'kitchen_cron'          => ["{$php} {$base}/cron/kitchen_sync.php 2>&1", false],
             'tg_alerts'             => ["{$php} {$base}/cron/telegram_alerts.php 2>&1", false],
+            // ВАЖНО: диапазон умеет только scripts/kitchen/resync_range.php.
+            // Раньше здесь стоял cron/kitchen_sync.php с датами в аргументах —
+            // но тот скрипт argv не читает и всегда синкает ТОЛЬКО сегодня,
+            // поэтому «пересинк диапазона» тихо не делал ничего за прошлые дни.
+            // Третий аргумент — job id: по нему resync_range.php пишет
+            // kitchen_resync_job_* в system_meta, а эта же страница показывает
+            // прогресс (без него панель job'а всегда пустая).
             'kitchen_resync_range'  => [
-                "{$php} {$base}/cron/kitchen_sync.php " . escapeshellarg($dateFrom) . ' ' . escapeshellarg($dateTo) . " >> {$base}/resync_range.log 2>&1 & echo \$!",
+                "{$php} {$base}/scripts/kitchen/resync_range.php "
+                    . escapeshellarg($dateFrom) . ' ' . escapeshellarg($dateTo) . ' '
+                    . escapeshellarg('ui_' . date('YmdHis'))
+                    . " >> {$base}/resync_range.log 2>&1 & echo \$!",
                 true,
             ],
         ];
