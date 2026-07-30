@@ -981,7 +981,23 @@ class EmployeesModel {
 
     try {
         $api = new \App\Classes\PosterAPI($this->posterToken);
-        $tx = $api->request('finance.getTransaction', ['transaction_id' => $transactionId], 'GET');
+        // timezone=client задан явно, хотя сегодня это no-op.
+        //
+        // Ниже дата этой транзакции читается и записывается обратно через
+        // finance.updateTransactions как date('dmY', strtotime($tx['date'])),
+        // то есть трактуется в таймзоне PHP (Нячанг). Списочный метод
+        // finance.getTransactions по умолчанию отдаёт КИЕВСКОЕ время (+03:00) и
+        // требует timezone=client — проверено на транзакции 9520: 23:55 против
+        // 19:55 для одного и того же момента. Поштучный метод сейчас отдаёт
+        // время спота независимо от параметра (тоже проверено), но это
+        // недокументированное умолчание: поменяется — и дата проводки для
+        // операций после полуночи по Нячангу уедет на сутки назад, молча.
+        // Явный параметр убирает эту зависимость.
+        $tx = $api->request(
+            'finance.getTransaction',
+            ['transaction_id' => $transactionId, 'timezone' => 'client'],
+            'GET'
+        );
         if (!is_array($tx)) throw new \Exception('Transaction not found');
 
         $type = (string)($tx['type'] ?? '');

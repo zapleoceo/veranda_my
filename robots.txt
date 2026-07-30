@@ -9,36 +9,11 @@ User-agent: *
 # Все три перечислены в sitemap.xml ниже.
 
 # ─── Админка и операторские интерфейсы ─────────────────────────
-Disallow: /admin
-Disallow: /admin/
 Disallow: /dashboard
 Disallow: /dashboard/
 Disallow: /dashboard.php
-Disallow: /payday
-Disallow: /payday/
-Disallow: /payday3
-Disallow: /payday3/
-Disallow: /kitchen_online
-Disallow: /kitchen_online/
-Disallow: /kitchen_online.php
-Disallow: /rawdata
-Disallow: /rawdata/
-Disallow: /rawdata.php
-Disallow: /zapara
-Disallow: /zapara/
-Disallow: /zapara.php
-Disallow: /schedule
-Disallow: /schedule/
 Disallow: /sepay
 Disallow: /sepay/
-Disallow: /employees
-Disallow: /employees/
-Disallow: /roma
-Disallow: /roma/
-Disallow: /banya
-Disallow: /banya/
-Disallow: /reservations
-Disallow: /reservations/
 Disallow: /neworder
 Disallow: /neworder/
 
@@ -52,7 +27,6 @@ Disallow: /auth_callback.php
 Disallow: /auth_check.php
 Disallow: /analytics.php
 Disallow: /daily_summary.php
-Disallow: /set_tg_webhook.php
 Disallow: /telegram_alerts.php
 Disallow: /telegram_webhook
 Disallow: /telegram_webhook.php
