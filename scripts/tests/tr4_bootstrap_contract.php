@@ -1,6 +1,17 @@
 <?php
 declare(strict_types=1);
 
+// Только из консоли. Каталоги scripts/ и cron/ лежат внутри docroot и
+// отдаются nginx'ом напрямую (проверено: GET /scripts/kitchen/cron.php
+// возвращает 500, то есть файл ИСПОЛНЯЕТСЯ, а не отдаётся как текст).
+// Без этой проверки любой мог по обычной ссылке запустить ресинк Poster,
+// перезапись kitchen_stats, удаление сообщений или рассылку персоналу.
+if (PHP_SAPI !== 'cli') {
+    http_response_code(403);
+    header('Content-Type: text/plain; charset=utf-8');
+    exit("Forbidden: скрипт запускается только из консоли.\n");
+}
+
 $urls = [
     'http://127.0.0.1:8001/tr3/api.php?ajax=bootstrap&lang=ru',
     'https://veranda.my/tr3/api.php?ajax=bootstrap&lang=ru',

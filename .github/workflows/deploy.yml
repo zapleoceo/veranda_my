@@ -9,7 +9,50 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # ── ГЕЙТ: без зелёных тестов деплой не стартует ──────────────────────────
+  # Раньше main уезжал на прод сразу после пуша, а единственной проверкой был
+  # `php -l` трёх файлов уже ПОСЛЕ раскатки — то есть поломку ловили на живом
+  # сайте. Теперь job `deploy` объявлен через `needs: test`: упал тест или
+  # синтаксис — rsync не выполняется вовсе и прод остаётся на прошлой версии.
+  test:
+    name: Тесты (обязательный гейт)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Setup PHP 8.2
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: mbstring, dom, xml, curl, tokenizer, pdo_mysql
+          coverage: none
+          tools: composer:v2
+
+      - name: Cache composer packages
+        uses: actions/cache@v4
+        with:
+          path: vendor
+          key: composer-${{ runner.os }}-php82-${{ hashFiles('composer.lock') }}
+          restore-keys: composer-${{ runner.os }}-php82-
+
+      - name: Install dependencies
+        run: composer install --prefer-dist --no-progress --no-interaction
+
+      - name: PHP syntax check
+        run: |
+          set -euo pipefail
+          find . \
+            -path ./vendor -prune -o \
+            -path ./node_modules -prune -o \
+            -path ./wa_listener/node_modules -prune -o \
+            -name '*.php' -print0 \
+          | xargs -0 -P4 -n1 php -l > /dev/null
+
+      - name: PHPUnit
+        run: vendor/bin/phpunit --testdox --colors=never
+
   deploy:
+    needs: test          # ← прод раскатывается только на зелёных тестах
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6

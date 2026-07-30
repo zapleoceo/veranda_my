@@ -15,6 +15,14 @@ class Database {
         ];
         try {
             $this->pdo = new \PDO($dsn, $user, $pass, $options);
+            // Таймзона сессии = таймзона заведения. Сервер живёт в EEST(+03:00),
+            // MySQL стоит на time_zone=SYSTEM, а приложение считает во вьетнамском
+            // времени — из-за этого NOW()/CURDATE()/DEFAULT CURRENT_TIMESTAMP
+            // расходились с PHP на 4 часа, а до 04:00 по Нячангу CURDATE() отдавал
+            // вчерашнюю дату (ресторан работает за полночь).
+            // Тот же расчёт, что и в App\Infrastructure\Database — держим оба
+            // подключения на одних часах.
+            $this->pdo->exec("SET time_zone = '" . \App\Infrastructure\Database::spotTimeZoneOffset() . "'");
             $suffix = trim((string)$tableSuffix);
             if ($suffix !== '' && !preg_match('/^[a-zA-Z0-9_]+$/', $suffix)) {
                 $suffix = '';

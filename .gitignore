@@ -39,3 +39,13 @@ Thumbs.db
 /wa_listener/qr_state.json
 /wa_listener/node_modules/
 /wa_listener/package-lock.json
+
+# Локальные настройки Claude Code: содержат пути, хосты и иногда учётные
+# данные конкретной машины. В общий репозиторий попадать не должны.
+.claude/settings.local.json
+.claude/settings.local.json.*
+
+# npm-зависимости фронта: libphonenumber грузится с CDN (tr3/index.php),
+# в репозитории эта папка — мёртвый груз (645 файлов, 9.7 МБ) и лишняя
+# поверхность в docroot.
+/node_modules/

@@ -219,9 +219,9 @@ Full/Full Strict; port 443 nginx config redirects to index.html and breaks Slim 
 
 | Secret | Value |
 |--------|-------|
-| `STAGING_SSH_PRIVATE_KEY` | ED25519 key for `veranda_my_usr@5.101.179.132` |
+| `STAGING_SSH_PRIVATE_KEY` | ED25519 key for `veranda_my_usr@<SERVER_IP>` |
 | `STAGING_KNOWN_HOSTS` | server host key fingerprint |
-| `STAGING_SSH_HOST` | `5.101.179.132` |
+| `STAGING_SSH_HOST` | `<SERVER_IP>` |
 | `STAGING_SSH_USER` | `veranda_my_usr` |
 | `STAGING_SSH_PORT` | `22` |
 | `STAGING_DEPLOY_PATH` | `/var/www/veranda_my_usr/data/www/veranda.my/beta` |

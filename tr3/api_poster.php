@@ -141,8 +141,38 @@ function tr3_api_free_tables(array $ctx): void {
   }
 }
 
+/**
+ * Отладочные срезы броней (api_raw / raw / debug) доступны только сотрудникам.
+ *
+ * /tr3/api — ПУБЛИЧНЫЙ роут виджета бронирования (без AuthMiddleware), и это
+ * правильно: гостю нужно видеть свободные слоты. Но флаг api_raw=1 отдавал
+ * сырой ответ incomingOrders.getReservations в обход всех фильтров — проверено
+ * на проде: 293 брони с полями first_name, last_name, phone, email, birthday,
+ * address, comment. То есть клиентская база выгружалась одним GET-запросом без
+ * авторизации. Обычный (не-raw) ответ фильтрует по залу и дню и ПДн не отдаёт —
+ * его не трогаем, чтобы не сломать виджет.
+ *
+ * Сессию поднимаем только когда запрошен отладочный флаг: иначе каждому гостю
+ * виджета выдавался бы cookie сессии.
+ */
+function tr3_debug_access_allowed(): bool {
+  if (session_status() !== PHP_SESSION_ACTIVE) {
+    \App\Infrastructure\Session::start();
+  }
+  return \App\Infrastructure\Permissions::can('reservations')
+      || \App\Infrastructure\Permissions::can('admin');
+}
+
 function tr3_api_reservations(array $ctx): void {
   api_json_headers(true);
+
+  $debugFlagRequested = (string)($_GET['api_raw'] ?? '') === '1'
+    || (string)($_GET['raw'] ?? '') === '1'
+    || (string)($_GET['debug'] ?? '') === '1';
+  if ($debugFlagRequested && !tr3_debug_access_allowed()) {
+    api_send_json(['ok' => false, 'error' => 'Forbidden'], 403);
+    return;
+  }
 
   $posterToken = trim((string)($ctx['posterToken'] ?? ''));
   if ($posterToken === '') api_error(500, 'POSTER_API_TOKEN не задан');

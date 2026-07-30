@@ -15,6 +15,53 @@ if (file_exists(__DIR__ . '/../.env')) {
     }
 }
 
+/**
+ * Аутентификация вебхука.
+ *
+ * До этой проверки эндпоинт принимал что угодно от кого угодно: POST с
+ * произвольным телом вставлял строку в sepay_transactions, а payday3 затем
+ * сверяет эти строки с чеками Poster. То есть посторонний мог «нарисовать»
+ * банковские поступления и исказить финансовую сверку.
+ *
+ * SePay умеет слать заголовок `Authorization: Apikey <ключ>` (настраивается
+ * в их панели, раздел вебхуков). Ключ кладём в .env как SEPAY_WEBHOOK_API_KEY.
+ *
+ * Закрыто по умолчанию: без настроенного ключа эндпоинт не принимает НИЧЕГО.
+ *
+ * Так можно, потому что этот вебхук фактически не используется. Проверено по
+ * данным прода: за всё время 2184 обращения, последнее 2026-05-17 00:25 — то
+ * есть тишина больше двух месяцев. При этом платежи продолжают поступать
+ * (768 строк в sepay_transactions за июль, последняя сегодня): их приносит
+ * опрос API через SepaySyncService по SEPAY_API_TOKEN. Отказ здесь ничего не
+ * ломает, а дыру закрывает сразу.
+ *
+ * Если вебхук решат вернуть: задать один и тот же ключ в двух местах —
+ * SEPAY_WEBHOOK_API_KEY в .env и поле API Key в панели SePay (настройки
+ * вебхука). SePay пришлёт его заголовком `Authorization: Apikey <ключ>`.
+ */
+$sepayApiKey = trim((string)($_ENV['SEPAY_WEBHOOK_API_KEY'] ?? ''));
+$authHeader  = (string)($_SERVER['HTTP_AUTHORIZATION'] ?? $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ?? '');
+$sepayAuthMode = $sepayApiKey === '' ? 'closed_no_key' : 'enforced';
+
+if ($sepayApiKey === '') {
+    http_response_code(503);
+    echo json_encode([
+        'success' => false,
+        'error'   => 'webhook disabled: SEPAY_WEBHOOK_API_KEY is not configured',
+    ], JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
+$presented = '';
+if (preg_match('/^\s*(?:Apikey|ApiKey|Bearer)\s+(.+)$/i', $authHeader, $m)) {
+    $presented = trim($m[1]);
+}
+if ($presented === '' || !hash_equals($sepayApiKey, $presented)) {
+    http_response_code(401);
+    echo json_encode(['success' => false, 'error' => 'unauthorized'], JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
 $dbHost = $_ENV['DB_HOST'] ?? 'localhost';
 $dbName = $_ENV['DB_NAME'] ?? 'veranda_my';
 $dbUser = $_ENV['DB_USER'] ?? 'veranda_my';
@@ -55,6 +102,13 @@ try {
             "INSERT INTO {$meta} (meta_key, meta_value) VALUES (?, ?)
              ON DUPLICATE KEY UPDATE meta_value = VALUES(meta_value)",
             ['sepay_webhook_last_ip', $remoteIp]
+        );
+        // Режим аутентификации виден в payday3: пока здесь 'disabled',
+        // эндпоинт принимает поступления от кого угодно.
+        $db->query(
+            "INSERT INTO {$meta} (meta_key, meta_value) VALUES (?, ?)
+             ON DUPLICATE KEY UPDATE meta_value = VALUES(meta_value)",
+            ['sepay_webhook_auth_mode', $sepayAuthMode]
         );
         $db->query(
             "INSERT INTO {$meta} (meta_key, meta_value) VALUES (?, ?)

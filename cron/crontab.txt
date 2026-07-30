@@ -1,4 +1,4 @@
-# crontab for veranda_my_usr@5.101.179.132
+# crontab for veranda_my_usr@<SERVER_IP>
 #
 # Source of truth. Apply via `crontab cron/crontab.txt` on the server (back up
 # the current crontab first: `crontab -l > ~/crontab.bak.$(date +%Y%m%d_%H%M%S)`).

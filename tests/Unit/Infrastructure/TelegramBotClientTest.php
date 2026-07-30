@@ -75,11 +75,35 @@ class TelegramBotClientTest extends TestCase
         $this->assertTrue($this->bot->deleteMessage(42));
     }
 
-    public function test_chat_id_normalizes_plain_number(): void
+    /**
+     * Положительный chat_id — это ЛИЧНЫЙ чат (user id), и он должен уходить
+     * в Telegram как есть.
+     *
+     * Тест раньше требовал обратного: что 1234567890 превратится в
+     * -1001234567890. Такое «дополнение до супергруппы» в коде было и его
+     * намеренно убрали — оно ломало каждый ответ в личку (user id 169510539
+     * становился -100169510539 → «Bad Request: chat not found»). Тест остался
+     * от старого поведения и с тех пор просто падал, поэтому фиксируем
+     * фактический контракт: caller передаёт канонический id, клиент его не
+     * переизобретает.
+     */
+    public function test_positive_chat_id_is_passed_through_for_private_chats(): void
     {
-        // plain number 1234567890 → -1001234567890
         $bot = new TelegramBotClient('tok', $this->http, '1234567890');
-        // verify via sendMessage — chat_id in params
+        $this->http->expects($this->once())
+            ->method('postJson')
+            ->with($this->anything(), $this->callback(function (array $params): bool {
+                return $params['chat_id'] === '1234567890';
+            }))
+            ->willReturn(['ok' => true]);
+
+        $bot->sendMessage('test');
+    }
+
+    /** Пробелы по краям срезаются — единственная нормализация, которая осталась. */
+    public function test_chat_id_is_trimmed(): void
+    {
+        $bot = new TelegramBotClient('tok', $this->http, "  -1001234567890\n");
         $this->http->expects($this->once())
             ->method('postJson')
             ->with($this->anything(), $this->callback(function (array $params): bool {

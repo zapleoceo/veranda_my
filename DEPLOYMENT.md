@@ -30,7 +30,7 @@ chmod 600 ~/.ssh/authorized_keys
 
 Нужные секреты для workflow:
 
-- `SSH_HOST`: IP/домен сервера (например `5.101.179.132` или `veranda.my`)
+- `SSH_HOST`: IP/домен сервера (например `<SERVER_IP>` или `veranda.my`)
 - `SSH_PORT`: `22`
 - `SSH_USER`: `veranda_my_usr`
 - `DEPLOY_PATH`: `/var/www/veranda_my_usr/data/www/veranda.my`
@@ -117,15 +117,15 @@ Baileys и выставляет локальный HTTP-эндпойнт `127.0.
 **Healthcheck:**
 
 ```bash
-ssh veranda_my_usr@5.101.179.132 "curl -sS http://127.0.0.1:3210/healthz"
+ssh veranda_my_usr@<SERVER_IP> "curl -sS http://127.0.0.1:3210/healthz"
 # {"ok":true,"connected":true,"version":"1.0.0"}
-ssh veranda_my_usr@5.101.179.132 "pm2 list"
+ssh veranda_my_usr@<SERVER_IP> "pm2 list"
 ```
 
 **Перезапустить вручную:**
 
 ```bash
-ssh veranda_my_usr@5.101.179.132 "pm2 restart all"
+ssh veranda_my_usr@<SERVER_IP> "pm2 restart all"
 # или полный цикл через systemd (требует root):
 sudo systemctl restart pm2-veranda_my_usr
 ```
@@ -137,7 +137,7 @@ sudo systemctl restart pm2-veranda_my_usr
 
 ```bash
 # 1) Скопировать юнит на сервер
-scp cron/pm2-veranda_my_usr.service root@5.101.179.132:/etc/systemd/system/
+scp cron/pm2-veranda_my_usr.service root@<SERVER_IP>:/etc/systemd/system/
 
 # 2) Включить и запустить
 sudo systemctl daemon-reload

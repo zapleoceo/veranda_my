@@ -1,5 +1,18 @@
 <?php
 
+// Только из консоли. Файл лежит в корне docroot и отдавался по HTTP
+// (HEAD /daily_summary.php → 200), а обычный GET запускал весь дневной
+// отчёт: exec('pm2 jlist'), чтение cron.log/telegram.log/menu_sync.log и
+// отправку выдержек из них в Telegram. То есть любой мог и спамить группу,
+// и вытягивать содержимое серверных логов.
+// Вызывается из crontab (0 3 * * *) и через шим scripts/kitchen/daily_summary.php,
+// оба запускают PHP из консоли — им guard не мешает.
+if (PHP_SAPI !== 'cli') {
+    http_response_code(403);
+    header('Content-Type: text/plain; charset=utf-8');
+    exit("Forbidden: скрипт запускается только из консоли.\n");
+}
+
 require_once __DIR__ . '/src/classes/Database.php';
 
 $logPath = __DIR__ . '/daily_summary.log';

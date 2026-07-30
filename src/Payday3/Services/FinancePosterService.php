@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Payday3\Services;
 
+use App\Infrastructure\Logger;
 use App\Payday3\Contracts\FinanceServiceInterface;
 use App\Payday3\Contracts\LocalSettingsRepositoryInterface;
 use App\Payday3\Contracts\PosterApiProviderInterface;
@@ -30,17 +31,37 @@ final class FinancePosterService implements FinanceServiceInterface
         $cfg = $this->settings->load();
 
         $rows = [];
-        foreach ([$cfg->accountAndreyId, $cfg->accountTipsId] as $accType) {
+        // account_id, а НЕ account_type: в настройках лежат идентификаторы
+        // счетов (1 = «Счет Андрея», 8 = «Tips»), а account_type принимает
+        // только 1|2|3 (банк / карта / наличные).
+        //
+        // Что было: id подставлялся в account_type. Для счёта Андрея (1) это
+        // случайно «работало» — тип 1 возвращает ВСЕ банковские счета разом,
+        // включая Tips, поэтому чаевые попадали в выборку побочным эффектом.
+        // Второй вызов с account_type=8 всегда падал с ошибкой 216 и молча
+        // глотался catch'ем. Данные сходились только по совпадению: смени
+        // счёт Андрея на счёт другого типа — и чаевые исчезли бы без следа.
+        //
+        // Проверено на проде (июль): account_type=1 → 312 строк (счета 1 и 8),
+        // account_id=1 → 266, account_id=8 → 46. 266 + 46 = 312, то есть
+        // выборка не меняется, но перестаёт зависеть от типа счёта и не
+        // затягивает чужие счета того же типа.
+        foreach ([$cfg->accountAndreyId, $cfg->accountTipsId] as $accountId) {
+            if ((int) $accountId <= 0) continue;
             try {
                 $batch = $api->request('finance.getTransactions', [
-                    'dateFrom'     => date('Ymd', strtotime($range->from)),
-                    'dateTo'       => date('Ymd', strtotime($range->to)),
-                    'account_type' => $accType,
-                    'timezone'     => 'client',
+                    'dateFrom'   => date('Ymd', strtotime($range->from)),
+                    'dateTo'     => date('Ymd', strtotime($range->to)),
+                    'account_id' => (int) $accountId,
+                    'timezone'   => 'client',
                 ]);
                 if (is_array($batch)) $rows = array_merge($rows, $batch);
             } catch (\Throwable $e) {
-                // Skip this account; other one might still return data.
+                // Один счёт мог не ответить — второй всё ещё может дать данные.
+                Logger::get()->warning('payday3.finance_fetch_failed', [
+                    'account_id' => (int) $accountId,
+                    'error'      => $e->getMessage(),
+                ]);
             }
         }
 

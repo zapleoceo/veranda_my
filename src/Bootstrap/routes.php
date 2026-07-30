@@ -76,6 +76,7 @@ use App\Controllers\MenuPublicController;
 use App\Controllers\Tr3Controller;
 use App\Controllers\ReservationsController;
 use App\Middleware\AuthMiddleware;
+use App\Middleware\RequirePermission;
 use App\Middleware\WebhookSecretMiddleware;
 use Slim\App;
 use Slim\Routing\RouteCollectorProxy;
@@ -130,16 +131,40 @@ $app->map(['GET', 'POST'], '/telegram_webhook.php', [WebhookController::class, '
 // same controller.
 $app->get('/admin/', [DashboardController::class, 'index'])
     ->add(AuthMiddleware::class);
+// Права на страницы админки. До этого вся группа была закрыта ТОЛЬКО
+// AuthMiddleware (=любой залогиненный сотрудник), а проверка прав была лишь
+// в одном контроллере из восьми — BloggersController. В проде это означало,
+// что все 8 обычных сотрудников имели доступ к запуску скриптов (/admin/sync),
+// чтению логов и настройкам Telegram-бота.
+//
+// Ключ выбираем по смыслу страницы, а не «admin на всё подряд»:
+//   • sync / telegram / menu / logs — чисто административные операции;
+//   • reservations — рабочий инструмент, у него есть свой ключ `reservations`;
+//   • bloggers — гейт уже стоит внутри контроллера;
+//   • access — гейт внутри контроллера (там же правится выдача прав).
+//
+// Дашборд намеренно БЕЗ гейта: это страница приземления после логина
+// (CallbackController: $next = '/admin'), а права `dashboard` в проде нет у
+// 5 сотрудников из 10. Гейт здесь означал бы 403 сразу после входа для
+// половины персонала — при том, что сама страница лишь показывает сводку,
+// а опасные действия закрыты выше. Ссылки, на которые прав нет, сайдбар и
+// так не показывает.
 $app->group('/admin', function (RouteCollectorProxy $group) {
     $group->get('', [DashboardController::class, 'index']);
-    $group->map(['GET', 'POST'], '/sync', [SyncController::class, 'index']);
-    $group->post('/sync/start', [SyncController::class, 'start']);
-    $group->map(['GET', 'POST'], '/telegram', [TelegramAdminController::class, 'index']);
-    $group->map(['GET', 'POST'], '/menu', [MenuController::class, 'index']);
+    $group->map(['GET', 'POST'], '/sync', [SyncController::class, 'index'])
+        ->add(RequirePermission::for('admin'));
+    $group->post('/sync/start', [SyncController::class, 'start'])
+        ->add(RequirePermission::for('admin'));
+    $group->map(['GET', 'POST'], '/telegram', [TelegramAdminController::class, 'index'])
+        ->add(RequirePermission::for('admin'));
+    $group->map(['GET', 'POST'], '/menu', [MenuController::class, 'index'])
+        ->add(RequirePermission::for('admin'));
     $group->map(['GET', 'POST'], '/access', [AccessController::class, 'index']);
     $group->map(['GET', 'POST'], '/bloggers', [BloggersController::class, 'index']);
-    $group->map(['GET', 'POST'], '/reservations', [ReservationsAdminController::class, 'index']);
-    $group->map(['GET', 'POST'], '/logs', [LogsController::class, 'index']);
+    $group->map(['GET', 'POST'], '/reservations', [ReservationsAdminController::class, 'index'])
+        ->add(RequirePermission::for('reservations'));
+    $group->map(['GET', 'POST'], '/logs', [LogsController::class, 'index'])
+        ->add(RequirePermission::for('admin'));
 })->add(AuthMiddleware::class);
 
 // Phase 4: staff-facing modules (auth-protected). Patterns accept the
@@ -271,7 +296,16 @@ $app->group('/payday3', function (RouteCollectorProxy $g) {
         $api->get(   '/finance/transfers',                           FinanceTransfersAction::class);
         $api->post(  '/finance/transfers/create',                    \App\Payday3\Http\Actions\FinanceTransferCreateAction::class);
     });
-})->add(AuthMiddleware::class);
+})
+    // Право `payday` проверялось ТОЛЬКО при рендере страницы, а все 38
+    // эндпоинтов /payday3/api/* оставались открытыми любому залогиненному
+    // сотруднику — включая POST /api/poster/finance/transactions, который
+    // создаёт реальную проводку в Poster, и /day/clear. Гейт на всю группу
+    // закрывает их разом и не даст забыть проверку в новом action'е.
+    // Легитимного доступа никто не теряет: страница payday3 и так требует
+    // это право, то есть все её пользователи им уже обладают.
+    ->add(RequirePermission::for('payday'))
+    ->add(AuthMiddleware::class);
 
 // /neworder — operator-facing order page (live Poster menu, create
 // new order or append to an open check). Public (no auth yet) but

@@ -28,10 +28,28 @@ class KitchenSyncService
         private readonly \DateTimeZone    $spotTz,
     ) {}
 
+    /** Синхронизация за сегодня (вызывается кроном каждые 5 минут). */
     public function run(): void
     {
+        $this->runForDate(date('Y-m-d'));
+    }
+
+    /**
+     * Полный цикл синхронизации за конкретную дату.
+     *
+     * Публичный, чтобы пересинк диапазона (scripts/kitchen/resync_range.php)
+     * гонял РОВНО ту же логику, что и ночной крон. Раньше шаги были скопированы
+     * в скрипты, и копии успели разъехаться: сервис возвращал ключ 'hookah',
+     * скрипты — 'set_hookah'; сервис брал HOOKAH_CATEGORY_ID, скрипты хардкодили
+     * 47. Хуже того, в копиях не было шага _reconcileOpenStatus, поэтому ручной
+     * пересинк оставлял чеки в status=1, и авто-исключения их не ретайрили —
+     * то есть цифры после пересинка отличались от цифр после крона.
+     *
+     * @param string $date YYYY-MM-DD
+     */
+    public function runForDate(string $date): void
+    {
         $startedAt = microtime(true);
-        $date      = date('Y-m-d');
 
         $synced  = $this->_syncStats($date);
         $reconciled = $this->_reconcileOpenStatus($date);
