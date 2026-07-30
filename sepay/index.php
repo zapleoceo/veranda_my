@@ -26,29 +26,40 @@ if (file_exists(__DIR__ . '/../.env')) {
  * SePay умеет слать заголовок `Authorization: Apikey <ключ>` (настраивается
  * в их панели, раздел вебхуков). Ключ кладём в .env как SEPAY_WEBHOOK_API_KEY.
  *
- * Пока ключ не настроен, запрос НЕ отклоняем — иначе оплаты перестанут
- * записываться в тот же миг, как это выедет на прод. Вместо этого поднимаем
- * заметный флаг в system_meta (виден в payday3) и пишем в лог. Как только
- * ключ появится в .env и в панели SePay — эндпоинт станет fail-closed.
+ * Закрыто по умолчанию: без настроенного ключа эндпоинт не принимает НИЧЕГО.
+ *
+ * Так можно, потому что этот вебхук фактически не используется. Проверено по
+ * данным прода: за всё время 2184 обращения, последнее 2026-05-17 00:25 — то
+ * есть тишина больше двух месяцев. При этом платежи продолжают поступать
+ * (768 строк в sepay_transactions за июль, последняя сегодня): их приносит
+ * опрос API через SepaySyncService по SEPAY_API_TOKEN. Отказ здесь ничего не
+ * ломает, а дыру закрывает сразу.
+ *
+ * Если вебхук решат вернуть: задать один и тот же ключ в двух местах —
+ * SEPAY_WEBHOOK_API_KEY в .env и поле API Key в панели SePay (настройки
+ * вебхука). SePay пришлёт его заголовком `Authorization: Apikey <ключ>`.
  */
 $sepayApiKey = trim((string)($_ENV['SEPAY_WEBHOOK_API_KEY'] ?? ''));
 $authHeader  = (string)($_SERVER['HTTP_AUTHORIZATION'] ?? $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ?? '');
-$sepayAuthOk = true;
-$sepayAuthMode = 'disabled';
+$sepayAuthMode = $sepayApiKey === '' ? 'closed_no_key' : 'enforced';
 
-if ($sepayApiKey !== '') {
-    $sepayAuthMode = 'enforced';
-    $presented = '';
-    if (preg_match('/^\s*(?:Apikey|ApiKey|Bearer)\s+(.+)$/i', $authHeader, $m)) {
-        $presented = trim($m[1]);
-    }
-    $sepayAuthOk = $presented !== '' && hash_equals($sepayApiKey, $presented);
+if ($sepayApiKey === '') {
+    http_response_code(503);
+    echo json_encode([
+        'success' => false,
+        'error'   => 'webhook disabled: SEPAY_WEBHOOK_API_KEY is not configured',
+    ], JSON_UNESCAPED_UNICODE);
+    exit;
+}
 
-    if (!$sepayAuthOk) {
-        http_response_code(401);
-        echo json_encode(['success' => false, 'error' => 'unauthorized'], JSON_UNESCAPED_UNICODE);
-        exit;
-    }
+$presented = '';
+if (preg_match('/^\s*(?:Apikey|ApiKey|Bearer)\s+(.+)$/i', $authHeader, $m)) {
+    $presented = trim($m[1]);
+}
+if ($presented === '' || !hash_equals($sepayApiKey, $presented)) {
+    http_response_code(401);
+    echo json_encode(['success' => false, 'error' => 'unauthorized'], JSON_UNESCAPED_UNICODE);
+    exit;
 }
 
 $dbHost = $_ENV['DB_HOST'] ?? 'localhost';
