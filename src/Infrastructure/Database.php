@@ -35,8 +35,39 @@ class Database
             throw new \RuntimeException('Database connection failed: ' . $e->getMessage());
         }
 
+        $this->pdo->exec("SET time_zone = '" . self::spotTimeZoneOffset() . "'");
+
         $suffix = trim($suffix);
         $this->tableSuffix = preg_match('/^[a-zA-Z0-9_]*$/', $suffix) ? $suffix : '';
+    }
+
+    /**
+     * Смещение таймзоны заведения для сессии MySQL.
+     *
+     * Зачем: сервер живёт в EEST (+03:00), MySQL настроен на time_zone=SYSTEM,
+     * а приложение работает во вьетнамском времени (+07:00). До этой правки
+     * NOW(), CURDATE() и колонки DEFAULT CURRENT_TIMESTAMP писались в киевском
+     * времени, то есть на 4 часа позади того, что в те же таблицы кладёт PHP
+     * через date('Y-m-d H:i:s'). Самое неприятное следствие — CURDATE() до
+     * 04:00 по Нячангу возвращал ВЧЕРАШНюю дату, а ресторан работает за
+     * полночь.
+     *
+     * Берём числовое смещение, а не 'Asia/Ho_Chi_Minh': именованные зоны
+     * требуют загруженных таблиц mysql.time_zone_name, которых на хостинге
+     * обычно нет. Вьетнам не переходит на летнее время, поэтому фиксированный
+     * +07:00 эквивалентен named-зоне круглый год.
+     */
+    public static function spotTimeZoneOffset(): string
+    {
+        $tzName = trim(Config::get('POSTER_SPOT_TIMEZONE', 'Asia/Ho_Chi_Minh')) ?: 'Asia/Ho_Chi_Minh';
+        try {
+            $offsetSeconds = (new \DateTimeZone($tzName))->getOffset(new \DateTimeImmutable('now', new \DateTimeZone('UTC')));
+        } catch (\Throwable) {
+            $offsetSeconds = 7 * 3600;
+        }
+        $sign    = $offsetSeconds < 0 ? '-' : '+';
+        $abs     = abs($offsetSeconds);
+        return sprintf('%s%02d:%02d', $sign, intdiv($abs, 3600), intdiv($abs % 3600, 60));
     }
 
     public static function getInstance(): self
