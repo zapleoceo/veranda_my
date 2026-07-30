@@ -2,6 +2,17 @@
 
 declare(strict_types=1);
 
+// Только из консоли. Каталоги scripts/ и cron/ лежат внутри docroot и
+// отдаются nginx'ом напрямую (проверено: GET /scripts/kitchen/cron.php
+// возвращает 500, то есть файл ИСПОЛНЯЕТСЯ, а не отдаётся как текст).
+// Без этой проверки любой мог по обычной ссылке запустить ресинк Poster,
+// перезапись kitchen_stats, удаление сообщений или рассылку персоналу.
+if (PHP_SAPI !== 'cli') {
+    http_response_code(403);
+    header('Content-Type: text/plain; charset=utf-8');
+    exit("Forbidden: скрипт запускается только из консоли.\n");
+}
+
 /**
  * RESCUE-ONLY one-shot maintenance script. НЕ ставить в cron.
  *
@@ -12,18 +23,21 @@ declare(strict_types=1);
  *
  * Этот скрипт оставлен как аварийный инструмент:
  *   - после прошлого периода когда баг ещё жил — вычистить накопившееся
- *   - если случится поломка синхронизации kitchen_stats и в Telegram
+ *   - если случится поломка син�
+ронизации kitchen_stats и в Telegram
  *     зависнут сообщения с битыми привязками
  *
  * Sources of orphans, которые он подметает:
  *   1. tg_alert_items с transaction_date < today — оставшиеся от
- *      старой логики, в которой main cron их не видел.
+ *      старой логики, в которой main cron и�
+ не видел.
  *   2. kitchen_stats.tg_message_id без соответствующей tg_alert_items
  *      строки И сама kitchen_stats row уже не «active» (status>1,
  *      ready_pressed_at, excluded, deleted).
  *
  * Telegram constraint: бот должен быть админом группы с правом
- * delete_messages — иначе 48h окно режет удаление старых сообщений.
+ * delete_messages — иначе 48h окно режет удаление стары�
+ сообщений.
  * У нас бот всегда админ, поэтому проблемы нет.
  *
  * Usage:

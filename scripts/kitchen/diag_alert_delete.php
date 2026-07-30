@@ -2,6 +2,17 @@
 
 declare(strict_types=1);
 
+// Только из консоли. Каталоги scripts/ и cron/ лежат внутри docroot и
+// отдаются nginx'ом напрямую (проверено: GET /scripts/kitchen/cron.php
+// возвращает 500, то есть файл ИСПОЛНЯЕТСЯ, а не отдаётся как текст).
+// Без этой проверки любой мог по обычной ссылке запустить ресинк Poster,
+// перезапись kitchen_stats, удаление сообщений или рассылку персоналу.
+if (PHP_SAPI !== 'cli') {
+    http_response_code(403);
+    header('Content-Type: text/plain; charset=utf-8');
+    exit("Forbidden: скрипт запускается только из консоли.\n");
+}
+
 /**
  * Диагностика: почему cleanup_orphan_alerts.php репортит 750 still-orphan.
  *
@@ -97,13 +108,16 @@ echo "\n=== diagnosis ===\n";
 $desc = (string) ($delResp['description'] ?? '');
 $code = (int) ($delResp['error_code'] ?? 0);
 if (!empty($delResp['ok'])) {
-    echo "OK — Telegram согласился удалить. Cleanup-скрипт ДОЛЖЕН был его удалить раньше — расхождение, проверяйте логи.\n";
+    echo "OK — Telegram согласился удалить. Cleanup-скрипт ДОЛЖЕН был его удалить раньше — рас�
+ождение, проверяйте логи.\n";
 } elseif (stripos($desc, 'not enough rights') !== false) {
     echo "ROOT CAUSE: у бота нет permission `can_delete_messages` в этой группе.\n";
-    echo "Это даже если бот формально admin — отдельная галка в правах админа.\n";
+    echo "Это даже если бот формально admin — отдельная галка в права�
+ админа.\n";
     echo "Действие: в группе → менеджмент → администраторы → найти бота → включить «Delete messages».\n";
 } elseif (stripos($desc, 'chat not found') !== false) {
-    echo "ROOT CAUSE: chat_id {$chatId} не найден этим ботом (бот не в этой группе ИЛИ id протух).\n";
+    echo "ROOT CAUSE: chat_id {$chatId} не найден этим ботом (бот не в этой группе ИЛИ id проту�
+).\n";
 } elseif (stripos($desc, 'message to delete not found') !== false) {
     echo "ROOT CAUSE: сообщение msg_id={$msgId} в группе {$chatId} уже не существует (удалено руками или из другой группы).\n";
     echo "Тогда строки в tg_alert_items валидно дропнуть БЕЗ API-вызова. Не критично, но cleanup можно делать тише.\n";

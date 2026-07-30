@@ -1,5 +1,16 @@
 <?php
 
+// Только из консоли. Каталоги scripts/ и cron/ лежат внутри docroot и
+// отдаются nginx'ом напрямую (проверено: GET /scripts/kitchen/cron.php
+// возвращает 500, то есть файл ИСПОЛНЯЕТСЯ, а не отдаётся как текст).
+// Без этой проверки любой мог по обычной ссылке запустить ресинк Poster,
+// перезапись kitchen_stats, удаление сообщений или рассылку персоналу.
+if (PHP_SAPI !== 'cli') {
+    http_response_code(403);
+    header('Content-Type: text/plain; charset=utf-8');
+    exit("Forbidden: скрипт запускается только из консоли.\n");
+}
+
 $maxGap = 1800;
 $dumpUnmapped = 0;
 foreach ($argv as $a) {
@@ -44,7 +55,8 @@ function section(string $p): string {
         preg_match('#^scripts/menu/#', $p)
     ) return 'Онлайн-меню';
 
-    if (preg_match('#^kitchen_online\.php$|^assets/js/kitchen_online\.js$|^assets/css/kitchen_online\.css$#', $p)) return 'КухняОнлайн';
+    if (preg_match('#^kitchen_online\.php$|^assets/js/kitchen_online\.js$|^assets/css/kitchen_online\.css$#', $p)) return 'Ку�
+няОнлайн';
     if (preg_match('#^dashboard\.php$|^assets/css/dashboard\.css$#', $p)) return 'Дашборд';
     if (preg_match('#^rawdata\.php$|^rawdata_receipts_chunk\.php$|^assets/css/rawdata\.css$#', $p)) return 'Rawdata';
     if (preg_match('#^errors\.php$|^assets/css/errors\.css$#', $p)) return 'Cooked (errors)';
@@ -170,8 +182,10 @@ arsort($totals);
 
 echo "### Времязатраты по Git (оценка)\n";
 echo "- Правило: считаем только интервалы между соседними коммитами <= " . (int)floor($maxGap / 60) . " минут\n";
-echo "- Интервал относится к следующему коммиту и распределяется по разделам пропорционально числу изменённых файлов\n";
-echo "- Учтённых интервалов: " . (int)$intervals . "\n";
+echo "- Интервал относится к следующему коммиту и распределяется по разделам пропорционально числу изменённы�
+ файлов\n";
+echo "- Учтённы�
+ интервалов: " . (int)$intervals . "\n";
 echo "- Итого эффективного времени: " . fmt((float)$total) . "\n\n";
 echo "| Раздел | Время |\n";
 echo "|---|---:|\n";
