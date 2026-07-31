@@ -20,9 +20,19 @@ class Database {
             // времени — из-за этого NOW()/CURDATE()/DEFAULT CURRENT_TIMESTAMP
             // расходились с PHP на 4 часа, а до 04:00 по Нячангу CURDATE() отдавал
             // вчерашнюю дату (ресторан работает за полночь).
-            // Тот же расчёт, что и в App\Infrastructure\Database — держим оба
-            // подключения на одних часах.
-            $this->pdo->exec("SET time_zone = '" . \App\Infrastructure\Database::spotTimeZoneOffset() . "'");
+            // Смещение считаем ЗДЕСЬ, а не через App\Infrastructure\Database.
+            //
+            // Этот класс подключают 12 автономных точек входа обычным
+            // require_once, БЕЗ composer-автозагрузчика (крон меню, напоминание
+            // о бронях, ko_fill, auth_check, tr3/api_context и др.). Ссылка на
+            // класс из другого неймспейса там падала с «Class not found» уже
+            // после успешного подключения к БД — и наружу это выглядело как
+            // «ошибка БД». Так сломалось утреннее напоминание о бронях.
+            //
+            // Небольшое дублирование с App\Infrastructure\Database::
+            // spotTimeZoneOffset() здесь осознанное: цена независимости
+            // легаси-класса от автозагрузчика.
+            $this->pdo->exec("SET time_zone = '" . self::spotTimeZoneOffset() . "'");
             $suffix = trim((string)$tableSuffix);
             if ($suffix !== '' && !preg_match('/^[a-zA-Z0-9_]+$/', $suffix)) {
                 $suffix = '';
@@ -31,6 +41,27 @@ class Database {
         } catch (\PDOException $e) {
             throw new \Exception("Database Connection Error: " . $e->getMessage());
         }
+    }
+
+    /**
+     * Смещение таймзоны заведения для сессии MySQL, например «+07:00».
+     *
+     * Самодостаточно: никаких зависимостей от автозагрузчика и Config —
+     * читаем POSTER_SPOT_TIMEZONE прямо из $_ENV (его наполняют и Config::load,
+     * и самописные загрузчики .env в легаси-скриптах), иначе Нячанг.
+     * Числовое смещение, а не именованная зона: таблицы mysql.time_zone_name
+     * на хостинге не загружены. Вьетнам без летнего времени.
+     */
+    public static function spotTimeZoneOffset(): string {
+        $tzName = trim((string)($_ENV['POSTER_SPOT_TIMEZONE'] ?? '')) ?: 'Asia/Ho_Chi_Minh';
+        try {
+            $offset = (new \DateTimeZone($tzName))->getOffset(new \DateTimeImmutable('now', new \DateTimeZone('UTC')));
+        } catch (\Throwable $e) {
+            $offset = 7 * 3600;
+        }
+        $sign = $offset < 0 ? '-' : '+';
+        $abs  = abs($offset);
+        return sprintf('%s%02d:%02d', $sign, intdiv($abs, 3600), intdiv($abs % 3600, 60));
     }
 
     public function query(string $sql, array $params = []) {
