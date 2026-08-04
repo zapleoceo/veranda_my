@@ -118,7 +118,7 @@ $linkDefs = [
     'phone' => ['href' => 'tel:+84396314266', 'icon' => 'phone'],
     'menu' => ['href' => '/links/menu.php', 'icon' => 'menu'],
     'reserve' => ['href' => '/tr3', 'icon' => 'reserve'],
-    'director' => ['href' => 'https://t.me/zapleo_ceo', 'icon' => 'director'],
+    'director' => ['href' => 'https://t.me/zapleosoft', 'icon' => 'director'],
     'instagram' => ['href' => 'https://www.instagram.com/veranda.my/', 'icon' => 'instagram'],
     'facebook' => ['href' => 'https://www.facebook.com/share/1LSPvAR8X7/', 'icon' => 'facebook'],
     'map' => ['href' => 'https://maps.app.goo.gl/wM9MMAGJjxUppDgR9', 'icon' => 'map'],
