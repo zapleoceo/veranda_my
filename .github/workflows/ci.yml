@@ -57,5 +57,10 @@ jobs:
             -name '*.php' -print0 \
           | xargs -0 -P4 -n1 php -l > /dev/null
 
+      - name: Node syntax check (wa_listener)
+        run: |
+          set -euo pipefail
+          find wa_listener -path "*/node_modules" -prune -o -name "*.js" -print0 \n          | xargs -0 -n1 node --check
+
       - name: PHPUnit
         run: vendor/bin/phpunit --testdox --colors=never

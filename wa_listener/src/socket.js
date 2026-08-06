@@ -30,6 +30,32 @@ let sock = null;
 let isConnected = false;
 let connectingInProgress = false;
 
+// ─── Подавление шума от кратковременных разрывов ────────────────────────────
+//
+// Baileys рвёт и поднимает соединение по несколько раз в сутки (code=428/503),
+// восстанавливаясь за 3-5 секунд. Раньше каждый такой чих давал ДВА сообщения
+// в Telegram — «disconnected» и «reconnected» — и оператор привыкал их
+// пролистывать, а значит пропустил бы настоящую аварию.
+//
+// Логика теперь такая:
+//   • разрыв   → молчим и заводим таймер;
+//   • вернулось за OUTAGE_ALERT_AFTER_MS → таймер снимаем, не пишем ничего;
+//   • не вернулось → пишем «лежит N секунд» — вот это реальная проблема;
+//   • после реального алерта пишем и о восстановлении (иначе непонятно, чем
+//     кончилось);
+//   • если рвётся часто, но каждый раз поднимается — одно сообщение о
+//     нестабильности, не чаще раза в час.
+const OUTAGE_ALERT_AFTER_MS  = Number(process.env.WA_OUTAGE_ALERT_AFTER_MS || 90_000);
+const FLAP_WINDOW_MS         = Number(process.env.WA_FLAP_WINDOW_MS || 3_600_000);
+const FLAP_THRESHOLD         = Number(process.env.WA_FLAP_THRESHOLD || 5);
+const FLAP_ALERT_COOLDOWN_MS = Number(process.env.WA_FLAP_COOLDOWN_MS || 3_600_000);
+
+let outageTimer     = null;  // таймер отложенного алерта
+let outageStartedAt = 0;     // когда упало
+let outageAlerted   = false; // сообщили ли уже об аварии
+let disconnectTimes = [];    // отметки разрывов для детекта «дёргается»
+let lastFlapAlertAt = 0;
+
 async function startSock() {
   if (connectingInProgress) return;
   connectingInProgress = true;
@@ -88,11 +114,39 @@ async function startSock() {
             'session logged out by WhatsApp — auth wiped, ждём новый QR'
           );
         } else if (wasUp) {
-          // Only notify on real disconnects, not the boot-time "close" that
-          // happens during the first connection attempt.
-          await sendStatusToTelegram(
-            `disconnected (code=${code}${reason ? ', ' + reason : ''}), реконнект через 3с`
-          );
+          // НЕ пишем сразу. Сообщение уйдёт только если связь не вернётся
+          // за OUTAGE_ALERT_AFTER_MS — тогда это уже не «чих», а авария.
+          const now = Date.now();
+
+          if (outageTimer === null) {
+            outageStartedAt = now;
+            outageTimer = setTimeout(async () => {
+              outageAlerted = true;
+              outageTimer = null;
+              const downSec = Math.round((Date.now() - outageStartedAt) / 1000);
+              await sendErrorToTelegram(
+                `WA не поднимается уже ${downSec}с (code=${code}${reason ? ', ' + reason : ''})`
+              );
+            }, OUTAGE_ALERT_AFTER_MS);
+            if (typeof outageTimer.unref === 'function') outageTimer.unref();
+          }
+
+          // Отдельный сигнал: соединение возвращается, но рвётся подозрительно
+          // часто. Само по себе каждое падение безобидно, а вот их частота —
+          // уже симптом (сеть, лимиты WhatsApp, память).
+          disconnectTimes.push(now);
+          disconnectTimes = disconnectTimes.filter((t) => now - t <= FLAP_WINDOW_MS);
+          if (
+            disconnectTimes.length >= FLAP_THRESHOLD &&
+            now - lastFlapAlertAt >= FLAP_ALERT_COOLDOWN_MS
+          ) {
+            lastFlapAlertAt = now;
+            const mins = Math.round(FLAP_WINDOW_MS / 60000);
+            await sendErrorToTelegram(
+              `WA нестабилен: ${disconnectTimes.length} разрывов за ${mins} мин ` +
+              `(каждый раз поднимался, последний code=${code})`
+            );
+          }
         }
         setTimeout(startSock, 3000);
       } else if (connection === 'open') {
@@ -102,11 +156,24 @@ async function startSock() {
         connectingInProgress = false;
         console.log('[wa] Connected');
         await clearQrMessage();
-        // Ping operator on every connection. Sends `connected ✅` on first
-        // boot (so a restart after deploy shows up), `reconnected ✅` after
-        // a real reconnect. 60s dedup in sendStatusToTelegram swallows the
-        // case where Baileys flaps multiple times in quick succession.
-        await sendStatusToTelegram(wasReconnect ? 'reconnected ✅' : 'connected ✅');
+
+        // Снимаем отложенный алерт: связь вернулась раньше, чем он сработал.
+        if (outageTimer !== null) {
+          clearTimeout(outageTimer);
+          outageTimer = null;
+        }
+
+        if (!wasReconnect) {
+          // Первый коннект после старта процесса — полезно видеть (деплой,
+          // перезапуск, ребут сервера).
+          await sendStatusToTelegram('connected ✅');
+        } else if (outageAlerted) {
+          // Об аварии сообщали — обязаны сообщить и чем кончилось.
+          const downSec = Math.round((Date.now() - outageStartedAt) / 1000);
+          outageAlerted = false;
+          await sendStatusToTelegram(`reconnected ✅ после ${downSec}с простоя`);
+        }
+        // Иначе — обычный короткий разрыв, о котором никто не узнал. Молчим.
       }
     });
   } catch (e) {
