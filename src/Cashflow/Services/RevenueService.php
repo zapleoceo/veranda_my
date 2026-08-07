@@ -7,38 +7,27 @@ namespace App\Cashflow\Services;
 use App\Cashflow\Domain\PosterMoney;
 
 /**
- * Live revenue grid straight from Poster — no DB, no manual entry.
+ * Live revenue per day straight from Poster — no DB, no manual entry.
  *
  * Per day: total = Σ dash.getCategoriesSales (÷100), hookah = category 47,
  * food = total − hookah. food + hookah == total by construction, so the
  * 12-July class of double-count is structurally impossible. Σ(day categories)
- * equals the month dash.getAnalytics.revenue (verified 2026-08-07), which
- * drives the reconciliation badge.
+ * equals the month dash.getAnalytics.revenue (verified), which drives the
+ * reconciliation badge.
  *
  * "Day" = Poster business day (date_close), timezone Asia/Ho_Chi_Minh.
  */
 final class RevenueService
 {
-    private const API = 'https://joinposter.com/api/';
-    private const TZ  = 'Asia/Ho_Chi_Minh';
+    private const TZ = 'Asia/Ho_Chi_Minh';
 
     /** Only hookah category today (verified Jan–Aug 2026). TODO §Q1: move to a map table. */
     public const HOOKAH_CATEGORY_IDS = [47];
 
-    private const RU_MONTHS = [
-        1 => 'Январь', 2 => 'Февраль', 3 => 'Март', 4 => 'Апрель', 5 => 'Май', 6 => 'Июнь',
-        7 => 'Июль', 8 => 'Август', 9 => 'Сентябрь', 10 => 'Октябрь', 11 => 'Ноябрь', 12 => 'Декабрь',
-    ];
-
-    public function __construct(
-        private readonly string $token,
-        private readonly string $caInfo = ''
-    ) {}
+    public function __construct(private readonly PosterHttp $http) {}
 
     /**
-     * Build the month revenue grid.
-     *
-     * @return array{year:int,month:int,label:string,rows:list<array{day:int,date:string,weekday:int,food:int,hookah:int,total:int}>,totals:array{food:int,hookah:int,total:int},reconcile:array{sumOfDays:int,analytics:?int,delta:?int,ok:bool},isCurrentMonth:bool,generatedAt:string}
+     * @return array{rows:list<array{day:int,date:string,weekday:int,food:int,hookah:int,total:int}>,totals:array{food:int,hookah:int,total:int},reconcile:array{sumOfDays:int,analytics:?int,delta:?int,ok:bool},isCurrentMonth:bool,lastDay:int}
      */
     public function month(int $year, int $month): array
     {
@@ -48,9 +37,7 @@ final class RevenueService
 
         $daysInMonth = (int) $first->format('t');
         $isCurrent   = $first->format('Y-m') === $today->format('Y-m');
-        // Current month → only elapsed days (future days are all zeros in Poster);
-        // any past/future month → all days.
-        $lastDay = $isCurrent ? max(1, min($daysInMonth, (int) $today->format('j'))) : $daysInMonth;
+        $lastDay     = $isCurrent ? max(1, min($daysInMonth, (int) $today->format('j'))) : $daysInMonth;
 
         $days      = range(1, $lastDay);
         $paramSets = array_map(
@@ -60,7 +47,7 @@ final class RevenueService
             ],
             $days
         );
-        $responses = $this->getMany('dash.getCategoriesSales', $paramSets);
+        $responses = $this->http->getMany('dash.getCategoriesSales', $paramSets);
 
         $rows = [];
         $sum  = ['food' => 0, 'hookah' => 0, 'total' => 0];
@@ -80,7 +67,7 @@ final class RevenueService
             $rows[] = [
                 'day'     => $d,
                 'date'    => $date->format('Y-m-d'),
-                'weekday' => (int) $date->format('N'), // 1=Mon … 7=Sun
+                'weekday' => (int) $date->format('N'),
                 'food'    => $food,
                 'hookah'  => $hookah,
                 'total'   => $total,
@@ -90,22 +77,18 @@ final class RevenueService
             $sum['total']  += $total;
         }
 
-        // Reconciliation: Σ days vs the month analytics counter (§7.3).
         $analyticsTotal = null;
         try {
-            $an = $this->get('dash.getAnalytics', [
+            $an = $this->http->get('dash.getAnalytics', [
                 'dateFrom' => $first->format('Ymd'),
                 'dateTo'   => $first->modify('last day of this month')->format('Ymd'),
             ]);
             $analyticsTotal = PosterMoney::fromAnalytics($an['counters']['revenue'] ?? 0);
         } catch (\Throwable) {
-            // Non-fatal: the grid still renders, badge shows "unavailable".
+            // Non-fatal: grid still renders, badge shows "unavailable".
         }
 
         return [
-            'year'   => $year,
-            'month'  => $month,
-            'label'  => (self::RU_MONTHS[$month] ?? (string) $month) . ' ' . $year,
             'rows'   => $rows,
             'totals' => $sum,
             'reconcile' => [
@@ -115,85 +98,7 @@ final class RevenueService
                 'ok'        => $analyticsTotal !== null && ($sum['total'] - $analyticsTotal) === 0,
             ],
             'isCurrentMonth' => $isCurrent,
-            'generatedAt'    => $today->format('Y-m-d H:i'),
+            'lastDay'        => $lastDay,
         ];
-    }
-
-    /** Single GET → response array. Throws on transport/API error. */
-    private function get(string $method, array $params): array
-    {
-        $params['token'] = $this->token;
-        $ch = curl_init(self::API . $method . '?' . http_build_query($params));
-        $this->applyOpts($ch);
-        $body = curl_exec($ch);
-        if ($body === false) {
-            $err = curl_error($ch);
-            curl_close($ch);
-            throw new \RuntimeException("Poster {$method}: {$err}");
-        }
-        curl_close($ch);
-        $data = json_decode((string) $body, true);
-        if (!is_array($data)) {
-            throw new \RuntimeException("Poster {$method}: bad JSON");
-        }
-        if (!empty($data['error'])) {
-            throw new \RuntimeException("Poster {$method}: error " . json_encode($data['error'], JSON_UNESCAPED_UNICODE));
-        }
-        return $data['response'] ?? [];
-    }
-
-    /**
-     * Parallel GETs via curl_multi. Returns responses indexed like $paramSets.
-     * A failed handle yields [] for that index (that day shows zeros) rather
-     * than failing the whole grid.
-     *
-     * @param  list<array<string,string>> $paramSets
-     * @return array<int,array>
-     */
-    private function getMany(string $method, array $paramSets): array
-    {
-        if ($paramSets === []) {
-            return [];
-        }
-        $mh      = curl_multi_init();
-        $handles = [];
-        foreach ($paramSets as $i => $params) {
-            $params['token'] = $this->token;
-            $ch = curl_init(self::API . $method . '?' . http_build_query($params));
-            $this->applyOpts($ch);
-            $handles[$i] = $ch;
-            curl_multi_add_handle($mh, $ch);
-        }
-        do {
-            $status = curl_multi_exec($mh, $running);
-            if ($running) {
-                curl_multi_select($mh, 1.0);
-            }
-        } while ($running && $status === CURLM_OK);
-
-        $out = [];
-        foreach ($handles as $i => $ch) {
-            $body    = curl_multi_getcontent($ch);
-            $data    = is_string($body) ? json_decode($body, true) : null;
-            $out[$i] = (is_array($data) && isset($data['response']) && is_array($data['response']))
-                ? $data['response']
-                : [];
-            curl_multi_remove_handle($mh, $ch);
-            curl_close($ch);
-        }
-        curl_multi_close($mh);
-        return $out;
-    }
-
-    private function applyOpts(\CurlHandle $ch): void
-    {
-        curl_setopt_array($ch, [
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_TIMEOUT        => 30,
-            CURLOPT_CONNECTTIMEOUT => 10,
-        ]);
-        if ($this->caInfo !== '') {
-            curl_setopt($ch, CURLOPT_CAINFO, $this->caInfo);
-        }
     }
 }

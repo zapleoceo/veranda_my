@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace App\Cashflow\Http;
 
+use App\Cashflow\Services\ExpenseService;
+use App\Cashflow\Services\PosterHttp;
+use App\Cashflow\Services\ReportService;
 use App\Cashflow\Services\RevenueService;
 use App\Infrastructure\Config;
 use App\Infrastructure\Permissions;
@@ -41,7 +44,8 @@ final class CashflowController
             $error = 'POSTER_API_TOKEN не задан на сервере.';
         } else {
             try {
-                $data = (new RevenueService($token))->month($year, $month);
+                $http = new PosterHttp($token);
+                $data = (new ReportService(new RevenueService($http), new ExpenseService($http)))->month($year, $month);
             } catch (\Throwable $e) {
                 $error = 'Poster недоступен: ' . $e->getMessage();
             }
@@ -53,7 +57,7 @@ final class CashflowController
 
         $pageTitle   = 'Финансовый отчёт';
         $currentPath = '/cashflowreport';
-        $headExtra   = '<link rel="stylesheet" href="/assets/css/cashflow.css?v=20260807_1">';
+        $headExtra   = '<link rel="stylesheet" href="/assets/css/cashflow.css?v=20260807_2">';
 
         ob_start();
         require __DIR__ . '/../../Views/cashflow_content.php';
