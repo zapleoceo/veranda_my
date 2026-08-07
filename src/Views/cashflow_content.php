@@ -67,15 +67,15 @@ $wd  = [1 => 'Пн', 2 => 'Вт', 3 => 'Ср', 4 => 'Чт', 5 => 'Пт', 6 => '�
     </thead>
     <tbody>
       <?php foreach ($data['rows'] as $r): ?>
-        <tr class="<?= $r['weekday'] >= 5 ? 'cf-weekend' : '' ?>">
+        <tr class="<?= $r['weekday'] >= 5 ? 'cf-weekend' : '' ?>" data-date="<?= htmlspecialchars($r['date']) ?>">
           <td class="cf-col-day"><?= (int) $r['day'] ?><span class="cf-wd"><?= $wd[$r['weekday']] ?? '' ?></span></td>
           <?php foreach ($data['columns'] as $col):
               $k = $col['key'];
               $v = $k === 'profit' ? $r['profit'] : ($r['values'][$k] ?? 0);
-              $cls = 'cf-num cf-kind-' . $col['kind'];
+              $cls = 'cf-num cf-kind-' . $col['kind'] . ' cf-clickable';
               if ($k === 'profit') { $cls .= ' cf-col-profit' . ($v < 0 ? ' cf-neg' : ''); }
           ?>
-            <td class="<?= $cls ?>"><?= $k === 'profit' ? number_format((int) $v, 0, '.', ' ') : $fmt($v) ?></td>
+            <td class="<?= $cls ?>" data-kind="<?= $col['kind'] ?>" data-key="<?= $k ?>" data-label="<?= htmlspecialchars($col['label']) ?>" data-val="<?= (int) $v ?>"><?= $k === 'profit' ? number_format((int) $v, 0, '.', ' ') : $fmt($v) ?></td>
           <?php endforeach; ?>
         </tr>
       <?php endforeach; ?>

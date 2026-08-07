@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Cashflow\Http;
 
+use App\Cashflow\Services\DrilldownService;
 use App\Cashflow\Services\ExpenseService;
 use App\Cashflow\Services\PosterHttp;
 use App\Cashflow\Services\ReportService;
@@ -28,8 +29,6 @@ final class CashflowController
         }
         date_default_timezone_set('Asia/Ho_Chi_Minh');
 
-        [$year, $month] = $this->parseMonth((string) ($request->getQueryParams()['ym'] ?? ''));
-
         // Token is server-only. Config first (Bootstrap loads .env into it),
         // then $_ENV / getenv fallbacks for the odd PHP-FPM worker.
         $token = trim((string) (
@@ -37,6 +36,14 @@ final class CashflowController
             ?: ($_ENV['POSTER_API_TOKEN'] ?? '')
             ?: (getenv('POSTER_API_TOKEN') ?: '')
         ));
+
+        // Drill-down AJAX (JSON): ?ajax=day|checks|expenses&date=YYYY-MM-DD[&column=key]
+        $ajax = (string) ($request->getQueryParams()['ajax'] ?? '');
+        if ($ajax !== '') {
+            return $this->ajax($request, $response, $ajax, $token);
+        }
+
+        [$year, $month] = $this->parseMonth((string) ($request->getQueryParams()['ym'] ?? ''));
 
         $data  = null;
         $error = null;
@@ -57,7 +64,8 @@ final class CashflowController
 
         $pageTitle   = 'Финансовый отчёт';
         $currentPath = '/cashflowreport';
-        $headExtra   = '<link rel="stylesheet" href="/assets/css/cashflow.css?v=20260807_2">';
+        $headExtra   = '<link rel="stylesheet" href="/assets/css/cashflow.css?v=20260807_3">' . "\n"
+                     . '<script src="/assets/js/cashflow.js?v=20260807_3" defer></script>';
 
         ob_start();
         require __DIR__ . '/../../Views/cashflow_content.php';
@@ -69,6 +77,36 @@ final class CashflowController
 
         $response->getBody()->write($html);
         return $response->withHeader('Content-Type', 'text/html; charset=utf-8');
+    }
+
+    /** JSON drill-down endpoint. `cashflow` permission already checked in index(). */
+    private function ajax(ServerRequestInterface $request, ResponseInterface $response, string $ajax, string $token): ResponseInterface
+    {
+        $json = static function (int $status, array $data) use ($response): ResponseInterface {
+            $response->getBody()->write((string) json_encode($data, JSON_UNESCAPED_UNICODE));
+            return $response->withStatus($status)
+                ->withHeader('Content-Type', 'application/json; charset=utf-8')
+                ->withHeader('Cache-Control', 'no-store');
+        };
+        if ($token === '') {
+            return $json(500, ['ok' => false, 'error' => 'POSTER_API_TOKEN не задан']);
+        }
+        $q    = $request->getQueryParams();
+        $date = (string) ($q['date'] ?? '');
+        if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $date) !== 1) {
+            return $json(400, ['ok' => false, 'error' => 'bad date']);
+        }
+        $svc = new DrilldownService(new PosterHttp($token));
+        try {
+            return match ($ajax) {
+                'day'      => $json(200, ['ok' => true] + $svc->dayRevenue($date)),
+                'checks'   => $json(200, ['ok' => true, 'checks' => $svc->dayChecks($date)]),
+                'expenses' => $json(200, ['ok' => true] + $svc->dayExpenses($date, (string) ($q['column'] ?? ''))),
+                default    => $json(404, ['ok' => false, 'error' => 'unknown ajax']),
+            };
+        } catch (\Throwable $e) {
+            return $json(500, ['ok' => false, 'error' => $e->getMessage()]);
+        }
     }
 
     /**
