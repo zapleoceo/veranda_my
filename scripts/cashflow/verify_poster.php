@@ -16,6 +16,12 @@ declare(strict_types=1);
  * Exit code 0 = all checks passed, 1 = a check failed, 2 = no token.
  */
 
+if (PHP_SAPI !== 'cli') {
+    http_response_code(403);
+    header('Content-Type: text/plain; charset=utf-8');
+    exit("Forbidden: скрипт запускается только из консоли.\n");
+}
+
 require __DIR__ . '/../../src/Cashflow/Domain/PosterMoney.php';
 
 use App\Cashflow\Domain\PosterMoney;
