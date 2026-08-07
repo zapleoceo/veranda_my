@@ -231,6 +231,13 @@ $app->get('/bloggers/logout', [BloggerCabinetController::class, 'logout']);
 $app->map(['GET', 'POST'], '/reservations[/]', [ReservationsController::class, 'index'])
     ->add(AuthMiddleware::class);
 
+// Финансовый отчёт (P&L) — живая выручка/расходы из Poster. Право `cashflow`
+// (доступ Маша/Ли/Дима). Гейт на роут — как у payday3, а контроллер дублирует
+// проверку при рендере.
+$app->map(['GET'], '/cashflowreport[/]', [\App\Cashflow\Http\CashflowController::class, 'index'])
+    ->add(RequirePermission::for('cashflow'))
+    ->add(AuthMiddleware::class);
+
 // Phase 6: payday3 — clean Slim-native rebuild of payday2 (SOLID/DRY).
 // Browser-facing render + REST API under /payday3/api/*. Each AJAX endpoint
 // is a single-action class (one responsibility per file).

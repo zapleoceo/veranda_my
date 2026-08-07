@@ -25,6 +25,7 @@ class UserPermissionsService
         'telegram_ack'   => false,
         'payday'         => false,
         'bloggers'       => false,
+        'cashflow'       => false,
     ];
 
     private const TTL = 30;
@@ -86,6 +87,7 @@ class UserPermissionsService
             $out['rawdata']      = true;
             $out['kitchen_online'] = true;
             $out['bloggers']     = true;
+            $out['cashflow']     = true;
         }
 
         return $out;

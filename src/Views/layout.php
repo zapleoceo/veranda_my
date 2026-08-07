@@ -186,6 +186,7 @@ $navSections = [
             '/banya'        => ['label' => 'Баня',            'perm' => 'banya'],
             '/roma'         => ['label' => 'Кальяны',         'perm' => 'roma'],
             '/payday3'      => ['label' => 'PayDay3',         'perm' => 'payday'],
+            '/cashflowreport' => ['label' => 'Финотчёт',      'perm' => 'cashflow'],
             '/employees'    => ['label' => 'ЗП сотрудников',  'perm' => 'employees'],
             '/schedule'     => ['label' => 'График смен',     'perm' => 'schedule'],
             '/reservations' => ['label' => 'Брони',           'perm' => 'reservations'],

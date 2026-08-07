@@ -1,0 +1,46 @@
+/* /cashflowreport — live financial report. Reuses layout.php design tokens. */
+
+.cf-head{display:flex;align-items:center;gap:1rem;flex-wrap:wrap;margin-bottom:1rem}
+.cf-title{font-size:1.15rem;font-weight:700;color:var(--text)}
+.cf-nav{display:flex;align-items:center;gap:.5rem}
+.cf-month{min-width:9.5rem;text-align:center;font-weight:600;color:var(--accent)}
+
+.cf-badge{font-size:.75rem;padding:.28rem .65rem;border-radius:999px;font-weight:600;white-space:nowrap}
+.cf-badge-ok{background:rgba(16,185,129,.14);color:#6ee7b7;border:1px solid rgba(16,185,129,.35)}
+.cf-badge-warn{background:rgba(184,135,70,.14);color:#e6c496;border:1px solid rgba(184,135,70,.35)}
+.cf-badge-err{background:rgba(239,68,68,.14);color:#fca5a5;border:1px solid rgba(239,68,68,.35)}
+
+.cf-note{font-size:.8rem;color:var(--muted);margin-bottom:.75rem;line-height:1.5;max-width:78ch}
+.cf-note b{color:var(--text);font-weight:600}
+
+.cf-grid-wrap{overflow:auto;border:1px solid var(--border);border-radius:8px;max-height:calc(100vh - 240px)}
+.cf-grid{width:100%;border-collapse:separate;border-spacing:0;font-size:.85rem}
+.cf-grid th,.cf-grid td{padding:.42rem .8rem;border-bottom:1px solid var(--border);white-space:nowrap}
+
+.cf-grid thead th{position:sticky;top:0;z-index:3;background:#171a24;color:var(--muted);
+  font-size:.72rem;text-transform:uppercase;letter-spacing:.03em;text-align:right}
+.cf-grid thead th.cf-col-day{text-align:left;z-index:4}
+
+.cf-num{text-align:right;font-variant-numeric:tabular-nums;
+  font-family:ui-monospace,'SF Mono',Menlo,Consolas,monospace}
+
+.cf-col-day{position:sticky;left:0;z-index:2;background:var(--surface);text-align:left;font-weight:600}
+.cf-wd{color:var(--muted);font-size:.72rem;margin-left:.35rem}
+.cf-col-total{font-weight:700;color:var(--text)}
+
+.cf-weekend td{background:rgba(239,68,68,.05)}
+.cf-weekend .cf-col-day{background:#211a1c}
+
+.cf-grid tbody tr:hover td{background:rgba(255,255,255,.03)}
+.cf-grid tbody tr:hover .cf-col-day{background:#20232f}
+
+.cf-total-row td{position:sticky;bottom:0;z-index:3;background:#12141d;font-weight:700;
+  color:var(--text);border-top:2px solid var(--accent)}
+.cf-total-row .cf-col-day{z-index:4;background:#12141d}
+
+.cf-foot{margin-top:.6rem;font-size:.75rem;color:var(--muted)}
+
+@media(max-width:768px){
+  .cf-grid-wrap{max-height:none}
+  .cf-note{font-size:.78rem}
+}
