@@ -534,7 +534,15 @@ class MenuController
         try {
             $token = Config::require('POSTER_API_TOKEN');
             $api   = new \App\Classes\PosterAPI($token);
-            $sync  = new \App\Classes\PosterMenuSync($api, $this->db);
+            // PosterMenuSync ждёт App\Classes\Database (как в кроне); $this->db — это App\Infrastructure\Database.
+            $posterDb = new \App\Classes\Database(
+                Config::get('DB_HOST', 'localhost'),
+                Config::get('DB_NAME', ''),
+                Config::get('DB_USER', ''),
+                Config::get('DB_PASS', ''),
+                Config::get('DB_TABLE_SUFFIX', '')
+            );
+            $sync  = new \App\Classes\PosterMenuSync($api, $posterDb);
             $result = $sync->sync(false);
             $mt = $this->db->t('system_meta');
             $now = (new \DateTime('now', new \DateTimeZone('Asia/Ho_Chi_Minh')))->format('Y-m-d H:i:s');
