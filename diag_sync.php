@@ -65,6 +65,15 @@ echo "\n=== menu_items ===\n";
 echo "Активных товаров БЕЗ строки menu_items (не опубликуются без ручного шага): $noMi\n";
 echo "Опубликовано (is_published=1): $pubN\n";
 
+echo "\n--- список активных БЕЗ menu_items (id | Poster-категория | название) ---\n";
+foreach ($db->query("SELECT p.poster_id, p.sub_category_name, p.main_category_name, p.name_raw
+                     FROM {$pmi} p LEFT JOIN {$mi} m ON m.poster_item_id = p.id
+                     WHERE p.is_active = 1 AND m.id IS NULL
+                     ORDER BY p.name_raw")->fetchAll() as $r) {
+    $cat = trim((string)($r['sub_category_name'] ?: $r['main_category_name'] ?: '—'));
+    echo "  " . (int)$r['poster_id'] . " | " . $cat . " | " . $r['name_raw'] . "\n";
+}
+
 echo "\n=== system_meta ===\n";
 $meta = $db->t('system_meta');
 foreach (['menu_last_sync_at', 'menu_last_sync_result', 'menu_last_sync_error'] as $k) {
