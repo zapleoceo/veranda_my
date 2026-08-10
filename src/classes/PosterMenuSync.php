@@ -138,6 +138,14 @@ class PosterMenuSync {
         }
 
         $this->markMissingItemsInactive(array_keys($seenPosterIds));
+
+        // Авто-заведение новинок в меню (создать строку + привязать категорию/цех),
+        // БЕЗ публикации. Не валим синк, если что-то пойдёт не так.
+        try {
+            $this->autofillMenuItems($canInsertUnlinkedItems, $canInsertUnlinkedCategories);
+        } catch (\Throwable $e) {
+        }
+
         $durationMs = (int)round((microtime(true) - $startedAt) * 1000);
 
         return [
@@ -148,6 +156,63 @@ class PosterMenuSync {
             'categories' => (int)$this->db->query("SELECT COUNT(*) FROM {$mc}")->fetchColumn(),
             'used_categories_fallback' => $usedFallbackCategories,
         ];
+    }
+
+    /**
+     * Авто-заведение: подтягивает активные товары в menu_items и привязывает
+     * категорию/цех. БЕЗ публикации (is_published=0) — новинки видны в админке
+     * в своей категории, но на публичное меню не попадают, пока не опубликуешь
+     * их вручную (чтобы не выкладывать «мусор» из Poster на сайт).
+     */
+    private function autofillMenuItems(bool $canNullCategory, bool $canNullWorkshop): void
+    {
+        $pmi = $this->db->t('poster_menu_items');
+        $mc  = $this->db->t('menu_categories');
+        $mw  = $this->db->t('menu_workshops');
+        $mi  = $this->db->t('menu_items');
+
+        // 1) Создать строки menu_items для активных товаров, у которых их ещё нет.
+        if ($canNullCategory) {
+            // Схема допускает NULL-категорию — заводим всех без строки.
+            $this->db->query(
+                "INSERT INTO {$mi} (poster_item_id, category_id, image_url, is_published, sort_order)
+                 SELECT p.id, NULL, NULL, 0, 0
+                 FROM {$pmi} p
+                 LEFT JOIN {$mi} i ON i.poster_item_id = p.id
+                 WHERE i.id IS NULL AND p.is_active = 1"
+            );
+        } else {
+            // category_id NOT NULL — заводим только тех, чья Poster-подкатегория есть на сайте.
+            $this->db->query(
+                "INSERT INTO {$mi} (poster_item_id, category_id, image_url, is_published, sort_order)
+                 SELECT p.id, c.id, NULL, 0, 0
+                 FROM {$pmi} p
+                 JOIN {$mc} c ON c.poster_id = p.sub_category_id
+                 LEFT JOIN {$mi} i ON i.poster_item_id = p.id
+                 WHERE i.id IS NULL AND p.is_active = 1 AND p.sub_category_id IS NOT NULL"
+            );
+        }
+
+        // 2) Привязать категорию у строк без неё (ручные привязки не трогаем — только пустые).
+        $this->db->query(
+            "UPDATE {$mi} i
+             JOIN {$pmi} p ON p.id = i.poster_item_id
+             JOIN {$mc} c ON c.poster_id = p.sub_category_id
+             SET i.category_id = c.id
+             WHERE (i.category_id IS NULL OR i.category_id = 0) AND p.sub_category_id IS NOT NULL"
+        );
+
+        // 3) Привязать категории к цехам (только пустые).
+        $workshopCond = $canNullWorkshop ? '(c.workshop_id IS NULL OR c.workshop_id = 0)' : 'c.workshop_id = 0';
+        $this->db->query(
+            "UPDATE {$mc} c
+             JOIN {$pmi} p ON p.sub_category_id = c.poster_id
+             JOIN {$mw} w ON w.poster_id = p.main_category_id
+             SET c.workshop_id = w.id
+             WHERE {$workshopCond} AND p.sub_category_id IS NOT NULL AND p.main_category_id IS NOT NULL"
+        );
+
+        // Шага публикации нет намеренно — is_published остаётся 0.
     }
 
     private function getFixedWorkshopTranslations(): array {
