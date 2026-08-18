@@ -22,14 +22,24 @@
 
 #fixModal .modal {
   position: relative;
-  width: min(1400px, calc(100vw - 16px));
+  /* Extra safe margins from viewport edges so the ✕ close button never
+     ends up under a mobile-browser chrome bar or a floating help-btn.
+     Was calc(100vh - 24px) — only 12 px per edge. Now 40 px per edge. */
+  width: min(1400px, calc(100vw - 40px));
   max-width: 1400px;
-  max-height: calc(100vh - 24px);
+  max-height: calc(100vh - 80px);
+  margin: 40px 0;
   overflow: hidden;
 }
 
+#fixModal #fixClose {
+  /* Belt-and-braces: explicit z-index so the ✕ sits above every
+     descendant of the modal (sticky thead in the FIX body etc.). */
+  z-index: 10;
+}
+
 #fixBody {
-  max-height: calc(100vh - 160px);
+  max-height: calc(100vh - 200px);
   overflow: auto;
   -webkit-overflow-scrolling: touch;
 }
