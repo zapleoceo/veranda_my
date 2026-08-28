@@ -506,5 +506,10 @@ class KitchenSyncService
             'kitchen_last_sync_result'  => $result,
             'kitchen_last_sync_error'   => '',
         ]);
+
+        // Суточный счётчик прогонов для сводки синков. Раньше она считала их
+        // грепом по cron.log и после перехода на структурное логирование
+        // показывала 0 при рабочем кроне.
+        $this->meta->bumpDailyRun('kitchen_runs_json', $date);
     }
 }

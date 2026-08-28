@@ -140,6 +140,23 @@ try {
          ON DUPLICATE KEY UPDATE meta_value=VALUES(meta_value), updated_at=CURRENT_TIMESTAMP",
         ['menu_last_sync_result', $summary]
     );
+
+    // Суточный счётчик прогонов для сводки синков. Пишем тем же сырым SQL,
+    // что и остальные метаданные в этом файле: composer-автозагрузчик здесь не
+    // подключён (только require_once легаси-классов), поэтому App\Repositories
+    // тут недоступен. Логи ротируются и меняют формат — счётчик в БД нет.
+    $runsRow  = $db->query("SELECT meta_value FROM {$meta} WHERE meta_key='menu_runs_json' LIMIT 1")->fetch();
+    $runs     = json_decode((string)($runsRow['meta_value'] ?? '{}'), true);
+    if (!is_array($runs)) { $runs = []; }
+    $runDay        = substr($now2, 0, 10);
+    $runs[$runDay] = (int)($runs[$runDay] ?? 0) + 1;
+    krsort($runs);
+    $runs = array_slice($runs, 0, 7, true);
+    $db->query(
+        "INSERT INTO {$meta} (meta_key, meta_value) VALUES (?, ?)
+         ON DUPLICATE KEY UPDATE meta_value=VALUES(meta_value), updated_at=CURRENT_TIMESTAMP",
+        ['menu_runs_json', json_encode($runs)]
+    );
     $db->query(
         "INSERT INTO {$meta} (meta_key, meta_value) VALUES (?, ?)
          ON DUPLICATE KEY UPDATE meta_value=VALUES(meta_value), updated_at=CURRENT_TIMESTAMP",

@@ -187,6 +187,9 @@ try {
         'telegram_last_run_error',
         'kitchen_last_sync_at',
         'kitchen_last_sync_error',
+        'menu_runs_json',
+        'telegram_runs_json',
+        'kitchen_runs_json',
     ];
     $in = implode(',', array_fill(0, count($keys), '?'));
     $rows = $db->query("SELECT meta_key, meta_value FROM {$metaTable} WHERE meta_key IN ({$in})", $keys)->fetchAll();
@@ -203,9 +206,29 @@ $menuLast = trim((string)($meta['menu_last_sync_at'] ?? '')) ?: $readLastTimesta
 $tgLast = trim((string)($meta['telegram_last_run_at'] ?? '')) ?: $readLastTimestampFromLog($tgLog);
 $kitchenLast = trim((string)($meta['kitchen_last_sync_at'] ?? '')) ?: $readLastTimestampFromLog($cronLog);
 
-$menuCount = $countLogMatchesForDate($menuLog, $yesterday, 'Starting menu sync');
-$tgCount = $countLogMatchesForDate($tgLog, $yesterday, 'DONE duration_ms');
-$kitchenCount = $countLogMatchesForDate($cronLog, $yesterday, 'Updated sync marker');
+// Счётчики прогонов берём из БД, а не грепом по логам.
+//
+// Как было: считали строки-маркеры в лог-файлах («Starting menu sync»,
+// «DONE duration_ms», «Updated sync marker»). После перехода сервисов кухни и
+// телеграм-алертов на структурное логирование эти строки писаться перестали,
+// и сводка month за месяцем показывала yesterday=0 при полностью рабочих
+// кронах. Проверено на проде: telegram.log не менялся с 16 мая, а маркера
+// «Updated sync marker» в cron.log нет вовсе — при этом оба крона отработали
+// сегодня (kitchen_last_sync_at и telegram_last_run_at свежие).
+//
+// Грep оставлен запасным путём: он ещё корректен для меню и выручает, если
+// счётчик в БД почему-то пуст (например, первые сутки после этой правки).
+$runCountFor = function (string $metaKey, string $date) use ($meta): ?int {
+    $decoded = json_decode((string)($meta[$metaKey] ?? ''), true);
+    if (!is_array($decoded) || !array_key_exists($date, $decoded)) {
+        return null;
+    }
+    return (int) $decoded[$date];
+};
+
+$menuCount    = $runCountFor('menu_runs_json', $yesterday)     ?? $countLogMatchesForDate($menuLog, $yesterday, 'Starting menu sync');
+$tgCount      = $runCountFor('telegram_runs_json', $yesterday) ?? $countLogMatchesForDate($tgLog, $yesterday, 'DONE duration_ms');
+$kitchenCount = $runCountFor('kitchen_runs_json', $yesterday)  ?? $countLogMatchesForDate($cronLog, $yesterday, 'Updated sync marker');
 
 $menuErr = trim((string)($meta['menu_last_sync_error'] ?? ''));
 $tgErr = trim((string)($meta['telegram_last_run_error'] ?? ''));
@@ -255,12 +278,28 @@ $fmt = function (string $s): string {
     return htmlspecialchars($s, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
 };
 
-$text = '<b>Сводка синков</b>' . "\n"
-    . 'Дата: ' . $fmt($today) . ' (' . $fmt($spotTzName) . ')' . "\n\n"
-    . '• <b>Menu sync</b>: last=' . $fmt($menuLast) . ', yesterday=' . (int)$menuCount . "\n"
-    . '• <b>Telegram alerts</b>: last=' . $fmt($tgLast) . ', yesterday=' . (int)$tgCount . "\n"
-    . '• <b>Kitchen online</b>: last=' . $fmt($kitchenLast) . ', yesterday=' . (int)$kitchenCount . "\n"
-    . '• <b>WA listener</b>: ' . $fmt($waStatus) . "\n";
+// Само число прогонов ни о чём не говорит, если не знать, сколько их должно
+// быть. Показываем «факт/ожидание» и помечаем строку, когда факт ниже нормы:
+//   OK — норма, ! — меньше 90% от ожидаемого, X — ни одного прогона за сутки.
+$runLine = function (string $title, string $last, int $count, int $expected, string $every): string {
+    if ($count <= 0) {
+        $mark = '❌';
+    } elseif ($count < $expected * 0.9) {
+        $mark = '⚠️';
+    } else {
+        $mark = '✅';
+    }
+    return '• <b>' . $title . '</b>: ' . $mark . ' ' . $count . '/' . $expected
+        . ' за сутки (' . $every . '), последний ' . $last;
+};
+
+$text = '<b>Сводка синков</b>' . PHP_EOL
+    . 'Дата: ' . $fmt($today) . ' (' . $fmt($spotTzName) . ')' . PHP_EOL
+    . '<i>прогоны за ' . $fmt($yesterday) . '</i>' . PHP_EOL . PHP_EOL
+    . $runLine('Меню', $fmt($menuLast), (int)$menuCount, 24, 'раз в час') . PHP_EOL
+    . $runLine('Телеграм-алерты', $fmt($tgLast), (int)$tgCount, 1440, 'раз в минуту') . PHP_EOL
+    . $runLine('Кухня (синк Poster)', $fmt($kitchenLast), (int)$kitchenCount, 288, 'раз в 5 мин') . PHP_EOL
+    . '• <b>WA listener</b>: ' . $fmt($waStatus) . PHP_EOL;
 
 $ok = $sendTelegram($tgToken, $tgUserId, $text);
 if (!$ok) {

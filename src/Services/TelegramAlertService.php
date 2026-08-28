@@ -556,5 +556,9 @@ class TelegramAlertService
             'telegram_last_run_result' => $result,
             'telegram_last_run_error'  => '',
         ]);
+
+        // Суточный счётчик прогонов для сводки синков (см. комментарий в
+        // MetaRepository::bumpDailyRun — грепу по логам больше не доверяем).
+        $this->meta->bumpDailyRun('telegram_runs_json', $today);
     }
 }

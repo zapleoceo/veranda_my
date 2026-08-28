@@ -225,7 +225,7 @@ class KitchenAnalytics {
                 $seq = 1;
                 foreach ($instances as $inst) {
                     $results[] = [
-                    'date' => date('Y-m-d', ($tx['date_start'] ?? time()*1000) / 1000),
+                    'date' => date('Y-m-d', (int)(($tx['date_start'] ?? time()*1000) / 1000)),
                     'receipt_number' => $tx['receipt_number'] ?? ($tx['transaction_id'] ?? 'N/A'),
                     'transaction_opened_at' => isset($tx['date_start']) ? $this->formatTimestamp($tx['date_start']) : null,
                     'transaction_closed_at' => $this->resolveClosedAt($tx),

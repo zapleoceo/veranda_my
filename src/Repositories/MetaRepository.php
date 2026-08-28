@@ -69,4 +69,37 @@ class MetaRepository
             $this->set((string) $key, (string) $value);
         }
     }
+
+    /**
+     * Инкремент суточного счётчика прогонов.
+     *
+     * Зачем: сводка синков считала прогоны грепом по лог-файлам, ища строки
+     * вроде «Updated sync marker» и «DONE duration_ms». После перехода сервисов
+     * на структурное логирование эти строки писаться перестали, и отчёт стал
+     * показывать yesterday=0 при полностью рабочих кронах — то есть врал в
+     * самую тревожную сторону.
+     *
+     * Счётчик в БД от формата логов не зависит и переживает ротацию.
+     * Храним JSON вида {"2026-08-27": 288, "2026-08-28": 137}, обрезая
+     * хвост до $keepDays суток, чтобы ключ не разрастался.
+     */
+    public function bumpDailyRun(string $key, string $date, int $keepDays = 7): void
+    {
+        $decoded = json_decode($this->get($key, '{}'), true);
+        $counts  = is_array($decoded) ? $decoded : [];
+
+        $counts[$date] = (int) ($counts[$date] ?? 0) + 1;
+
+        krsort($counts);
+        $counts = array_slice($counts, 0, max(1, $keepDays), true);
+
+        $this->set($key, (string) json_encode($counts));
+    }
+
+    /** Число прогонов за конкретную дату (0, если данных нет). */
+    public function dailyRunCount(string $key, string $date): int
+    {
+        $decoded = json_decode($this->get($key, '{}'), true);
+        return is_array($decoded) ? (int) ($decoded[$date] ?? 0) : 0;
+    }
 }
