@@ -155,7 +155,7 @@ function tr3_api_wa_state_create(array $ctx): void {
   $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
   $returnUrl = ($host !== '' ? ($scheme . '://' . $host) : '') . '/' . ltrim($sourcePage, '/') . '?wa_state=' . rawurlencode($code);
 
-  $msg = "Подтвердите WhatsApp номер:\n" . $returnUrl;
+  $msg = $trFor('wa_confirm_msg') . "\n" . $returnUrl;
   $sent = wa_bridge_send($phoneNorm, $msg);
   if (!$sent) api_error(500, $trFor('err_wa_send_failed'));
   try { $db->query("UPDATE {$t} SET return_sent_at = ? WHERE code = ?", [$createdAt, $code]); } catch (\Throwable $e) {}
