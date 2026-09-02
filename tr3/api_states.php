@@ -77,9 +77,9 @@ function tr3_api_tg_state_create(array $ctx): void {
 
   $db->query("INSERT INTO {$t} (code, payload_json, created_at, expires_at) VALUES (?, ?, ?, ?)", [$code, $payloadJson, $createdAt, $expiresAt]);
 
-  $host = (string)($_SERVER['HTTP_HOST'] ?? '');
-  $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
-  $returnUrl = ($host !== '' ? ($scheme . '://' . $host) : '') . '/' . ltrim($sourcePage, '/') . '?tg_state=' . rawurlencode($code);
+  // Базовый адрес берём из Config: он учитывает SITE_BASE_URL и прокси-заголовки.
+  // За Cloudflare $_SERVER['HTTPS'] пуст, поэтому ссылка уходила гостю как http://.
+  $returnUrl = rtrim(\App\Infrastructure\Config::baseUrl(), '/') . '/' . ltrim($sourcePage, '/') . '?tg_state=' . rawurlencode($code);
   $botUrl = 'https://t.me/' . rawurlencode($tgUserBot) . '?start=' . rawurlencode($code);
 
   api_send_json(['ok' => true, 'code' => $code, 'bot_url' => $botUrl, 'return_url' => $returnUrl], 200);
@@ -151,9 +151,9 @@ function tr3_api_wa_state_create(array $ctx): void {
   if ($payloadJson === false) $payloadJson = '{}';
   $db->query("INSERT INTO {$t} (code, phone, payload_json, created_at, expires_at) VALUES (?, ?, ?, ?, ?)", [$code, $phoneNorm, $payloadJson, $createdAt, $expiresAt]);
 
-  $host = (string)($_SERVER['HTTP_HOST'] ?? '');
-  $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
-  $returnUrl = ($host !== '' ? ($scheme . '://' . $host) : '') . '/' . ltrim($sourcePage, '/') . '?wa_state=' . rawurlencode($code);
+  // Базовый адрес берём из Config: он учитывает SITE_BASE_URL и прокси-заголовки.
+  // За Cloudflare $_SERVER['HTTPS'] пуст, поэтому ссылка уходила гостю как http://.
+  $returnUrl = rtrim(\App\Infrastructure\Config::baseUrl(), '/') . '/' . ltrim($sourcePage, '/') . '?wa_state=' . rawurlencode($code);
 
   $msg = $trFor('wa_confirm_msg') . "\n" . $returnUrl;
   $sent = wa_bridge_send($phoneNorm, $msg);
