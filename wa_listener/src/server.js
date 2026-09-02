@@ -3,6 +3,8 @@
 const http = require('node:http');
 const { BRIDGE_SECRET, HTTP_HOST, HTTP_PORT } = require('./config');
 const { getSocket, isReady } = require('./socket');
+const { generateMessageID } = require('@whiskeysockets/baileys');
+const { remember, rememberSent } = require('./msgStore');
 
 function jsonReply(res, code, body) {
   const json = JSON.stringify(body);
@@ -38,11 +40,20 @@ async function handleSend(req, res) {
     const jid = `${phone}@s.whatsapp.net`;
     try {
       const sock = getSocket();
-      if (imageUrl) {
-        await sock.sendMessage(jid, { image: { url: imageUrl }, caption: text });
-      } else {
-        await sock.sendMessage(jid, { text });
+      // Свой messageId, чтобы контент лёг в msgStore ДО отправки: при таймауте
+      // ACK sendMessage бросает исключение, хотя сообщение уже ушло в сеть, —
+      // без предзаписи обслужить ретрай по нему было бы нечем.
+      const messageId = generateMessageID();
+      if (!imageUrl) {
+        // Ровно тот контент, что Baileys генерирует для { text } (см.
+        // generateWAMessageContent: текст уходит как extendedTextMessage).
+        remember(messageId, { extendedTextMessage: { text } });
       }
+      const sent = imageUrl
+        ? await sock.sendMessage(jid, { image: { url: imageUrl }, caption: text }, { messageId })
+        : await sock.sendMessage(jid, { text }, { messageId });
+      // Авторитетный контент от библиотеки перекрывает предзапись.
+      rememberSent(sent);
       console.log('[wa] sendMessage ok: ' + jid);
       jsonReply(res, 200, { ok: true, sent: true });
     } catch (e) {

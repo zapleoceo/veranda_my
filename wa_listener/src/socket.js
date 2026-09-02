@@ -12,6 +12,7 @@ const {
 } = require('@whiskeysockets/baileys');
 
 const { AUTH_DIR } = require('./config');
+const { lookup } = require('./msgStore');
 const {
   sendQrToTelegram,
   clearQrMessage,
@@ -83,6 +84,11 @@ async function startSock() {
       markOnlineOnConnect: false,
       connectTimeoutMs: 60000,
       retryRequestDelayMs: 2000,
+      // Обслуживание retry-запросов: получатель не смог расшифровать и просит
+      // переслать. Без этого колбэка Baileys подставляет свой дефолт
+      // (async () => undefined) и молча ничего не пересылает — сообщение
+      // навсегда зависает у получателя как «Ожидание сообщения». См. msgStore.js.
+      getMessage: async (key) => lookup(key),
     });
 
     sock.ev.on('creds.update', saveCreds);
