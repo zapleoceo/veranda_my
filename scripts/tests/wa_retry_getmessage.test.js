@@ -45,7 +45,8 @@ assert(lookup({ id: 'K6' }) !== undefined, 'newest entry kept')
 
 // ─── проводка в мосте ───────────────────────────────────────────────────────
 const socketSrc = fs.readFileSync(path.join(WA, 'socket.js'), 'utf8')
-assert(/getMessage:\s*async\s*\(key\)\s*=>\s*lookup\(key\)/.test(socketSrc), 'socket.js must pass getMessage into makeWASocket')
+assert(socketSrc.includes('getMessage: async (key) =>'), 'socket.js must pass getMessage into makeWASocket')
+assert(socketSrc.includes('lookup(key)'), 'getMessage must resolve through msgStore.lookup')
 assert(/require\('\.\/msgStore'\)/.test(socketSrc), 'socket.js must import msgStore')
 
 const serverSrc = fs.readFileSync(path.join(WA, 'server.js'), 'utf8')

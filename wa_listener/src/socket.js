@@ -88,7 +88,14 @@ async function startSock() {
       // переслать. Без этого колбэка Baileys подставляет свой дефолт
       // (async () => undefined) и молча ничего не пересылает — сообщение
       // навсегда зависает у получателя как «Ожидание сообщения». См. msgStore.js.
-      getMessage: async (key) => lookup(key),
+      getMessage: async (key) => {
+        const msg = lookup(key);
+        // Единственный внешний признак, что ретрай реально обслужен:
+        // логгер Baileys выключен (pino silent), своих логов у ретраев нет,
+        // и без этой строки проверить починку было бы нечем.
+        console.log('[wa] retry request ' + (key && key.id) + ' — ' + (msg ? 'served from store' : 'NOT in store'));
+        return msg;
+      },
     });
 
     sock.ev.on('creds.update', saveCreds);
