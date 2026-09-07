@@ -99,6 +99,6 @@ declare(strict_types=1);
     </div>
 
     <footer class="pd3-card__footer">
-        <span class="pd3-balances__status muted" id="pd3BalancesStatus">Авто-сохранение по blur</span>
+        <span class="pd3-balances__status muted" id="pd3BalancesStatus"></span>
     </footer>
 </section>
