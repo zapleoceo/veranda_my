@@ -193,7 +193,7 @@ $metaDescription = (string)($metaDescriptions[$lang] ?? $metaDescriptions['en'])
 $metaOgDescription = $metaDescription;
 
 $ogImage = \App\Infrastructure\Config::baseUrl() . '/assets/img/links_bg.png';
-$telephone = '+84396314266';
+$telephone = \App\Infrastructure\Contact::phone();
 ?>
 <!doctype html>
 <html lang="<?= htmlspecialchars($lang) ?>">

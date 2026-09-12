@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Home\Content;
 
+use App\Infrastructure\Contact;
+
 /**
  * Единый источник правды по контактам и ссылкам комплекса.
  *
@@ -14,10 +16,12 @@ namespace App\Home\Content;
  */
 final class Contacts
 {
+    /** Телефон для показа — выводится из единого источника Contact. */
+    public readonly string $phoneDisplay;
+
     public function __construct(
         // Ресторан Veranda (канонический публичный номер — см. /links, Instagram)
-        public readonly string $phone = '+84396314266',
-        public readonly string $phoneDisplay = '+84 396 314 266',
+        public readonly string $phone = Contact::PHONE,
         // Баня «Сила Духа»
         public readonly string $banyaPhone = '+84395959140',
         public readonly string $banyaPhoneDisplay = '+84 39 5959 140',
@@ -41,6 +45,7 @@ final class Contacts
         public readonly string $banyaSite = 'https://sila-duha.com/',
         public readonly string $gamezoneSite = 'https://ru.vn-gamezone.com/',
     ) {
+        $this->phoneDisplay = Contact::display();
     }
 
     /** WhatsApp-ссылка собирается из канонического номера ресторана. */

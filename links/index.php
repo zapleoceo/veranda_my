@@ -114,7 +114,7 @@ foreach ($sections as $sectionKey => $keys) {
     if ($secItems) $sectionView[] = ['key' => $sectionKey, 'title' => $secTitle, 'items' => $secItems];
 }
 
-$telephone = '+84396314266';
+$telephone = \App\Infrastructure\Contact::phone();
 $ogImage = \App\Infrastructure\Config::baseUrl() . '/assets/img/links_bg.png';
 
 $jsonLd = [

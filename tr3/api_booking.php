@@ -260,8 +260,9 @@ function tr3_api_submit_booking(array $ctx): void {
     $waSecret = trim((string)($_ENV['WA_NODE_SECRET'] ?? ($_ENV['WA_BRIDGE_SECRET'] ?? '')));
     if ($waSecret === '') api_error(500, $trFor('err_wa_not_configured'));
 
-    $mgrPhone = '+84396314266';
-    $mgrWaLink = 'https://wa.me/84396314266';
+    require_once __DIR__ . '/../src/Infrastructure/Contact.php';
+    $mgrPhone = \App\Infrastructure\Contact::phone();
+    $mgrWaLink = \App\Infrastructure\Contact::whatsApp();
 
     $waText = $trFor('tg_thanks_title') . ' ' . $trFor('tg_thanks_body') . "\n\n";
     if ($qrUrl !== '') {
@@ -286,8 +287,9 @@ function tr3_api_submit_booking(array $ctx): void {
     api_ok(['id' => $resId, 'qr_code' => $qrCode]);
   }
 
-  $mgrPhone = '+84396314266';
-  $mgrWaLink = 'https://wa.me/84396314266';
+  require_once __DIR__ . '/../src/Infrastructure/Contact.php';
+  $mgrPhone = \App\Infrastructure\Contact::phone();
+  $mgrWaLink = \App\Infrastructure\Contact::whatsApp();
 
   $tableLabelOut = $tableLabel !== '' ? $tableLabel : $tableNum;
 
