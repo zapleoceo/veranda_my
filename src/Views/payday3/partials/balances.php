@@ -1,11 +1,13 @@
 <?php
 declare(strict_types=1);
 /**
- * Итоговый баланс card. Compact 4×4 grid:
+ * Итоговый баланс card. Compact grid:
  *   Показатель | Poster | Факт. | Δ
  *
  * Poster column → /payday3/api/poster/balances (finance.getAccounts
- *                 mapped to Andrey+Tips / Vietnam / Cash account 2)
+ *                 mapped to Andrey+Tips / Vietnam / Cash account 2 /
+ *                 Заначка). Poster Total = every account; Факт. Total =
+ *                 sum of the rows, so each Poster account needs a row.
  * Факт. column  → operator-editable, auto-saves on blur to
  *                 /payday3/api/balances (no save button — debounced
  *                 commit happens implicitly while you tab between fields)
@@ -64,6 +66,7 @@ declare(strict_types=1);
                 ['key' => 'andrey',  'label' => 'Андрей'],
                 ['key' => 'vietnam', 'label' => 'Вьет.'],
                 ['key' => 'cash',    'label' => 'Касса'],
+                ['key' => 'stash',   'label' => 'Заначка'],
                 ['key' => 'total',   'label' => 'Total', 'readonly' => true],
             ] as $row): ?>
                 <tr data-key="<?= htmlspecialchars($row['key']) ?>">
@@ -83,6 +86,10 @@ declare(strict_types=1);
             <?php endforeach; ?>
         </tbody>
     </table>
+
+    <!-- Poster accounts that count toward Total but have no row above.
+         Their balance is missing from Факт. Total, so Δ Total goes red. -->
+    <p class="pd3-bal-unmapped" id="pd3BalUnmapped" hidden></p>
 
     <!-- All Poster accounts list — server hydrates on reload click. -->
     <div class="pd3-bal-accounts" id="pd3BalAccountsWrap" hidden>

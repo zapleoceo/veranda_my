@@ -41,6 +41,7 @@ final class LocalSettingsCodec
                                        ? self::normaliseCustomNames($raw['custom_category_names'])
                                        : $d->customCategoryNames,
             posterAdmin:          self::mergePosterAdmin($raw['poster_admin'] ?? [], $d->posterAdmin),
+            accountStashId:       self::positiveInt($acc['stash'] ?? null, $d->accountStashId),
         );
     }
 
@@ -59,6 +60,7 @@ final class LocalSettingsCodec
                 'andrey'  => (int)($accIn['andrey']  ?? 0),
                 'tips'    => (int)($accIn['tips']    ?? 0),
                 'vietnam' => (int)($accIn['vietnam'] ?? 0),
+                'stash'   => (int)($accIn['stash']   ?? 0),
             ],
             'balance_sinc_account_id'    => (int)($payload['balance_sinc_account_id'] ?? 0),
             'allowed_categories'         => array_values(array_map('intval', $payload['allowed_categories'] ?? [])),
@@ -83,7 +85,7 @@ final class LocalSettingsCodec
             return 'Неверный service_user_id.';
         }
         $acc = isset($p['accounts']) && is_array($p['accounts']) ? $p['accounts'] : [];
-        foreach (['andrey', 'tips', 'vietnam'] as $label) {
+        foreach (['andrey', 'tips', 'vietnam', 'stash'] as $label) {
             $n = (int)($acc[$label] ?? 0);
             if ($n <= 0 || $n > 999_999_999) {
                 return 'Неверный ID счёта: ' . $label;

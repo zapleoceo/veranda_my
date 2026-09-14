@@ -18,7 +18,11 @@ const _v = new URL(import.meta.url).searchParams.get('v') || '';
 const _qs = _v ? '?v=' + encodeURIComponent(_v) : '';
 const { api } = await import(new URL('../api.js' + _qs, import.meta.url).href);
 
-const KEYS = ['andrey', 'vietnam', 'cash', 'total'];
+// Rows of the card. Факт. Total = sum of ROW_KEYS; Poster Total = every
+// Poster account — so a Poster account without a row skews Δ Total
+// (see renderUnmapped).
+const ROW_KEYS = ['andrey', 'vietnam', 'cash', 'stash'];
+const KEYS     = [...ROW_KEYS, 'total'];
 
 const fmt = (n) => {
     if (n === null || n === undefined || n === '') return '';
@@ -52,7 +56,7 @@ function paintDiff(el, diff) {
 
 function refreshDiffs(posterMap) {
     let actualTotal = 0;
-    for (const k of ['andrey', 'vietnam', 'cash']) {
+    for (const k of ROW_KEYS) {
         const input  = document.getElementById('pd3BalActual_' + k);
         const diffEl = document.getElementById('pd3BalDiff_'   + k);
         const v = parse(input?.value);
@@ -78,6 +82,19 @@ function refreshDiffs(posterMap) {
     }
 }
 
+// Warn about Poster accounts that are counted in Poster Total but have
+// no row of their own — otherwise the only symptom is a red Δ Total.
+function renderUnmapped(unmapped) {
+    const el = document.getElementById('pd3BalUnmapped');
+    if (!el) return;
+    const list = Array.isArray(unmapped) ? unmapped : [];
+    if (list.length === 0) { el.hidden = true; el.textContent = ''; return; }
+    const parts = list.map((a) => `#${a.account_id} ${a.name || ''} (${fmt(a.balance)})`);
+    el.textContent = '⚠ Не учтены в строках, но входят в Poster Total: ' + parts.join(', ')
+        + '. Без своей строки Δ Total уйдёт в минус.';
+    el.hidden = false;
+}
+
 function renderAccountsList(accounts) {
     const wrap  = document.getElementById('pd3BalAccountsWrap');
     const tbody = document.getElementById('pd3BalAccountsTbody');
@@ -98,7 +115,7 @@ function renderAccountsList(accounts) {
     wrap.hidden = false;
 }
 
-let posterCache = { andrey: null, vietnam: null, cash: null, total: null, accounts: [] };
+let posterCache = { andrey: null, vietnam: null, cash: null, stash: null, total: null, accounts: [], unmapped: [] };
 let reloadInFlight = false;
 
 async function reloadPoster() {
@@ -117,6 +134,7 @@ async function reloadPoster() {
             el.textContent = v === null || v === undefined ? '—' : fmt(v);
         }
         renderAccountsList(posterCache.accounts || []);
+        renderUnmapped(posterCache.unmapped);
         refreshDiffs(posterCache);
     } catch (e) {
         setStatus('Poster balances: ' + (e.message || 'error'), 'error');
@@ -131,7 +149,7 @@ async function loadActual(state) {
     const date = state.get('range')?.to || new Date().toISOString().slice(0, 10);
     try {
         const data = await api.get('/payday3/api/balances?date=' + encodeURIComponent(date));
-        for (const k of ['andrey', 'vietnam', 'cash']) {
+        for (const k of ROW_KEYS) {
             const input = document.getElementById('pd3BalActual_' + k);
             const v = data?.['bal_' + k] ?? null;
             if (input) input.value = fmt(v);
@@ -166,7 +184,7 @@ async function saveActualNow(state) {
     const date = state.get('range')?.to || new Date().toISOString().slice(0, 10);
     const body = { target_date: date };
     let changed = false;
-    for (const k of ['andrey', 'vietnam', 'cash', 'total']) {
+    for (const k of KEYS) {
         const input = document.getElementById('pd3BalActual_' + k);
         const v = input ? parse(input.value) : null;
         body['bal_' + k] = v;
@@ -176,7 +194,7 @@ async function saveActualNow(state) {
     setStatus('Сохраняю…');
     try {
         await api.post('/payday3/api/balances', body);
-        for (const k of ['andrey', 'vietnam', 'cash', 'total']) lastSavedKeys[k] = body['bal_' + k];
+        for (const k of KEYS) lastSavedKeys[k] = body['bal_' + k];
         setStatus('Сохранено в ' + date, 'ok');
     } catch (e) {
         setStatus('Ошибка: ' + (e.message || 'error'), 'error');

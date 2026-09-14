@@ -20,6 +20,7 @@ final class ActualBalances
         public readonly ?Money $vietnam = null,
         public readonly ?Money $cash    = null,
         public readonly ?Money $total   = null,
+        public readonly ?Money $stash   = null,
     ) {}
 
     public static function fromRow(array $r): self
@@ -36,6 +37,7 @@ final class ActualBalances
             vietnam:    $m($r['bal_vietnam'] ?? null),
             cash:       $m($r['bal_cash']    ?? null),
             total:      $m($r['bal_total']   ?? null),
+            stash:      $m($r['bal_stash']   ?? null),
         );
     }
 
@@ -47,6 +49,7 @@ final class ActualBalances
             'bal_andrey'  => $j($this->andrey),
             'bal_vietnam' => $j($this->vietnam),
             'bal_cash'    => $j($this->cash),
+            'bal_stash'   => $j($this->stash),
             'bal_total'   => $j($this->total),
         ];
     }

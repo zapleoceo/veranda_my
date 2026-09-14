@@ -78,6 +78,10 @@ declare(strict_types=1);
                         <input type="number" name="accounts[vietnam]" required min="1">
                     </label>
                     <label class="pd3-field">
+                        <span>Заначка (id)</span>
+                        <input type="number" name="accounts[stash]" required min="1">
+                    </label>
+                    <label class="pd3-field">
                         <span>Чай (balance_sinc, id)</span>
                         <input type="number" name="balance_sinc_account_id" required min="1">
                     </label>

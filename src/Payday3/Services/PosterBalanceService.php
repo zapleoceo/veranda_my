@@ -50,11 +50,12 @@ final class PosterBalanceService implements PosterBalanceServiceInterface
         }
         $cfg = $this->settings->load();
 
-        // Mirrors payday2/view.php exactly:
-        //   Андрей  = accountAndreyId + accountTipsId combined
-        //   Вьет.   = accountVietnamId
-        //   Касса   = account_id 2 (hard-coded in payday2)
-        //   Total   = SUM of every account Poster returned
+        // Rows of the card:
+        //   Андрей   = accountAndreyId + accountTipsId combined
+        //   Вьет.    = accountVietnamId
+        //   Касса    = account_id 2 (hard-coded in payday2)
+        //   Заначка  = accountStashId
+        //   Total    = SUM of every account Poster returned
         $andreyParts = [];
         if (isset($byId[$cfg->accountAndreyId])) $andreyParts[] = $byId[$cfg->accountAndreyId];
         if (isset($byId[$cfg->accountTipsId]))   $andreyParts[] = $byId[$cfg->accountTipsId];
@@ -62,10 +63,23 @@ final class PosterBalanceService implements PosterBalanceServiceInterface
 
         $v = $byId[$cfg->accountVietnamId]  ?? null;
         $c = $byId[self::CASH_ACCOUNT_ID]   ?? null;
+        $s = $byId[$cfg->accountStashId]    ?? null;
 
-        // Total: sum of EVERY account, not just the three above — matches
-        // payday2's "Total" row (`$sum += $r['balance']` across all rows).
+        // Total: sum of EVERY account, not just the rows above. Факт. Total
+        // is the sum of the rows only, so any Poster account that has no
+        // row of its own silently skews Δ Total — that's exactly how the
+        // new «Zana4ka» account showed up as a minus. Report such accounts
+        // so the card can warn instead of just going red.
         $total = $byId === [] ? null : array_sum($byId);
+
+        $mappedIds = [
+            $cfg->accountAndreyId, $cfg->accountTipsId, $cfg->accountVietnamId,
+            self::CASH_ACCOUNT_ID, $cfg->accountStashId,
+        ];
+        $unmapped = array_values(array_filter(
+            $accounts,
+            static fn(array $acc) => !in_array($acc['account_id'], $mappedIds, true),
+        ));
 
         // Stable ID-ascending order so the list table doesn't jitter.
         usort($accounts, static fn($x, $y) => $x['account_id'] <=> $y['account_id']);
@@ -74,8 +88,10 @@ final class PosterBalanceService implements PosterBalanceServiceInterface
             'andrey'   => $a,
             'vietnam'  => $v,
             'cash'     => $c,
+            'stash'    => $s,
             'total'    => $total,
             'accounts' => $accounts,
+            'unmapped' => $unmapped,
         ];
     }
 }

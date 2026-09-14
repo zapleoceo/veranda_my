@@ -361,10 +361,19 @@ class Database {
             bal_andrey BIGINT NULL,
             bal_vietnam BIGINT NULL,
             bal_cash BIGINT NULL,
+            bal_stash BIGINT NULL,
             bal_total BIGINT NULL,
             KEY idx_target_date (target_date),
             KEY idx_created_at (created_at)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
+
+        // «Заначка» (Poster account 11) row added to Итоговый баланс.
+        try {
+            if (!$this->pdo->query("SHOW COLUMNS FROM {$ab} LIKE 'bal_stash'")->fetch()) {
+                $this->pdo->exec("ALTER TABLE {$ab} ADD COLUMN bal_stash BIGINT NULL AFTER bal_cash");
+            }
+        } catch (\Throwable $e) {
+        }
 
         $this->pdo->exec("CREATE TABLE IF NOT EXISTS {$st} (
             id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,

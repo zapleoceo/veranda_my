@@ -801,6 +801,17 @@ body.pd3-mode-out .pd3-section--out { display: block; }
 .pd3-balances__status.is-ok    { color: #10b981; transition: color .2s; }
 .pd3-balances__status.is-error { color: #ef4444; }
 
+/* Poster accounts counted in Total but missing a row (balances.js). */
+.pd3-bal-unmapped {
+    margin: var(--pd3-s-4) 0 0;
+    padding: var(--pd3-s-4) var(--pd3-s-6);
+    border-radius: var(--pd3-r-sm);
+    background: rgba(239,68,68,0.12);
+    color: #fca5a5;
+    font-size: var(--pd3-fs-md);
+    line-height: 1.35;
+}
+
 /* All-accounts list table — hydrated by reloadPoster(). Scrolls
    vertically with a dark scrollbar (site-wide rule in common.css). */
 .pd3-bal-accounts {

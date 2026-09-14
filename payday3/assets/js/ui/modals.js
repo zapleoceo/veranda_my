@@ -486,6 +486,7 @@ async function loadSettings() {
         form.elements['accounts[andrey]'].value  = acc.andrey  || '';
         form.elements['accounts[tips]'].value    = acc.tips    || '';
         form.elements['accounts[vietnam]'].value = acc.vietnam || '';
+        form.elements['accounts[stash]'].value   = acc.stash   || '';
         form.elements['balance_sinc_account_id'].value = data.balance_sinc_account_id || '';
         const adm = data.poster_admin || {};
         form.elements['poster_admin[account]'].value     = adm.account     || '';
@@ -624,6 +625,7 @@ async function saveSettings(event) {
             andrey:  Number(fd.get('accounts[andrey]'))  || 0,
             tips:    Number(fd.get('accounts[tips]'))    || 0,
             vietnam: Number(fd.get('accounts[vietnam]')) || 0,
+            stash:   Number(fd.get('accounts[stash]'))   || 0,
         },
         balance_sinc_account_id: Number(fd.get('balance_sinc_account_id')) || 0,
         poster_admin: {

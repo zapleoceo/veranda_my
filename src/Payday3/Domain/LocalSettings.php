@@ -31,6 +31,9 @@ final class LocalSettings
         public readonly array  $allowedCategories,
         public readonly array  $customCategoryNames,
         public readonly array  $posterAdmin,
+        // «Заначка» — cash stash account added in Poster 2026-09.
+        // Last + defaulted so existing named-arg constructors keep working.
+        public readonly int    $accountStashId = 11,
     ) {}
 
     public static function defaults(): self
@@ -49,6 +52,7 @@ final class LocalSettings
             allowedCategories:    [],
             customCategoryNames:  [],
             posterAdmin:          self::emptyPosterAdmin(),
+            accountStashId:       11,
         );
     }
 
@@ -71,6 +75,7 @@ final class LocalSettings
                 'andrey'  => $this->accountAndreyId,
                 'tips'    => $this->accountTipsId,
                 'vietnam' => $this->accountVietnamId,
+                'stash'   => $this->accountStashId,
             ],
             'balance_sinc_account_id' => $this->balanceSyncAccountId,
             'allowed_categories'      => array_values($this->allowedCategories),

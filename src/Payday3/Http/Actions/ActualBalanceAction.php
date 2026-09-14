@@ -15,7 +15,7 @@ use Psr\Http\Message\ServerRequestInterface;
  * GET  /payday3/api/balances?date=YYYY-MM-DD
  *      → latest snapshot at or before that date, or empty record.
  * POST /payday3/api/balances
- *      Body { target_date, bal_andrey?, bal_vietnam?, bal_cash?, bal_total? }
+ *      Body { target_date, bal_andrey?, bal_vietnam?, bal_cash?, bal_stash?, bal_total? }
  *      → inserts a new snapshot.
  *
  * Both verbs handled by one action — keeps the single-action-per-file
@@ -41,7 +41,8 @@ final class ActualBalanceAction
         return JsonResponder::ok($response, $bal?->toJsonShape() ?? [
             'target_date' => $date,
             'bal_andrey'  => null, 'bal_vietnam' => null,
-            'bal_cash'    => null, 'bal_total'   => null,
+            'bal_cash'    => null, 'bal_stash'   => null,
+            'bal_total'   => null,
         ]);
     }
 
@@ -58,6 +59,7 @@ final class ActualBalanceAction
             vietnam:    self::optionalMoney($body['bal_vietnam'] ?? null),
             cash:       self::optionalMoney($body['bal_cash']    ?? null),
             total:      self::optionalMoney($body['bal_total']   ?? null),
+            stash:      self::optionalMoney($body['bal_stash']   ?? null),
         );
         $id = $this->repo->save($bal);
         return JsonResponder::ok($response, ['id' => $id, 'balances' => $bal->toJsonShape()]);
