@@ -90,7 +90,8 @@ MAXIM_CITY_ID=...
 ONLINEORDER_RESTAURANT_LAT=12.2xxxxx
 ONLINEORDER_RESTAURANT_LNG=109.1xxxxx
 ONLINEORDER_RESTAURANT_ADDRESS=Veranda, <улица, дом>, Nha Trang
-ONLINEORDER_PHONE=+84xxxxxxxxx        # телефон для Grab-отправителя
+# Телефон для Grab-отправителя НЕ задаётся в .env — берётся из единого источника
+# App\Infrastructure\Contact::PHONE (src/Infrastructure/Contact.php).
 
 # Куда слать алерты о заказах (если пусто — упадёт в TELEGRAM_CHAT_ID):
 ONLINEORDER_TG_CHAT_ID=

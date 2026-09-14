@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\OnlineOrder\Infrastructure;
 
 use App\Infrastructure\Config;
+use App\Infrastructure\Contact;
 use App\OnlineOrder\Domain\GeoPoint;
 
 /**
@@ -45,9 +46,14 @@ final class OnlineOrderConfig
         return Config::get('ONLINEORDER_RESTAURANT_ADDRESS', 'Veranda, Nha Trang');
     }
 
+    /**
+     * Телефон ресторана — наследуется из единого источника Contact.
+     * Уходит на фронт чек-аута и в Grab как телефон отправителя (для курьера).
+     * Раньше читался из ONLINEORDER_PHONE, который на проде не был задан, — Grab получал "".
+     */
     public function restaurantPhone(): string
     {
-        return Config::get('ONLINEORDER_PHONE', '');
+        return Contact::phone();
     }
 
     public function hours(): string
