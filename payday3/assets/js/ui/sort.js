@@ -1,8 +1,12 @@
-// Column sort. Click a `.pd3-sortable` header → sort its tbody by the
-// `data-sort-key` lookup on each row's data-* attributes.
+// Column sort. Click a `.pd3-sortable` header → sort the table's rows by
+// the `data-sort-key` lookup on each row's data-* attributes.
 //
 // Numeric vs string is auto-detected per key (sum/total/card/tips/num/ts → numeric).
 // Toggles between asc → desc → none on repeated clicks.
+//
+// Every <tbody> is sorted on its own: the «Деньги» table keeps incoming
+// rows above the «Расходы» divider and outgoing rows below it, whatever
+// the column.
 
 'use strict';
 
@@ -21,6 +25,28 @@ function compare(a, b, key) {
     return String(av ?? '').localeCompare(String(bv ?? ''), 'ru');
 }
 
+/**
+ * Reorder one tbody's `tr.pd3-row`s. dir '' restores the document order
+ * stamped on the first sort (data-pd3-orig-idx).
+ * @param {{querySelectorAll:Function, appendChild:Function}} tbody
+ * @param {string} key
+ * @param {'asc'|'desc'|''} dir
+ */
+export function sortTbody(tbody, key, dir) {
+    const rows = Array.from(tbody.querySelectorAll('tr.pd3-row'));
+    if (!rows.length) return;
+    rows.forEach((r, i) => { if (!r.dataset.pd3OrigIdx) r.dataset.pd3OrigIdx = String(i); });
+    if (!dir) {
+        rows.sort((a, b) => Number(a.dataset.pd3OrigIdx) - Number(b.dataset.pd3OrigIdx));
+    } else {
+        rows.sort((a, b) => {
+            const c = compare(a, b, key);
+            return dir === 'desc' ? -c : c;
+        });
+    }
+    rows.forEach((r) => tbody.appendChild(r));
+}
+
 export function initSort() {
     document.querySelectorAll('.pd3-table').forEach((table) => {
         table.querySelectorAll('thead th.pd3-sortable').forEach((th) => {
@@ -37,22 +63,7 @@ export function initSort() {
                 if (nextDir) th.dataset.sortDir = nextDir;
                 else th.removeAttribute('data-sort-dir');
 
-                const tbody = table.tBodies[0];
-                if (!tbody) return;
-                const rows = Array.from(tbody.querySelectorAll('tr.pd3-row'));
-
-                if (!nextDir) {
-                    // Restore document order: just re-append by the original index
-                    // stamp we add the first time we touch a row.
-                    rows.sort((a, b) => Number(a.dataset.pd3OrigIdx || 0) - Number(b.dataset.pd3OrigIdx || 0));
-                } else {
-                    rows.forEach((r, i) => { if (!r.dataset.pd3OrigIdx) r.dataset.pd3OrigIdx = String(i); });
-                    rows.sort((a, b) => {
-                        const c = compare(a, b, key);
-                        return nextDir === 'desc' ? -c : c;
-                    });
-                }
-                rows.forEach((r) => tbody.appendChild(r));
+                for (const tbody of table.tBodies) sortTbody(tbody, key, nextDir);
             });
         });
     });

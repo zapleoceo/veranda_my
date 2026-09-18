@@ -20,16 +20,17 @@ const [
     { State },
     { setCsrf },
     { initModeToggle },
-    { initSelection },
+    { initSelection, SIDE_KINDS },
     { initSort },
     { initEyeToggles },
     { initHelpMode },
     { initDateForm },
     { refreshStats },
     { LineRenderer },
-    { initLinkActions },
+    { createInLinks },
+    { initLinkPanel },
     { initDataActions },
-    { initModeTab },
+    { BANK_TABLE, BANK_SCROLL, SEPAY_TBODY },
     { initModals },
     { initOutMode },
     { initBalances },
@@ -49,8 +50,9 @@ const [
     _i('./ui/stats.js'),
     _i('./ui/lineRenderer.js'),
     _i('./ui/linkActions.js'),
+    _i('./ui/linkPanel.js'),
     _i('./ui/dataActions.js'),
-    _i('./ui/modeTab.js'),
+    _i('./ui/bankTable.js'),
     _i('./ui/modals.js'),
     _i('./out/bootstrap.js'),
     _i('./ui/balances.js'),
@@ -77,19 +79,50 @@ const state = new State({
 setCsrf(state.get('csrf'));
 window.__pd3 = state;
 
-initModeTab();
 initModeToggle();
 const selection = initSelection();
 initSort();
-initEyeToggles();
+const eyes = initEyeToggles();
 initHelpMode();
 initDateForm();
 initModals({ state });
-// initOutMode FIRST so we can pass its reload() into createTx —
-// the "+" popup uses it to refresh the OUT-mode tables after
-// finance.createTransactions succeeds.
-const outMode = initOutMode({ state }) || {};
-// Balances BEFORE createTx: the "+" popup refreshes the Poster column
+
+// After a side re-renders its rows: its old ticks are gone, and the eye
+// toggles must be applied to the fresh rows. Each side resets only its
+// own selection buckets (SIDE_KINDS).
+const afterSideRender = (side) => () => {
+    selection.reset(SIDE_KINDS[side]);
+    eyes.reapply();
+};
+
+// Incoming connectors — SePay rows ↔ Poster checks. Observes the WHOLE
+// «Деньги» table and the WHOLE right column: the other side's rows
+// shift these anchors too (e.g. the checks pane growing moves nothing
+// here, but a new SePay row moves every outgoing row below it).
+const grid = document.querySelector('#pd3GraphRoot .pd3-graph__grid');
+const renderer = grid ? new LineRenderer({
+    container:          grid,
+    layer:              document.getElementById('pd3LineLayer'),
+    leftScroll:         document.querySelector(BANK_SCROLL),
+    rightScroll:        document.getElementById('pd3PosterScroll'),
+    leftTbody:          document.querySelector(BANK_TABLE),
+    rightTbody:         document.getElementById('pd3RightColumn'),
+    horizontalScroller: document.getElementById('pd3GraphRoot'),
+    onUnlink: null,            // wired below, once the adapter exists
+}) : null;
+if (!renderer) console.warn('[payday3] grid not found, LineRenderer disabled');
+
+const inLinks = createInLinks({ state, renderer, onChanged: afterSideRender('in') });
+if (renderer) {
+    renderer._onUnlink = inLinks.onUnlink;   // late-bind the × button handler
+    renderer.setLinks(state.get('links'));
+}
+
+// Outgoing side — BIDV mail ↔ Poster finance. Loads itself right away
+// (live IMAP + Poster), draws its own connectors on the same grid.
+const outMode = initOutMode({ state, onChanged: afterSideRender('out') });
+
+// Balances BEFORE createTx: the «+» popups refresh the Poster column
 // after finance.createTransactions succeeds.
 const balances = initBalances({ state });
 // Import the modal host helpers AFTER initModals so initCreateTx can
@@ -101,41 +134,22 @@ initCreateTx({
     openModal:  modalHost.open,
     closeModal: modalHost.close,
     onCreated:  () => {
-        outMode.reload?.();
+        outMode?.reload();
         balances.reload();
     },
 });
+
+// One link panel for both sides (🧩 / 🎯 / ⛓️‍💥 in the mid column).
+initLinkPanel({ state, inLinks, outLinks: outMode, selection });
 refreshStats();
 
-// Line renderer — bezier connectors between sepay/poster anchors.
-const grid = document.querySelector('.pd3-graph__grid');
-const renderer = grid ? new LineRenderer({
-    container:          grid,
-    layer:              document.getElementById('pd3LineLayer'),
-    sepayScroll:        document.getElementById('pd3SepayScroll'),
-    posterScroll:       document.getElementById('pd3PosterScroll'),
-    sepayTbody:         document.querySelector('#pd3SepayTable tbody'),
-    posterTbody:        document.querySelector('#pd3PosterTable tbody'),
-    horizontalScroller: document.getElementById('pd3GraphRoot'),
-    onUnlink: null,            // wired after linkActions returns
-}) : null;
-
-if (renderer) {
-    const onUnlink = initLinkActions({ state, renderer, selection });
-    renderer._onUnlink = onUnlink;   // late-bind the close-button handler
-    renderer.setLinks(state.get('links'));
-} else {
-    console.warn('[payday3] grid not found, LineRenderer disabled');
-}
-
 // Font-scale widget — single «Aa» button that cycles 1 / 1.2 / 1.5×.
-// Renderer redraws happen via a window event ('pd3:font-scale-changed'),
-// so IN-mode and OUT-mode LineRenderer instances both pick it up
-// regardless of which one is currently visible.
+// Both LineRenderer instances redraw on the 'pd3:font-scale-changed'
+// window event.
 initFontScale();
 
-// AJAX IN-mode refresh — replaces window.location.reload() after sync.
-const loadInData = makeInLoader({ state, renderer });
+// AJAX refresh of the incoming side — replaces window.location.reload().
+const loadInData = makeInLoader({ state, renderer, onRendered: afterSideRender('in') });
 const finance    = initFinanceTransfers({ state });
 initDataActions({
     state,
@@ -144,40 +158,21 @@ initDataActions({
         finance.reload();
     },
 });
-// Per-row hide/restore — direct port of payday2's ?ajax=sepay_hide.
-// Reuses loadInData so the eye-toggle picks up the change without a
-// full page reload.
+// Per-row hide/restore of incoming rows — reuses loadInData so the eye
+// toggle picks up the change without a full page reload.
 initSepayHide({ reload: loadInData });
 
-// First-paint auto-fill. When the operator opens the page (or picks a
-// fresh date) we don't want either tab to greet them with empty tables.
-//
-//   IN  — server-rendered from DB. If both tables came back empty, fire
-//         Sepay + Poster sync in parallel. The sync buttons already own
-//         the busy spinner + refresh-on-success flow, so we just simulate
-//         the clicks. Buttons no-op while busy, so this is safe even if
-//         the operator races us with a manual click.
-//
-//   OUT — always lives off live IMAP + Poster API (never cached), so it
-//         can't be "pre-rendered". out/bootstrap loads on tab activation
-//         by default. We additionally kick off that load right now, in
-//         the background, so when the operator clicks the OUT tab the
-//         data is already there. Delayed by a beat so IN sync gets the
-//         browser's HTTP slot first.
+// First-paint auto-fill: incoming rows and checks are server-rendered
+// from the DB. If both came back empty (a fresh day), fire SePay + Poster
+// sync — the buttons own the busy spinner + refresh flow, and no-op
+// while busy. The outgoing side needs no kick: it always loads live.
 (function autoFillTables() {
     const inEmpty =
-        document.querySelector('#pd3SepayTable .pd3-empty') &&
+        document.querySelector(`${SEPAY_TBODY} .pd3-empty`) &&
         document.querySelector('#pd3PosterTable .pd3-empty');
     if (inEmpty) {
         document.getElementById('pd3SepaySyncBtn')?.click();
         document.getElementById('pd3PosterSyncBtn')?.click();
-    }
-    // Pre-warm OUT. setTimeout(0) yields to the event loop so the IN
-    // sync clicks above start their fetches first; the IMAP call inside
-    // OUT can be slow (~2 s) and we don't want it competing for the
-    // browser's first paint.
-    if (typeof outMode?.reload === 'function') {
-        setTimeout(() => { outMode.reload(); }, 0);
     }
 })();
 

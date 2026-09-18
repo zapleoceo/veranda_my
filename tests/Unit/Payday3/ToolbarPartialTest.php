@@ -41,6 +41,18 @@ final class ToolbarPartialTest extends TestCase
             'обе кнопки type=button — клик не должен отправлять форму сам по себе');
     }
 
+    public function test_tabs_are_gone_and_create_transaction_button_took_their_place(): void
+    {
+        $html = $this->render('2026-09-18');
+        $this->assertStringNotContainsString('data-tab=', $html, 'вкладок IN/OUT больше нет — всё на одной странице');
+        $this->assertStringNotContainsString('pd3-tabs', $html);
+        $this->assertMatchesRegularExpression(
+            '#<button type="button" class="pd3-btn pd3-btn--sm" id="pd3CreateTxBtn"[^>]*>\+ транзакция</button>#u',
+            $html,
+            'кнопка «+ транзакция» открывает модалку создания транзакции'
+        );
+    }
+
     public function test_selected_day_is_in_visible_and_hidden_fields(): void
     {
         $html = $this->render('2026-09-18');

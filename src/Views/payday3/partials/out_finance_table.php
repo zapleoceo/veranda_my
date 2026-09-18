@@ -34,7 +34,7 @@ declare(strict_types=1);
                 </tr>
             </thead>
             <tbody>
-                <tr class="pd3-empty"><td colspan="7">Открой OUT, чтобы загрузить транзакции…</td></tr>
+                <tr class="pd3-empty"><td colspan="7">Загрузка транзакций Poster…</td></tr>
             </tbody>
         </table>
     </div>

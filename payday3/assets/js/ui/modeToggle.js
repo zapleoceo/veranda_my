@@ -3,14 +3,12 @@
 // the three pieces flips the state. State persists in localStorage
 // and is mirrored to body.pd3-mode-lite for CSS to pick up.
 //
-// Both the IN-mode and OUT-mode mid columns have their own toggles
-// (#pd3ModeToggle and #pd3OutModeToggle) but they share the same
-// body class — toggling either updates both.
+// The single mid column carries the one toggle (#pd3ModeToggle).
 
 'use strict';
 
 const LS_KEY = 'pd3:mode';
-const TOGGLE_IDS = ['pd3ModeToggle', 'pd3OutModeToggle'];
+const TOGGLE_IDS = ['pd3ModeToggle'];
 
 let _suspendChange = false;
 

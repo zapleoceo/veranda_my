@@ -10,6 +10,7 @@
 const _v = new URL(import.meta.url).searchParams.get('v') || '';
 const _qs = _v ? '?v=' + encodeURIComponent(_v) : '';
 const { createTxButtonHtml, TX_TYPE } = await import(new URL('../ui/rowCreateTx.js' + _qs, import.meta.url).href);
+const { BANK_COLUMNS, SEPAY_TBODY } = await import(new URL('../ui/bankTable.js' + _qs, import.meta.url).href);
 
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
@@ -31,9 +32,6 @@ function rowState(edges) {
     if (manual) return 'row-gray';
     return yellow ? 'row-yellow' : 'row-green';
 }
-
-/** Cells per SePay row — must equal the <th> count in sepay_table.php. */
-export const SEPAY_COLUMNS = 7;
 
 function sepayRow(s, cls) {
     const content = s.content ?? '';
@@ -94,7 +92,7 @@ function posterRow(p, cls) {
 }
 
 export function renderSepay(open, hidden, links) {
-    const tbody = document.querySelector('#pd3SepayTable tbody');
+    const tbody = document.querySelector(SEPAY_TBODY);
     if (!tbody) return;
     const bySepay = new Map();
     for (const l of links) {
@@ -102,7 +100,7 @@ export function renderSepay(open, hidden, links) {
         bySepay.get(l.sepay_id).push(l);
     }
     if (open.length === 0 && hidden.length === 0) {
-        tbody.innerHTML = `<tr class="pd3-empty"><td colspan="${SEPAY_COLUMNS}">Нет банковских транзакций за период.</td></tr>`;
+        tbody.innerHTML = `<tr class="pd3-empty"><td colspan="${BANK_COLUMNS}">Нет поступлений за период.</td></tr>`;
         return;
     }
     const parts = [];

@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 ?>
-<aside class="pd3-mid" data-help="Управление связями. Чекбоксы в таблицах задают селект; кнопки применяют действие.">
+<aside class="pd3-mid" data-help="Управление связями для всей страницы: поступления ↔ чеки Poster и расходы ↔ транзакции Poster. Чекбоксы в таблицах задают селект; кнопки применяют действие.">
 
     <div class="pd3-mode-toggle" title="Lite/Full">
         <span class="pd3-mode-toggle__label"><span class="pd3-mode-toggle__full">Lite</span><span class="pd3-mode-toggle__short">L</span></span>
@@ -15,20 +15,20 @@ declare(strict_types=1);
     <div class="pd3-mid__glass">
         <button type="button" class="pd3-mid__btn pd3-mid__btn--primary" id="pd3LinkMakeBtn"
                 title="Связать выбранные"
-                data-help-abs="Создать ручную связь между выбранными строками."
+                data-help-abs="Создать ручную связь между выбранными строками: поступления — с чеками, расходы — с транзакциями Poster."
                 disabled aria-disabled="true">🎯</button>
 
         <button type="button" class="pd3-mid__btn pd3-mid__btn--toggle" id="pd3HideLinkedBtn"
                 title="Скрыть связанные"
-                data-help-abs="Скрыть/показать уже связанные строки.">👁</button>
+                data-help-abs="Скрыть/показать уже связанные строки во всех таблицах.">👁</button>
 
         <button type="button" class="pd3-mid__btn" id="pd3LinkAutoBtn"
                 title="Автосвязи"
-                data-help-abs="Автоматически связать совпадения по сумме/времени.">🧩</button>
+                data-help-abs="Автоматически связать совпадения по сумме/времени: поступления с чеками и расходы с транзакциями Poster — одной кнопкой.">🧩</button>
 
         <button type="button" class="pd3-mid__btn" id="pd3LinkClearBtn"
                 title="Снять все связи"
-                data-help-abs="Снять ВСЕ связи за выбранный период. Селект не нужен.">⛓️‍💥</button>
+                data-help-abs="Снять ВСЕ связи за выбранный период — и приходов, и расходов. Селект не нужен.">⛓️‍💥</button>
 
         <div class="pd3-mid__sums">
             <div class="pd3-mid__sum-row"><span class="muted">←</span><span id="pd3SelSepaySum">0</span></div>

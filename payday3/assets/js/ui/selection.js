@@ -1,6 +1,14 @@
-// Checkbox-driven row selection.
-// Maintains two Sets (sepayIds, posterIds), updates the mid-col sums,
-// enables/disables the link/clear buttons. Pure DOM, no fetch yet.
+// Checkbox-driven row selection for the whole page.
+//
+// Four kinds of rows can be ticked:
+//   left  «Деньги»: incoming SePay (.pd3-cb--sepay, data-sepay-id)
+//                   outgoing mail  (.pd3-cb--out-mail, data-mail-uid)
+//   right:          Poster checks  (.pd3-cb--poster, data-poster-id)
+//                   Poster finance (.pd3-cb--out-finance, data-finance-id)
+//
+// Valid pairs are incoming ↔ checks and outgoing ↔ finance. linkPlan()
+// turns the current selection into the link calls to make; the mid
+// column shows the left/right sums and enables 🎯 only for a valid plan.
 
 'use strict';
 
@@ -8,66 +16,114 @@ const fmt = (n) => {
     const v = Math.round(Number(n) || 0);
     try {
         return new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 })
-            .format(v).replace(/,/g, ' ');
+            .format(v).replace(/,/g, ' ');
     } catch (_) {
-        return String(v).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+        return String(v).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
     }
 };
 
+/** Checkbox dataset key → selection bucket. */
+const KINDS = { sepayId: 'sepay', posterId: 'poster', mailUid: 'mail', financeId: 'finance' };
+
+/** Selection bucket → its checkbox class. */
+const CHECKBOX = {
+    sepay: '.pd3-cb--sepay', poster: '.pd3-cb--poster',
+    mail: '.pd3-cb--out-mail', finance: '.pd3-cb--out-finance',
+};
+
+/** Buckets owned by each side — a side re-render resets only its own. */
+export const SIDE_KINDS = Object.freeze({ in: ['sepay', 'poster'], out: ['mail', 'finance'] });
+
+/**
+ * Which manual links the selection asks for.
+ *   in  — incoming SePay rows ↔ Poster checks
+ *   out — outgoing mail rows  ↔ Poster finance transactions
+ * A selection is linkable only if at least one pair is complete AND no
+ * row is left without its counterpart kind (e.g. ticked mail with no
+ * finance row) — otherwise a click would silently ignore some ticks.
+ *
+ * @param {{sepay:number, poster:number, mail:number, finance:number}} n  counts
+ * @returns {{in:boolean, out:boolean, canLink:boolean}}
+ */
+export function linkPlan({ sepay = 0, poster = 0, mail = 0, finance = 0 } = {}) {
+    const inPair  = sepay > 0 && poster > 0;
+    const outPair = mail > 0 && finance > 0;
+    const orphan  = (sepay > 0) !== (poster > 0) || (mail > 0) !== (finance > 0);
+    return { in: inPair, out: outPair, canLink: (inPair || outPair) && !orphan };
+}
+
+/**
+ * Mid-column match indicator for left vs right selected sums.
+ * @returns {{state:'empty'|'ok'|'warn'|'err', glyph:string}}
+ */
+export function matchState(leftSum, rightSum, leftCount, rightCount) {
+    if (!leftCount && !rightCount) return { state: 'empty', glyph: '·' };
+    if (!leftCount || !rightCount) return { state: 'warn', glyph: '∙' };
+    const diff = leftSum - rightSum;
+    if (diff === 0) return { state: 'ok', glyph: '✅' };
+    return { state: Math.abs(diff) > 1000 ? 'err' : 'warn', glyph: '⚠' };
+}
+
 export function initSelection() {
-    const sepayIds  = new Set();
-    const posterIds = new Set();
+    const sets = { sepay: new Set(), poster: new Set(), mail: new Set(), finance: new Set() };
 
-    const $selSepaySum  = document.getElementById('pd3SelSepaySum');
-    const $selPosterSum = document.getElementById('pd3SelPosterSum');
-    const $selMatch     = document.getElementById('pd3SelMatch');
-    const $selDiff      = document.getElementById('pd3SelDiff');
-    const $linkMake     = document.getElementById('pd3LinkMakeBtn');
-    const $linkClear    = document.getElementById('pd3LinkClearBtn');
+    const $left  = document.getElementById('pd3SelSepaySum');
+    const $right = document.getElementById('pd3SelPosterSum');
+    const $match = document.getElementById('pd3SelMatch');
+    const $diff  = document.getElementById('pd3SelDiff');
+    const $make  = document.getElementById('pd3LinkMakeBtn');
 
+    // Finance amounts are signed (expenses negative) — compare magnitudes.
     const sumOf = (sel) => Array.from(document.querySelectorAll(sel))
         .filter((el) => el.checked)
-        .reduce((acc, el) => acc + (Number(el.dataset.sum) || 0), 0);
+        .reduce((acc, el) => acc + Math.abs(Number(el.dataset.sum) || 0), 0);
+
+    const counts = () => ({
+        sepay: sets.sepay.size, poster: sets.poster.size,
+        mail: sets.mail.size,   finance: sets.finance.size,
+    });
 
     const recompute = () => {
-        const s = sumOf('.pd3-cb--sepay');
-        const p = sumOf('.pd3-cb--poster');
-        const diff = s - p;
-        if ($selSepaySum)  $selSepaySum.textContent  = fmt(s);
-        if ($selPosterSum) $selPosterSum.textContent = fmt(p);
-        if ($selDiff)      $selDiff.textContent      = fmt(diff);
-        if ($selMatch) {
-            if (!sepayIds.size && !posterIds.size) {
-                $selMatch.dataset.state = 'empty';
-                $selMatch.textContent   = '·';
-            } else if (diff === 0 && sepayIds.size && posterIds.size) {
-                $selMatch.dataset.state = 'ok';
-                $selMatch.textContent   = '✅';
-            } else if (sepayIds.size && posterIds.size) {
-                $selMatch.dataset.state = Math.abs(diff) > 1000 ? 'err' : 'warn';
-                $selMatch.textContent   = '⚠';
-            } else {
-                $selMatch.dataset.state = 'warn';
-                $selMatch.textContent   = '∙';
-            }
+        const left  = sumOf('.pd3-cb--sepay') + sumOf('.pd3-cb--out-mail');
+        const right = sumOf('.pd3-cb--poster') + sumOf('.pd3-cb--out-finance');
+        const n = counts();
+        if ($left)  $left.textContent  = fmt(left);
+        if ($right) $right.textContent = fmt(right);
+        if ($diff)  $diff.textContent  = fmt(left - right);
+        if ($match) {
+            const m = matchState(left, right, n.sepay + n.mail, n.poster + n.finance);
+            $match.dataset.state = m.state;
+            $match.textContent   = m.glyph;
         }
-        const canLink = sepayIds.size > 0 && posterIds.size > 0;
-        if ($linkMake) $linkMake.toggleAttribute('disabled', !canLink);
-        // linkClear is always available — it clears EVERY link in the
-        // current date range regardless of selection.
+        if ($make) $make.toggleAttribute('disabled', !linkPlan(n).canLink);
+    };
+
+    /**
+     * Untick the given buckets (all by default). Programmatic
+     * .checked=false fires no change event, so the sets are cleared here.
+     * A side that re-renders passes its own kinds (SIDE_KINDS) so ticks
+     * on the other side survive — e.g. the outgoing rows arriving ~2 s
+     * after page load don't wipe ticks already made on incoming rows.
+     */
+    const reset = (kinds = Object.keys(sets)) => {
+        for (const kind of kinds) {
+            document.querySelectorAll(CHECKBOX[kind]).forEach((cb) => { cb.checked = false; });
+            sets[kind].clear();
+        }
+        recompute();
     };
 
     document.body.addEventListener('change', (e) => {
         const t = e.target;
-        if (!(t instanceof HTMLInputElement)) return;
-        if (!t.classList.contains('pd3-cb')) return;
-        const sid = t.dataset.sepayId;
-        const pid = t.dataset.posterId;
-        if (sid !== undefined) (t.checked ? sepayIds.add(Number(sid))  : sepayIds.delete(Number(sid)));
-        if (pid !== undefined) (t.checked ? posterIds.add(Number(pid)) : posterIds.delete(Number(pid)));
+        if (!(t instanceof HTMLInputElement) || !t.classList.contains('pd3-cb')) return;
+        for (const [key, kind] of Object.entries(KINDS)) {
+            if (t.dataset[key] === undefined) continue;
+            const id = Number(t.dataset[key]);
+            t.checked ? sets[kind].add(id) : sets[kind].delete(id);
+        }
         recompute();
     });
 
     recompute();
-    return { sepayIds, posterIds, recompute };
+    return { sets, counts, recompute, reset };
 }

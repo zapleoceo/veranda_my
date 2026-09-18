@@ -34,10 +34,11 @@ declare(strict_types=1);
         </button>
     </div>
 
-    <nav class="pd3-tabs" aria-label="Режим сверки">
-        <button type="button" class="pd3-tab is-active" data-tab="in"  data-help-abs="Сверка входящих платежей.">IN</button>
-        <button type="button" class="pd3-tab"           data-tab="out" data-help-abs="Сверка исходящих платежей.">OUT</button>
-    </nav>
+    <!-- Free-form Poster finance transaction (type + account chosen in
+         the modal) — the per-row «+» buttons pre-fill it from a bank row. -->
+    <button type="button" class="pd3-btn pd3-btn--sm" id="pd3CreateTxBtn"
+            title="Создать транзакцию в Poster"
+            data-help-abs="Создать финансовую транзакцию в Poster: доход, расход или перевод — с выбором счёта.">+ транзакция</button>
 
     <form class="pd3-toolbar__dates" method="get" action="/payday3" id="pd3DateForm">
         <!-- Single-day mode only. Auto-submit on date change — no

@@ -1,6 +1,7 @@
 // "+" popup on unlinked bank rows → create a Poster finance
 // transaction: OUT mail rows open it as an expense, IN SePay rows as
-// an income (the button + its data live in ./rowCreateTx.js).
+// an income (the button + its data live in ./rowCreateTx.js); the
+// toolbar «+ транзакция» opens it blank on the selected day.
 // Direct port of payday2's #createTxModal flow, trimmed to the
 // essentials we actually use:
 //
@@ -307,6 +308,12 @@ export function initCreateTx({ state, host, openModal, closeModal, onCreated }) 
         e.stopPropagation();
         const { amount, date, type } = readCreateTxTrigger(btn);
         open(amount, date, type);
+    });
+
+    // Toolbar «+ транзакция»: blank transaction on the selected day (time =
+    // now); the operator picks type, account, amount and category.
+    document.getElementById('pd3CreateTxBtn')?.addEventListener('click', () => {
+        open(0, state?.get?.('range')?.from || '');
     });
 
     return { open };

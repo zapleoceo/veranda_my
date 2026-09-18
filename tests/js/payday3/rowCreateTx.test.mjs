@@ -34,7 +34,7 @@ test('кнопка IN несёт тип «приход», сумму и врем
         html,
         '<button type="button" class="pd3-row-create" title="Создать приход в Poster на эту сумму"'
         + ' data-tx-type="1" data-amount="350000" data-date="2026-09-18 14:05:09">+</button>',
-        'разметка обязана совпадать с серверной (sepay_table.php)',
+        'разметка обязана совпадать с серверной (bank_table.php)',
     );
 });
 

@@ -15,6 +15,7 @@ const { renderSepay,
         renderPoster,
         updateInFooters }  = await import(new URL('./renderTables.js' + _qs, import.meta.url).href);
 const { refreshStats }     = await import(new URL('../ui/stats.js'   + _qs, import.meta.url).href);
+const { SEPAY_TBODY }      = await import(new URL('../ui/bankTable.js' + _qs, import.meta.url).href);
 
 function dateQuery(range) {
     const p = new URLSearchParams();
@@ -25,7 +26,12 @@ function dateQuery(range) {
 
 let inFlight = null;
 
-export function makeInLoader({ state, renderer }) {
+/**
+ * @param {{state:object, renderer:object|null, onRendered?:()=>void}} deps
+ *   onRendered — after the incoming rows and checks are re-rendered
+ *   (selection reset, eye-toggle re-apply) — owned by index.js.
+ */
+export function makeInLoader({ state, renderer, onRendered }) {
     return async function loadInData() {
         // Coalesce overlapping calls — sync + clearDay can both fire.
         if (inFlight) return inFlight;
@@ -47,6 +53,7 @@ export function makeInLoader({ state, renderer }) {
                 renderer.setLinks(links);
             }
             refreshStats();
+            onRendered?.();
         })();
         inFlight = promise.finally(() => { inFlight = null; });
         return inFlight;
@@ -54,8 +61,8 @@ export function makeInLoader({ state, renderer }) {
 }
 
 /**
- * Wires the SePay per-row hide/restore button (`.pd3-row-hide` in
- * #pd3SepayTable). Delegated on document.body so it works for both
+ * Wires the SePay per-row hide/restore button (`.pd3-row-hide` in the
+ * incoming block of «Деньги»). Delegated on document.body so it works for both
  * server-rendered and JS-rendered rows. After every mutation we call
  * `reload()` so the row drops from the "open" list (or reappears under
  * the eye-toggle) without a full page reload.
@@ -66,7 +73,7 @@ export function makeInLoader({ state, renderer }) {
  */
 export function initSepayHide({ reload }) {
     document.body.addEventListener('click', async (e) => {
-        const btn = e.target.closest?.('#pd3SepayTable .pd3-row-hide');
+        const btn = e.target.closest?.(`${SEPAY_TBODY} .pd3-row-hide`);
         if (!btn) return;
         const id = Number(btn.dataset.sepayId);
         if (!id) return;

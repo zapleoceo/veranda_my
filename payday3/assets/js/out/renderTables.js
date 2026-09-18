@@ -8,6 +8,7 @@
 const _v = new URL(import.meta.url).searchParams.get('v') || '';
 const _qs = _v ? '?v=' + encodeURIComponent(_v) : '';
 const { createTxButtonHtml, TX_TYPE } = await import(new URL('../ui/rowCreateTx.js' + _qs, import.meta.url).href);
+const { BANK_COLUMNS, MAIL_TBODY, byTimeAsc } = await import(new URL('../ui/bankTable.js' + _qs, import.meta.url).href);
 
 const fmt = (n) => {
     const v = Math.round(Number(n) || 0);
@@ -36,13 +37,15 @@ export function renderOutMail(rows, links, { showHidden = false } = {}) {
         if (!byMail.has(l.mail_uid)) byMail.set(l.mail_uid, []);
         byMail.get(l.mail_uid).push(l);
     }
-    const tbody = document.querySelector('#pd3OutMailTable tbody');
+    const tbody = document.querySelector(MAIL_TBODY);
     if (!tbody) return;
     if (!rows.length) {
-        tbody.innerHTML = '<tr class="pd3-empty"><td colspan="7">Писем за период не найдено.</td></tr>';
+        tbody.innerHTML = `<tr class="pd3-empty"><td colspan="${BANK_COLUMNS}">Расходов за период нет.</td></tr>`;
         return;
     }
-    tbody.innerHTML = rows.map((r) => {
+    // IMAP returns newest first; the «Деньги» table reads top-down in
+    // time (earliest expense first, right under the divider).
+    tbody.innerHTML = byTimeAsc(rows, 'date').map((r) => {
         const state = r.is_hidden ? 'row-hidden' : rowState(byMail.get(r.mail_uid));
         const time  = (r.date || '').slice(11, 19);
         const cls   = ['pd3-row', state, r.is_hidden && !showHidden ? 'is-hidden' : ''].filter(Boolean).join(' ');

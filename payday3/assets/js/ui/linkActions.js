@@ -1,14 +1,20 @@
-// Wire mid-col buttons to backend mutations. After every successful
-// call the row classes are recomputed from the fresh link set and
-// LineRenderer is asked to redraw.
+// Incoming-side links: SePay rows ↔ Poster checks (table
+// check_payment_links, /payday3/api/links/*).
+//
+// Adapter only — no buttons are bound here. The page-wide link panel
+// (ui/linkPanel.js) drives both this and the outgoing adapter
+// (out/bootstrap.js) from one set of mid-column buttons. After every
+// successful call the row classes are recomputed from the fresh link
+// set and the LineRenderer redraws.
 
 'use strict';
 
 // Cache-bust cross-module imports — see comment in out/bootstrap.js.
 const _v = new URL(import.meta.url).searchParams.get('v') || '';
 const _qs = _v ? '?v=' + encodeURIComponent(_v) : '';
-const { api } = await import(new URL('../api.js' + _qs, import.meta.url).href);
-const { recomputePosterFooter } = await import(new URL('../in/renderTables.js' + _qs, import.meta.url).href);
+const { api }           = await import(new URL('../api.js'       + _qs, import.meta.url).href);
+const { refreshStats }  = await import(new URL('./stats.js'      + _qs, import.meta.url).href);
+const { SEPAY_TBODY }   = await import(new URL('./bankTable.js'  + _qs, import.meta.url).href);
 
 function dateQuery(range) {
     const p = new URLSearchParams();
@@ -17,10 +23,19 @@ function dateQuery(range) {
     return p.toString();
 }
 
-/**
- * Recompute row CSS classes from the fresh link list.
- * Mirrors src/Payday3/Domain/RowState::classify on the client.
- */
+/** Mirrors src/Payday3/Domain/RowState::classify on the client. */
+function classify(edges) {
+    if (!edges || edges.length === 0) return 'row-red';
+    let manual = false, yellow = false;
+    for (const e of edges) {
+        if (e.is_manual) manual = true;
+        if (e.link_type === 'auto_yellow') yellow = true;
+    }
+    if (manual) return 'row-gray';
+    return yellow ? 'row-yellow' : 'row-green';
+}
+
+/** Recompute row CSS classes from the fresh link list. */
 function reclassifyRows(links) {
     const bySepay  = new Map();
     const byPoster = new Map();
@@ -30,141 +45,52 @@ function reclassifyRows(links) {
         bySepay.get(l.sepay_id).push(l);
         byPoster.get(l.poster_transaction_id).push(l);
     }
-    const classify = (edges) => {
-        if (!edges || edges.length === 0) return 'row-red';
-        let manual = false, yellow = false;
-        for (const e of edges) {
-            if (e.is_manual) manual = true;
-            if (e.link_type === 'auto_yellow') yellow = true;
-        }
-        if (manual) return 'row-gray';
-        return yellow ? 'row-yellow' : 'row-green';
-    };
-
-    document.querySelectorAll('#pd3SepayTable tr.pd3-row').forEach((tr) => {
+    const STATES = ['row-red', 'row-green', 'row-yellow', 'row-gray'];
+    document.querySelectorAll(`${SEPAY_TBODY} tr.pd3-row`).forEach((tr) => {
         if (tr.classList.contains('row-hidden')) return;  // hidden rows keep their class
-        const sid = Number(tr.dataset.sepayId);
-        const next = classify(bySepay.get(sid));
-        ['row-red','row-green','row-yellow','row-gray'].forEach((c) => tr.classList.remove(c));
-        tr.classList.add(next);
+        tr.classList.remove(...STATES);
+        tr.classList.add(classify(bySepay.get(Number(tr.dataset.sepayId))));
     });
     document.querySelectorAll('#pd3PosterTable tr.pd3-row').forEach((tr) => {
-        const pid = Number(tr.dataset.posterId);
-        const next = classify(byPoster.get(pid));
-        ['row-red','row-green','row-yellow','row-gray'].forEach((c) => tr.classList.remove(c));
-        tr.classList.add(next);
+        tr.classList.remove(...STATES);
+        tr.classList.add(classify(byPoster.get(Number(tr.dataset.posterId))));
     });
 }
 
-function refreshFooterStats() {
-    const rows = document.querySelectorAll('#pd3SepayTable tr.pd3-row');
-    let linked = 0, unlinked = 0;
-    rows.forEach((r) => {
-        if (r.classList.contains('row-hidden')) return;
-        if (r.classList.contains('row-red')) unlinked++;
-        else linked++;
-    });
-    const $l = document.getElementById('pd3SepayLinked');
-    const $u = document.getElementById('pd3SepayUnlinked');
-    if ($l) $l.textContent = String(linked);
-    if ($u) $u.textContent = String(unlinked);
+/**
+ * @param {{state:object, renderer:object|null, onChanged?:(links:array)=>void}} deps
+ *   onChanged — called after every applied mutation (selection reset,
+ *   eye-toggle re-apply) so this adapter stays unaware of those modules.
+ */
+export function createInLinks({ state, renderer, onChanged }) {
+    const qs = () => dateQuery(state.get('range') || {});
 
-    // Poster footer (Tips / в таблице связи / несвязи) is link-state
-    // dependent — recompute it from the freshly-reclassified rows.
-    recomputePosterFooter();
-}
-
-function uncheckAll(selection) {
-    document.querySelectorAll('.pd3-cb').forEach((cb) => { cb.checked = false; });
-    // Programmatic `.checked = false` doesn't fire a change event, so
-    // we manually reset the selection state and force a recompute.
-    selection.sepayIds.clear();
-    selection.posterIds.clear();
-    selection.recompute();
-}
-
-function flash(msg, isErr = false) {
-    // Non-blocking toast. Replace with a real component later.
-    if (isErr) console.error('[payday3]', msg); else console.info('[payday3]', msg);
-}
-
-export function initLinkActions({ state, renderer, selection }) {
-    const range = state.get('range') || {};
-    const qs    = () => dateQuery(state.get('range') || {});
-
-    const after = (result) => {
+    const apply = (result) => {
         const links = Array.isArray(result?.links) ? result.links : [];
         state.set('links', links);
         reclassifyRows(links);
-        refreshFooterStats();
-        renderer.setLinks(links);
-        uncheckAll(selection);
+        refreshStats();
+        renderer?.setLinks(links);
+        onChanged?.(links);
+        return result;
     };
 
-    const $auto   = document.getElementById('pd3LinkAutoBtn');
-    const $make   = document.getElementById('pd3LinkMakeBtn');
-    const $clear  = document.getElementById('pd3LinkClearBtn');
-
-    $auto?.addEventListener('click', async () => {
-        if ($auto.disabled) return;
-        $auto.disabled = true;
-        try {
-            const r = await api.post('/payday3/api/links/auto?' + qs());
-            after(r);
-            flash(`Авто-связи: добавлено ${r.added}, всего ${r.total}`);
-        } catch (e) {
-            flash(e.message, true);
-        } finally {
-            $auto.disabled = false;
-        }
-    });
-
-    $make?.addEventListener('click', async () => {
-        if ($make.disabled) return;
-        const sepayIds  = [...selection.sepayIds];
-        const posterIds = [...selection.posterIds];
-        if (!sepayIds.length || !posterIds.length) return;
-        $make.disabled = true;
-        try {
-            const r = await api.post('/payday3/api/links/manual?' + qs(), { sepayIds, posterIds });
-            after(r);
-            flash(`Ручные связи: добавлено ${r.added}`);
-        } catch (e) {
-            flash(e.message, true);
-        } finally {
-            $make.disabled = false;
-        }
-    });
-
-    $clear?.addEventListener('click', async () => {
-        if ($clear.disabled) return;
-        const r = state.get('range') || {};
-        const period = r.from === r.to ? r.from : `${r.from} — ${r.to}`;
-        if (!confirm(`Снять ВСЕ связи Sepay↔Poster за период ${period}?\n\nЭто удалит и авто-, и ручные связи в выбранном диапазоне дат. Селект чекбоксов не учитывается.`)) return;
-        $clear.disabled = true;
-        try {
-            const result = await api.post('/payday3/api/links/clear?' + qs());
-            after(result);
-            flash(`Связи очищены (${result.removed ?? 0})`);
-        } catch (e) {
-            flash(e.message, true);
-        } finally {
-            $clear.disabled = false;
-        }
-    });
-
-    // Per-link unlink hook (called from LineRenderer's × button).
-    // Receives the full link record so OUT-mode can reuse the same hook
-    // shape with different id fields.
-    return async function onUnlink(link) {
-        const sid = Number(link?.sepay_id);
-        const pid = Number(link?.poster_transaction_id);
-        if (!sid || !pid) return;
-        try {
-            const r = await api.delete(`/payday3/api/links/${sid}/${pid}?${qs()}`);
-            after(r);
-        } catch (e) {
-            flash(e.message, true);
-        }
+    return {
+        autoLink:   async () => apply(await api.post('/payday3/api/links/auto?' + qs())),
+        manualLink: async (sepayIds, posterIds) =>
+            apply(await api.post('/payday3/api/links/manual?' + qs(), { sepayIds, posterIds })),
+        clearLinks: async () => apply(await api.post('/payday3/api/links/clear?' + qs())),
+        /** Per-link unlink (LineRenderer × button). */
+        onUnlink: async (link) => {
+            const sid = Number(link?.sepay_id);
+            const pid = Number(link?.poster_transaction_id);
+            if (!sid || !pid) return;
+            try {
+                apply(await api.delete(`/payday3/api/links/${sid}/${pid}?${qs()}`));
+            } catch (e) {
+                console.error('[payday3]', e);
+                alert(e.message);
+            }
+        },
     };
 }

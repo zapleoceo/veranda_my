@@ -148,22 +148,6 @@
 .pd3-icon-btn:active { transform: translateY(1px); }
 .pd3-icon-btn--small { width: 22px; height: 22px; font-size: var(--pd3-fs-base); }
 
-.pd3-tabs { display: flex; gap: var(--pd3-s-4); }
-.pd3-tab {
-    padding: var(--pd3-s-4) var(--pd3-s-9);
-    border: 1px solid var(--border);
-    border-radius: var(--pd3-r-xl);
-    background: var(--card);
-    color: var(--muted);
-    font-weight: 800;
-    cursor: pointer;
-}
-.pd3-tab.is-active {
-    background: rgba(255,255,255,0.12);
-    color: var(--text);
-}
-.pd3-tab:hover { color: var(--text); }
-
 .pd3-toolbar__dates {
     display: flex;
     align-items: center;
@@ -214,15 +198,6 @@
     max-width: 100%;
 }
 
-/* IN / OUT section toggle — driven by body.pd3-mode-in / body.pd3-mode-out. */
-.pd3-section { display: none; }
-body.pd3-mode-in  .pd3-section--in  { display: block; }
-body.pd3-mode-out .pd3-section--out { display: block; }
-.pd3-out-placeholder {
-    padding: var(--pd3-s-13) var(--pd3-s-12);
-    text-align: center;
-}
-.pd3-out-placeholder h2 { margin: 0 0 var(--pd3-s-8); }
 .pd3-link {
     color: var(--accent);
     text-decoration: underline;
@@ -272,6 +247,31 @@ body.pd3-mode-out .pd3-section--out { display: block; }
     border-right: 1px solid var(--border);
 }
 .pd3-pane--poster { border-right: 0; }
+
+/* Right column: Poster checks above Poster finance transactions. Each
+   pane keeps its own vertical scroll, so together they stay about as
+   tall as the «Деньги» pane on the left. */
+.pd3-right {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+.pd3-right .pd3-pane { flex: 1 1 auto; min-height: 0; }
+.pd3-right .pd3-pane + .pd3-pane { border-top: 1px solid var(--border); }
+.pd3-right .pd3-pane__scroll { max-height: 34vh; }
+
+/* «Деньги»: divider row between incoming (above) and outgoing (below). */
+.pd3-bank-split td {
+    padding: var(--pd3-s-2) var(--pd3-s-4);
+    background: rgba(255,255,255,0.05);
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+    color: var(--muted);
+    font-size: var(--pd3-fs-sm);
+    font-weight: 700;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+}
 
 .pd3-pane__header {
     display: flex;

@@ -6,7 +6,7 @@
 //
 // The button is rendered on every row; CSS shows it only on unlinked
 // (row-red) rows. The server-side SePay partial
-// (src/Views/payday3/partials/sepay_table.php) must emit the same
+// (src/Views/payday3/partials/bank_table.php) must emit the same
 // markup — tests on both sides pin the shared contract.
 //
 // Pure functions, no DOM access at module level, so the module loads

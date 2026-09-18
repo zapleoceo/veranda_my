@@ -1,11 +1,13 @@
-// OUT-mode bootstrap. Lazy: stays inert until the user clicks the
-// OUT tab the first time. After that it owns:
-//   * data fetch from /payday3/api/out/data
-//   * tbody rendering for mail + finance tables
-//   * a second LineRenderer instance with OUT anchor-id factories
-//   * mid-col buttons (auto / manual / clear / per-link × unlink / hide)
-//   * row selection sums
-//   * Lite/Full toggle for the OUT panes (shares body.pd3-mode-lite)
+// Outgoing side: BIDV mail rows (lower block of «Деньги») ↔ Poster
+// finance transactions (lower right table). Owns:
+//   * data fetch — /out/mail (live IMAP), /out/finance (Poster API),
+//     /out/links (DB), fanned out in parallel on page load;
+//   * rendering of the mail block and the finance table;
+//   * the outgoing LineRenderer (its own SVG layer in the shared grid);
+//   * outgoing link mutations as an adapter — autoLink / manualLink /
+//     clearLinks — driven by the page-wide link panel (ui/linkPanel.js);
+//   * per-row mail hide (−) and the shared «show hidden» eye.
+// Row selection lives in ui/selection.js for the whole page.
 
 'use strict';
 
@@ -22,12 +24,8 @@ const { LineRenderer }        = await import(new URL('../ui/lineRenderer.js'  + 
 const { renderOutMail,
         renderOutFinance,
         updateOutFooter }     = await import(new URL('./renderTables.js'      + _qs, import.meta.url).href);
-
-const fmt = (n) => {
-    const v = Math.round(Number(n) || 0);
-    try { return new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(v).replace(/,/g, ' '); }
-    catch (_) { return String(v).replace(/\B(?=(\d{3})+(?!\d))/g, ' '); }
-};
+const { BANK_COLUMNS, BANK_SCROLL,
+        BANK_TABLE, MAIL_TBODY } = await import(new URL('../ui/bankTable.js'  + _qs, import.meta.url).href);
 
 function rangeQs(state) {
     const r = state.get('range') || {};
@@ -37,128 +35,92 @@ function rangeQs(state) {
     return p.toString();
 }
 
-export function initOutMode({ state }) {
-    let loaded         = false;
+/**
+ * @param {{state:object, onChanged?:()=>void}} deps
+ *   onChanged — after every render of the outgoing rows (load or link
+ *   mutation), so the page can reset the selection and re-apply eye
+ *   toggles without this module knowing about them.
+ */
+export function initOutMode({ state, onChanged }) {
     let renderer       = null;
     let mailRows       = [];
     let finRows        = [];
     let links          = [];
-    let showHiddenMail = false;   // tracks the hidden-mail eye toggle state
-    const selMail = new Set();
-    const selFin  = new Set();
+    let showHiddenMail = false;   // shared «show hidden» eye (#pd3SepayHiddenToggle)
 
-    const grid = document.querySelector('.pd3-section--out .pd3-graph__grid');
-    if (!grid) return;
+    const grid = document.querySelector('#pd3GraphRoot .pd3-graph__grid');
+    if (!grid) return null;
 
     function buildRenderer() {
         if (renderer) return;
         renderer = new LineRenderer({
             container:          grid,
             layer:              document.getElementById('pd3OutLineLayer'),
-            leftScroll:         document.getElementById('pd3OutMailScroll'),
+            leftScroll:         document.querySelector(BANK_SCROLL),
             rightScroll:        document.getElementById('pd3OutFinanceScroll'),
-            leftTbody:          document.querySelector('#pd3OutMailTable tbody'),
-            rightTbody:         document.querySelector('#pd3OutFinanceTable tbody'),
-            horizontalScroller: document.getElementById('pd3OutGraphRoot'),
+            // Observe the WHOLE bank table and right column: the incoming
+            // block above / the checks pane above move these anchors too.
+            leftTbody:          document.querySelector(BANK_TABLE),
+            rightTbody:         document.getElementById('pd3RightColumn'),
+            horizontalScroller: document.getElementById('pd3GraphRoot'),
             leftAnchorId:       (l) => 'pd3-out-mail-anchor-'    + l.mail_uid,
             rightAnchorId:      (l) => 'pd3-out-finance-anchor-' + l.finance_id,
             linkKey:            (l) => l.mail_uid + ':' + l.finance_id,
             onUnlink: async (link) => {
                 try {
-                    const r = await api.delete(`/payday3/api/out/links/${link.mail_uid}/${link.finance_id}?${rangeQs(state)}`);
-                    afterMutation(r);
+                    apply(await api.delete(`/payday3/api/out/links/${link.mail_uid}/${link.finance_id}?${rangeQs(state)}`));
                 } catch (e) { console.error('[payday3-out]', e); alert(e.message); }
             },
         });
     }
 
-    function recomputeSelection() {
-        let mailSum = 0, finSum = 0;
-        for (const cb of document.querySelectorAll('.pd3-cb--out-mail:checked')) {
-            mailSum += Number(cb.dataset.sum) || 0;
-        }
-        for (const cb of document.querySelectorAll('.pd3-cb--out-finance:checked')) {
-            finSum += Math.abs(Number(cb.dataset.sum) || 0);
-        }
-        const $m = document.getElementById('pd3OutSelMailSum');
-        const $f = document.getElementById('pd3OutSelFinanceSum');
-        const $d = document.getElementById('pd3OutSelDiff');
-        const $i = document.getElementById('pd3OutSelMatch');
-        if ($m) $m.textContent = fmt(mailSum);
-        if ($f) $f.textContent = fmt(finSum);
-        const diff = mailSum - finSum;
-        if ($d) $d.textContent = fmt(diff);
-        if ($i) {
-            if (!selMail.size && !selFin.size)               { $i.dataset.state = 'empty'; $i.textContent = '·'; }
-            else if (diff === 0 && selMail.size && selFin.size) { $i.dataset.state = 'ok';    $i.textContent = '✅'; }
-            else if (selMail.size && selFin.size)              { $i.dataset.state = Math.abs(diff) > 1000 ? 'err' : 'warn'; $i.textContent = '⚠'; }
-            else                                                 { $i.dataset.state = 'warn';  $i.textContent = '∙'; }
-        }
-        const $make  = document.getElementById('pd3OutLinkMakeBtn');
-        if ($make) $make.toggleAttribute('disabled', !(selMail.size > 0 && selFin.size > 0));
-    }
-
-    function afterMutation(result) {
-        links = Array.isArray(result?.links) ? result.links : links;
-        // Re-render tbodies so row colours follow the new link set,
-        // then ask the renderer to redraw connectors.
+    function render() {
         renderOutMail(mailRows, links, { showHidden: showHiddenMail });
         renderOutFinance(finRows, links);
-        selMail.clear();
-        selFin.clear();
-        recomputeSelection();
-        renderer?.setLinks(links);
+        buildRenderer();
+        renderer.setLinks(links);
+        onChanged?.();
     }
 
-    // Flood protection: while a fetch is in flight, every reload
-    // button is disabled and shows the .is-busy spinner. A re-entry
-    // attempt aborts (no queue — the user gets the freshest data
-    // from whichever click wins).
+    /** Apply a link-mutation response (it carries the fresh link set). */
+    function apply(result) {
+        links = Array.isArray(result?.links) ? result.links : links;
+        render();
+        return result;
+    }
+
+    // Flood protection: while a fetch is in flight every reload button
+    // is disabled and shows the .is-busy spinner; re-entry is dropped
+    // (the in-flight request already brings the freshest data).
     let loading = false;
-    async function load(opts = {}) {
+    async function load() {
         if (loading) return;
         loading = true;
-        const includeHidden = opts.includeHidden ? '1' : '0';
-        const reloadButtons = [
-            document.getElementById('pd3OutMailReloadBtn'),
-            document.getElementById('pd3OutFinanceReloadBtn'),
-        ].filter(Boolean);
+        const reloadButtons = [document.getElementById('pd3OutFinanceReloadBtn')].filter(Boolean);
         reloadButtons.forEach((b) => { b.disabled = true; b.classList.add('is-busy'); });
         try {
-            // Fan out — IMAP, Poster API and the DB link query each
-            // hit a dedicated endpoint. AuthMiddleware releases the
-            // PHP session lock for /payday3/* so the three really
-            // do run concurrently on the server. Total wait drops
-            // from sum (~2.5 s) to max (~IMAP ≈ 2 s).
+            // Fan out — IMAP, Poster API and the DB link query each hit
+            // a dedicated endpoint; AuthMiddleware releases the session
+            // lock for /payday3/* so they really run concurrently.
             const qs = rangeQs(state);
             const [mailRes, finRes, linkRes] = await Promise.allSettled([
-                api.get(`/payday3/api/out/mail?include_hidden=${includeHidden}&${qs}`),
+                api.get(`/payday3/api/out/mail?include_hidden=${showHiddenMail ? '1' : '0'}&${qs}`),
                 api.get(`/payday3/api/out/finance?${qs}`),
                 api.get(`/payday3/api/out/links?${qs}`),
             ]);
-            // Partial failures are surfaced inline but don't sink the
-            // whole render — e.g. IMAP can flake but the operator
-            // still gets to see Poster txs and existing links.
+            // Partial failures don't sink the render — e.g. IMAP can flake
+            // but the operator still sees Poster txs and existing links.
             mailRows = mailRes.status === 'fulfilled' ? (mailRes.value?.mail    || []) : [];
             finRows  = finRes .status === 'fulfilled' ? (finRes .value?.finance || []) : [];
             links    = linkRes.status === 'fulfilled' ? (linkRes.value?.links   || []) : [];
-            renderOutMail(mailRows, links, { showHidden: !!opts.includeHidden });
-            renderOutFinance(finRows, links);
+            render();
             updateOutFooter(mailRows, finRows);
-            buildRenderer();
-            renderer.setLinks(links);
-            selMail.clear();
-            selFin.clear();
-            recomputeSelection();
-            loaded = true;
-            // If any leg rejected, log AND show a footnote — useful
-            // when IMAP creds are wrong but Poster works.
             for (const [name, p] of [['mail', mailRes], ['finance', finRes], ['links', linkRes]]) {
                 if (p.status === 'rejected') console.error('[payday3-out] /' + name, p.reason);
             }
         } catch (e) {
-            const tb = document.querySelector('#pd3OutMailTable tbody');
-            if (tb) tb.innerHTML = `<tr class="pd3-empty"><td colspan="6">Не удалось загрузить: ${e.message || 'ошибка'}</td></tr>`;
+            const tb = document.querySelector(MAIL_TBODY);
+            if (tb) tb.innerHTML = `<tr class="pd3-empty"><td colspan="${BANK_COLUMNS}">Не удалось загрузить: ${e.message || 'ошибка'}</td></tr>`;
             console.error('[payday3-out]', e);
         } finally {
             loading = false;
@@ -166,64 +128,12 @@ export function initOutMode({ state }) {
         }
     }
 
-    // Lazy: first time OUT tab becomes active.
-    const watchActivation = () => {
-        if (document.body.classList.contains('pd3-mode-out') && !loaded) load();
-    };
-    watchActivation();
-    document.querySelectorAll('.pd3-tab').forEach((t) => t.addEventListener('click', () => setTimeout(watchActivation, 0)));
-
-    // Selection toggle
-    document.body.addEventListener('change', (e) => {
-        const t = e.target;
-        if (!(t instanceof HTMLInputElement)) return;
-        if (t.classList.contains('pd3-cb--out-mail')) {
-            const uid = Number(t.dataset.mailUid);
-            t.checked ? selMail.add(uid) : selMail.delete(uid);
-            recomputeSelection();
-        } else if (t.classList.contains('pd3-cb--out-finance')) {
-            const fid = Number(t.dataset.financeId);
-            t.checked ? selFin.add(fid) : selFin.delete(fid);
-            recomputeSelection();
-        }
-    });
-
-    // Reload buttons just re-call load — mail and finance share a fetch.
-    document.getElementById('pd3OutMailReloadBtn')?.addEventListener('click', () => load());
+    // Both reload buttons refetch the outgoing side: the finance pane's ↻
+    // and the «Деньги» ↻ (which also syncs SePay — see ui/dataActions.js).
     document.getElementById('pd3OutFinanceReloadBtn')?.addEventListener('click', () => load());
+    document.getElementById('pd3SepaySyncBtn')?.addEventListener('click', () => load());
 
-    // Mid-col actions
-    document.getElementById('pd3OutLinkAutoBtn')?.addEventListener('click', async (e) => {
-        const btn = e.currentTarget;
-        if (btn.disabled) return; btn.disabled = true;
-        try {
-            const r = await api.post('/payday3/api/out/links/auto?' + rangeQs(state));
-            afterMutation(r);
-        } catch (err) { alert(err.message); } finally { btn.disabled = false; }
-    });
-    document.getElementById('pd3OutLinkMakeBtn')?.addEventListener('click', async (e) => {
-        const btn = e.currentTarget;
-        if (btn.disabled) return; btn.disabled = true;
-        try {
-            const r = await api.post('/payday3/api/out/links/manual?' + rangeQs(state), {
-                mailUids:   [...selMail],
-                financeIds: [...selFin],
-            });
-            afterMutation(r);
-        } catch (err) { alert(err.message); } finally { btn.disabled = false; }
-    });
-    document.getElementById('pd3OutLinkClearBtn')?.addEventListener('click', async (e) => {
-        const r0 = state.get('range') || {};
-        const period = r0.from === r0.to ? r0.from : `${r0.from} — ${r0.to}`;
-        if (!confirm(`Снять ВСЕ OUT-связи за период ${period}?`)) return;
-        const btn = e.currentTarget; btn.disabled = true;
-        try {
-            const r = await api.post('/payday3/api/out/links/clear?' + rangeQs(state));
-            afterMutation(r);
-        } catch (err) { alert(err.message); } finally { btn.disabled = false; }
-    });
-
-    // Hide mail row from its hide-button.
+    // Per-row hide (−) on a mail row.
     document.body.addEventListener('click', async (e) => {
         const t = e.target.closest?.('.pd3-out-mail-hide');
         if (!t) return;
@@ -232,41 +142,27 @@ export function initOutMode({ state }) {
         const cmt = prompt('Комментарий к скрытию (необязательно):', '') ?? '';
         try {
             await api.post('/payday3/api/out/mail/hide?' + rangeQs(state), { mailUid: uid, comment: cmt });
-            await load();   // refresh mail list (the hidden row drops out unless eye is on)
+            await load();   // the hidden row drops out unless «show hidden» is on
         } catch (err) { alert(err.message); }
     });
 
-    // Hide-linked eye toggle in mid-col.
-    const $hideLinked = document.getElementById('pd3OutHideLinkedBtn');
-    if ($hideLinked) {
-        let pressed = false;
-        $hideLinked.addEventListener('click', () => {
-            pressed = !pressed;
-            $hideLinked.setAttribute('aria-pressed', pressed ? 'true' : 'false');
-            document.querySelectorAll('#pd3OutMailTable .pd3-row.row-green, #pd3OutMailTable .pd3-row.row-yellow, #pd3OutMailTable .pd3-row.row-gray, #pd3OutFinanceTable .pd3-row.row-green, #pd3OutFinanceTable .pd3-row.row-yellow, #pd3OutFinanceTable .pd3-row.row-gray')
-                .forEach((r) => r.classList.toggle('is-hidden', pressed));
-            renderer?.redraw();
-        });
-    }
-
-    // Hidden-mail eye toggle on the mail card — reloads everything
-    // through the same fan-out load() helper with includeHidden set
-    // so the request stays parallel and we reuse one code path.
-    // (showHiddenMail is declared at the top of initOutMode so
-    //  afterMutation can pass it to renderOutMail as well.)
-    document.getElementById('pd3OutMailHiddenToggle')?.addEventListener('click', async (e) => {
+    // Shared «show hidden» eye of the «Деньги» pane: SePay rows are
+    // toggled in place by ui/eyeToggles.js; hidden mail rows are only
+    // returned by the server on request, so refetch with the flag.
+    document.getElementById('pd3SepayHiddenToggle')?.addEventListener('click', () => {
         showHiddenMail = !showHiddenMail;
-        e.currentTarget.setAttribute('aria-pressed', showHiddenMail ? 'true' : 'false');
-        loaded = false;                       // force a fresh fetch
-        try { await load({ includeHidden: showHiddenMail }); }
-        catch (err) { alert(err.message); }
+        load().catch((err) => alert(err.message));
     });
 
-    // Public handle so other modules (createTx after a successful
-    // finance.createTransactions) can ask OUT to refetch without
-    // re-implementing the load logic. Returns the load() promise so
-    // callers can `await` it.
+    // First paint: IN rows are server-rendered; the outgoing side is live
+    // (IMAP ≈ 2 s). setTimeout(0) lets IN's own requests go out first.
+    setTimeout(() => { load(); }, 0);
+
     return {
         reload: () => load(),
+        autoLink:   async () => apply(await api.post('/payday3/api/out/links/auto?' + rangeQs(state))),
+        manualLink: async (mailUids, financeIds) =>
+            apply(await api.post('/payday3/api/out/links/manual?' + rangeQs(state), { mailUids, financeIds })),
+        clearLinks: async () => apply(await api.post('/payday3/api/out/links/clear?' + rangeQs(state))),
     };
 }
