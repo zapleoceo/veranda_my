@@ -6,6 +6,7 @@ namespace App\Payday3\Services;
 
 use App\Infrastructure\Database;
 use App\Payday3\Contracts\MailServiceInterface;
+use App\Payday3\Domain\BidvMail;
 use App\Payday3\Domain\DateRange;
 use App\Payday3\Domain\MailTransaction;
 use App\Payday3\Domain\Money;
@@ -76,6 +77,11 @@ final class MailImapService implements MailServiceInterface
                 $fromAddr = isset($h->from[0]) ? ($h->from[0]->mailbox . '@' . $h->from[0]->host) : '';
                 if (strcasecmp($fromAddr, 'bidvsmartbanking@bidv.com.vn') !== 0) continue;
 
+                // The sender also mails OTP codes and login warnings —
+                // skip non-receipts BEFORE fetching the body (saves a fetch).
+                $subject = self::decodeHeader($h->subject ?? '');
+                if (!BidvMail::isPaymentReceipt($subject)) continue;
+
                 $body = $this->fetchHtmlBody($inbox, $num);
                 $src  = preg_replace('/\s+/u', ' ', $body);
 
@@ -116,6 +122,11 @@ final class MailImapService implements MailServiceInterface
                     if ($udate > 0 && $udate > $toTsGrace)   continue;
                 }
 
+                // Safety net behind the subject filter: a mail without an
+                // amount is not an expense. A 0 VND row only clutters the
+                // table and is dropped by the auto-matcher anyway.
+                if ($amount <= 0) continue;
+
                 $uid = (int)@imap_uid($inbox, $num);
                 if ($uid <= 0) continue;
                 $isHidden = isset($hidden[$uid]);
@@ -128,7 +139,7 @@ final class MailImapService implements MailServiceInterface
                     mailUid:       $uid,
                     date:          $displayTs > 0 ? date('Y-m-d H:i:s', $displayTs) : '',
                     amount:        Money::vnd($amount),
-                    content:       self::decodeHeader($h->subject ?? ''),
+                    content:       $subject,
                     txTime:        $txTime,
                     isHidden:      $isHidden,
                     hiddenComment: $hidden[$uid] ?? '',
