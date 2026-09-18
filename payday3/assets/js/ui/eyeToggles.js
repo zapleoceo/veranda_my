@@ -36,6 +36,9 @@ function makeToggle(btnId, getRows, initialPressed = false) {
 export function initEyeToggles() {
     const appliers = [
         // Hidden incoming rows — start hidden (matches payday2 default).
+        // NB: the same button has a SECOND listener in out/bootstrap.js that
+        // refetches hidden mail rows; both flip on every click — don't add a
+        // guard/early return to only one of them.
         makeToggle(
             'pd3SepayHiddenToggle',
             () => document.querySelectorAll(`${SEPAY_TBODY} tr.row-hidden`),

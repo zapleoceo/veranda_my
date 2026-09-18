@@ -49,6 +49,9 @@ export function initDataActions({ state, refresh }) {
     const $posterSync = document.getElementById('pd3PosterSyncBtn');
     const $clearDay   = document.getElementById('pd3ClearDayBtn');
 
+    // NB: #pd3SepaySyncBtn is the «Деньги» ↻ and has a SECOND, independent
+    // listener in out/bootstrap.js that reloads the outgoing (mail) block.
+    // Keep both: this one syncs SePay + refreshes the incoming side.
     $sepaySync?.addEventListener('click', withBusy(
         $sepaySync, 'Loading sepay...',
         async () => {
