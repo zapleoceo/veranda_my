@@ -4,6 +4,11 @@
 
 'use strict';
 
+// Cache-bust cross-module imports — see comment in out/bootstrap.js.
+const _v = new URL(import.meta.url).searchParams.get('v') || '';
+const _qs = _v ? '?v=' + encodeURIComponent(_v) : '';
+const { createTxButtonHtml, TX_TYPE } = await import(new URL('../ui/rowCreateTx.js' + _qs, import.meta.url).href);
+
 const fmt = (n) => {
     const v = Math.round(Number(n) || 0);
     try { return new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(v).replace(/,/g, ' '); }
@@ -52,13 +57,7 @@ export function renderOutMail(rows, links, { showHidden = false } = {}) {
             <td class="pd3-col pd3-col--content">${esc(r.content)}</td>
             <td class="pd3-col pd3-col--time nowrap">${esc(time)}</td>
             <td class="pd3-col pd3-col--sum  nowrap right">${esc(r.amount_fmt)}</td>
-            <td class="pd3-col pd3-col--create">
-                <button type="button" class="pd3-out-mail-create"
-                        title="Создать транзакцию в Poster на эту сумму"
-                        data-mail-uid="${r.mail_uid}"
-                        data-amount="${r.amount}"
-                        data-date="${esc(r.date)}">+</button>
-            </td>
+            <td class="pd3-col pd3-col--create">${createTxButtonHtml({ amount: r.amount, date: r.date, type: TX_TYPE.EXPENSE })}</td>
             <td class="pd3-col pd3-col--cb">
                 <input type="checkbox" class="pd3-cb pd3-cb--out-mail" data-mail-uid="${r.mail_uid}" data-sum="${r.amount}">
             </td>

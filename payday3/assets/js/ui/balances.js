@@ -351,8 +351,13 @@ async function sendBalancesToTelegram(state) {
     }
 }
 
+/**
+ * @returns {{reload: () => Promise<void>}} — re-reads Poster balances;
+ *   used after a "+" transaction is created so the Poster column moves.
+ */
 export function initBalances({ state }) {
-    if (!document.getElementById('pd3Balances')) return;
+    const reload = () => reloadPoster().then(syncBtnRefresh);
+    if (!document.getElementById('pd3Balances')) return { reload: async () => {} };
 
     document.querySelectorAll('.pd3-bal-input').forEach((el) => {
         // Live diff while typing — cheap, no network.
@@ -373,7 +378,7 @@ export function initBalances({ state }) {
         el.addEventListener('input', () => scheduleAutoSave(state));
     });
 
-    document.getElementById('pd3BalancesReloadBtn')?.addEventListener('click', () => reloadPoster().then(syncBtnRefresh));
+    document.getElementById('pd3BalancesReloadBtn')?.addEventListener('click', reload);
     document.getElementById('pd3BalancesTelegramBtn')?.addEventListener('click', () => sendBalancesToTelegram(state));
     document.getElementById('pd3BalancesUpldBtn')?.addEventListener('click', () => runUpld(state));
 
@@ -398,4 +403,6 @@ export function initBalances({ state }) {
     // Failures here are silent — the actual click will retry and
     // surface the error in the status strip.
     setTimeout(() => { loadHtml2Canvas().catch(() => {}); }, 1500);
+
+    return { reload };
 }

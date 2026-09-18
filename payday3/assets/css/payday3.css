@@ -1313,12 +1313,13 @@ body.pd3-help-mode [data-help-abs] {
     color: var(--muted);
 }
 
-/* "+" button on each OUT-mail row → opens Create-TX modal.
+/* "+" button on bank rows → opens Create-TX modal (ui/rowCreateTx.js).
+   OUT mail rows create an expense, IN SePay rows create an income.
    Lives in its own narrow column (.pd3-col--create) right before the
    checkbox. Visible only on UNLINKED rows (row-red) — same rule as
    payday2. Linked rows already have a Poster counterpart, no point
    offering the create-from-scratch action there. */
-.pd3-out-mail-create {
+.pd3-row-create {
     display: none;
     align-items: center;
     justify-content: center;
@@ -1334,8 +1335,8 @@ body.pd3-help-mode [data-help-abs] {
     line-height: 1;
     padding: 0;
 }
-.pd3-out-mail-create:hover { background: rgba(255,255,255,0.08); }
-tr.row-red .pd3-out-mail-create { display: inline-flex; }
+.pd3-row-create:hover { background: rgba(255,255,255,0.08); }
+tr.row-red .pd3-row-create { display: inline-flex; }
 
 /* ─── Font-scale toolbar widget ───────────────────────────────
    One icon button («Aa») that cycles 1× → 1.2× → 1.5× → 1×. The

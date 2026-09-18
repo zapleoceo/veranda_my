@@ -89,6 +89,9 @@ initModals({ state });
 // the "+" popup uses it to refresh the OUT-mode tables after
 // finance.createTransactions succeeds.
 const outMode = initOutMode({ state }) || {};
+// Balances BEFORE createTx: the "+" popup refreshes the Poster column
+// after finance.createTransactions succeeds.
+const balances = initBalances({ state });
 // Import the modal host helpers AFTER initModals so initCreateTx can
 // route open/close through the same code path as the toolbar buttons.
 const { modalHost } = await _i('./ui/modals.js');
@@ -97,9 +100,11 @@ initCreateTx({
     host:       modalHost,
     openModal:  modalHost.open,
     closeModal: modalHost.close,
-    onCreated:  outMode.reload,
+    onCreated:  () => {
+        outMode.reload?.();
+        balances.reload();
+    },
 });
-initBalances({ state });
 refreshStats();
 
 // Line renderer — bezier connectors between sepay/poster anchors.

@@ -6,6 +6,11 @@
 
 'use strict';
 
+// Cache-bust cross-module imports — see comment in out/bootstrap.js.
+const _v = new URL(import.meta.url).searchParams.get('v') || '';
+const _qs = _v ? '?v=' + encodeURIComponent(_v) : '';
+const { createTxButtonHtml, TX_TYPE } = await import(new URL('../ui/rowCreateTx.js' + _qs, import.meta.url).href);
+
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
 })[c]);
@@ -27,6 +32,9 @@ function rowState(edges) {
     return yellow ? 'row-yellow' : 'row-green';
 }
 
+/** Cells per SePay row — must equal the <th> count in sepay_table.php. */
+export const SEPAY_COLUMNS = 7;
+
 function sepayRow(s, cls) {
     const content = s.content ?? '';
     const time    = s.time ?? '';
@@ -42,6 +50,7 @@ function sepayRow(s, cls) {
         <td class="pd3-col pd3-col--content">${esc(content)}</td>
         <td class="pd3-col pd3-col--time nowrap">${esc(time)}</td>
         <td class="pd3-col pd3-col--sum nowrap right">${esc(s.amount_fmt ?? fmt(amount))}</td>
+        <td class="pd3-col pd3-col--create">${createTxButtonHtml({ amount, date: s.transaction_date, type: TX_TYPE.INCOME })}</td>
         <td class="pd3-col pd3-col--cb">
             <input type="checkbox" class="pd3-cb pd3-cb--sepay" data-sepay-id="${s.id}" data-sum="${amount}">
         </td>
@@ -93,7 +102,7 @@ export function renderSepay(open, hidden, links) {
         bySepay.get(l.sepay_id).push(l);
     }
     if (open.length === 0 && hidden.length === 0) {
-        tbody.innerHTML = '<tr class="pd3-empty"><td colspan="6">Нет банковских транзакций за период.</td></tr>';
+        tbody.innerHTML = `<tr class="pd3-empty"><td colspan="${SEPAY_COLUMNS}">Нет банковских транзакций за период.</td></tr>`;
         return;
     }
     const parts = [];

@@ -26,6 +26,9 @@ $h = static function (\App\Payday3\Domain\SepayTransaction $s, string $rowClass)
         <td class="pd3-col pd3-col--content"><?= htmlspecialchars($s->content) ?></td>
         <td class="pd3-col pd3-col--time nowrap"><?= htmlspecialchars($time) ?></td>
         <td class="pd3-col pd3-col--sum nowrap right"><?= htmlspecialchars($s->amount->format()) ?></td>
+        <?php /* «+» → приход в Poster. Same markup as createTxButtonHtml()
+                 in payday3/assets/js/ui/rowCreateTx.js (JS re-render). */ ?>
+        <td class="pd3-col pd3-col--create"><button type="button" class="pd3-row-create" title="Создать приход в Poster на эту сумму" data-tx-type="1" data-amount="<?= $s->amount->amount ?>" data-date="<?= htmlspecialchars($s->transactionDate) ?>">+</button></td>
         <td class="pd3-col pd3-col--cb">
             <input type="checkbox" class="pd3-cb pd3-cb--sepay" data-sepay-id="<?= $s->id ?>" data-sum="<?= $s->amount->amount ?>">
         </td>
@@ -63,6 +66,7 @@ $h = static function (\App\Payday3\Domain\SepayTransaction $s, string $rowClass)
                     <th class="pd3-col pd3-col--content pd3-sortable" data-sort-key="content">Content</th>
                     <th class="pd3-col pd3-col--time pd3-sortable nowrap" data-sort-key="ts">Время</th>
                     <th class="pd3-col pd3-col--sum pd3-sortable nowrap right" data-sort-key="sum">Сумма</th>
+                    <th class="pd3-col pd3-col--create"></th>
                     <th class="pd3-col pd3-col--cb"></th>
                     <th class="pd3-col pd3-col--anchor"></th>
                 </tr>
@@ -75,7 +79,7 @@ $h = static function (\App\Payday3\Domain\SepayTransaction $s, string $rowClass)
                     <?= $h($s, 'row-hidden is-hidden') ?>
                 <?php endforeach; ?>
                 <?php if ($sepayOpen === [] && $sepayHidden === []): ?>
-                    <tr class="pd3-empty"><td colspan="6">Нет банковских транзакций за период.</td></tr>
+                    <tr class="pd3-empty"><td colspan="7">Нет банковских транзакций за период.</td></tr>
                 <?php endif; ?>
             </tbody>
         </table>

@@ -57,6 +57,15 @@ jobs:
       - name: PHPUnit
         run: vendor/bin/phpunit --testdox --colors=never
 
+      # Фронт payday3 — node:test без зависимостей (см. ci.yml).
+      - name: Setup Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: JS unit tests (payday3)
+        run: node --test "tests/js/**/*.test.mjs"
+
   deploy:
     needs: test          # ← прод раскатывается только на зелёных тестах
     runs-on: ubuntu-latest

@@ -1,6 +1,8 @@
-// "+" popup on each OUT-mail row → create a Poster finance
-// transaction. Direct port of payday2's #createTxModal flow,
-// trimmed to the essentials we actually use:
+// "+" popup on unlinked bank rows → create a Poster finance
+// transaction: OUT mail rows open it as an expense, IN SePay rows as
+// an income (the button + its data live in ./rowCreateTx.js).
+// Direct port of payday2's #createTxModal flow, trimmed to the
+// essentials we actually use:
 //
 //   - Date / Time / Type
 //   - Account-from (expense / transfer) and Account-to (income / transfer)
@@ -17,6 +19,8 @@
 const _v = new URL(import.meta.url).searchParams.get('v') || '';
 const _qs = _v ? '?v=' + encodeURIComponent(_v) : '';
 const { api } = await import(new URL('../api.js' + _qs, import.meta.url).href);
+const { TX_TYPE, CREATE_TX_SELECTOR, readCreateTxTrigger, splitDateTime } =
+    await import(new URL('./rowCreateTx.js' + _qs, import.meta.url).href);
 
 const fmtVndInt = (n) => {
     const v = Math.round(Number(n) || 0);
@@ -238,11 +242,12 @@ export function initCreateTx({ state, host, openModal, closeModal, onCreated }) 
             });
             // Clear status so a stale "Создаю…" doesn't appear on next open.
             status('');
-            // Refresh the OUT-mode tables so the newly-created
-            // transaction shows up immediately on the Poster side
-            // (and auto-matchers can pick it up if it pairs with a
-            // mail row). Fire-and-forget — the user is already looking
-            // at the success modal, no need to block on the refetch.
+            // Refresh what the new transaction changes: the OUT finance
+            // table (an expense shows up there and becomes linkable) and
+            // the Poster balances. An IN income is intentionally not
+            // linked to anything — IN links bank rows to sales checks.
+            // Fire-and-forget — the user is already looking at the
+            // success modal, no need to block on the refetch.
             try { onCreated?.(); } catch (_) { /* swallow */ }
         } catch (err) {
             status(err.message || 'Ошибка', 'error');
@@ -252,26 +257,18 @@ export function initCreateTx({ state, host, openModal, closeModal, onCreated }) 
     });
 
     /**
-     * Open the modal pre-filled from an OUT-mail row's data-* values.
-     *   amount = number, VND
-     *   dateIso = 'Y-m-d H:i:s' or 'Y-m-d' (mail row's data-ts)
+     * Open the modal pre-filled from a bank row's "+" button.
+     *   amount  = number, VND
+     *   dateIso = 'Y-m-d H:i:s' or 'Y-m-d' (bank row timestamp)
+     *   type    = TX_TYPE.EXPENSE (OUT mail) | TX_TYPE.INCOME (IN SePay)
      */
-    async function open(amount, dateIso) {
+    async function open(amount, dateIso, type = TX_TYPE.EXPENSE) {
         status('');
-        // Parse "YYYY-MM-DD HH:MM:SS" into the date + time inputs;
-        // fall back to "now" when the row didn't have a timestamp.
-        const now = new Date();
-        const pad = (n) => String(n).padStart(2, '0');
-        let datePart = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
-        let timePart = `${pad(now.getHours())}:${pad(now.getMinutes())}`;
-        const m = String(dateIso || '').match(/^(\d{4}-\d{2}-\d{2})(?:[ T](\d{2}:\d{2}))?/);
-        if (m) {
-            datePart = m[1];
-            if (m[2]) timePart = m[2];
-        }
-        form.elements['date'].value   = datePart;
-        form.elements['time'].value   = timePart;
-        form.elements['type'].value   = '2';                     // Expense (matches payday2 default)
+        // Row timestamp → date + time inputs ("now" when missing).
+        const { date, time } = splitDateTime(dateIso);
+        form.elements['date'].value   = date;
+        form.elements['time'].value   = time;
+        form.elements['type'].value   = String(type);
         form.elements['amount'].value = fmtVndInt(Number(amount) || 0);
         // Default comment mirrors payday2 ("Created by <email>"); the
         // email is shipped from server via pd3-bootstrap.userEmail.
@@ -301,16 +298,15 @@ export function initCreateTx({ state, host, openModal, closeModal, onCreated }) 
         applyTypeVisibility(form);
     }
 
-    // Delegated click handler on the OUT-mail tbody — works across
-    // re-renders without re-binding.
+    // Delegated click handler for the "+" on any bank row (OUT mail
+    // and IN SePay) — works across re-renders without re-binding.
     document.addEventListener('click', (e) => {
-        const btn = e.target.closest?.('.pd3-out-mail-create');
+        const btn = e.target.closest?.(CREATE_TX_SELECTOR);
         if (!btn) return;
         e.preventDefault();
         e.stopPropagation();
-        const amount = btn.dataset.amount;
-        const date   = btn.dataset.date;
-        open(amount, date);
+        const { amount, date, type } = readCreateTxTrigger(btn);
+        open(amount, date, type);
     });
 
     return { open };

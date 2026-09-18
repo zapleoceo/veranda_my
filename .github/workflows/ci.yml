@@ -65,3 +65,14 @@ jobs:
 
       - name: PHPUnit
         run: vendor/bin/phpunit --testdox --colors=never
+
+      # Фронт payday3 — чистые ES-модули, тестируются встроенным node:test
+      # без зависимостей. Node 22+: сам распознаёт ESM в .js и раскрывает
+      # glob в --test (предустановленный на раннере Node 20 не умеет).
+      - name: Setup Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: JS unit tests (payday3)
+        run: node --test "tests/js/**/*.test.mjs"
