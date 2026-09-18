@@ -91,11 +91,12 @@ final class Payday3PageSecurityTest extends TestCase
         $this->assertStringContainsString('KEY idx_out_links_date_to (date_to)', $db);
     }
 
-    public function test_imap_validates_the_certificate(): void
+    // php-imap (c-client) не шлёт SNI — Gmail без SNI отдаёт self-signed
+    // сертификат, поэтому проверка сертификата на проде невозможна.
+    public function test_imap_skips_cert_check_because_c_client_has_no_sni(): void
     {
         $src = self::src('Payday3/Services/MailImapService.php');
-        $this->assertStringContainsString("'{imap.gmail.com:993/imap/ssl}INBOX'", $src);
-        $this->assertStringNotContainsString('novalidate-cert}', $src);
+        $this->assertStringContainsString("'{imap.gmail.com:993/imap/ssl/novalidate-cert}INBOX'", $src);
     }
 
     public function test_payday3_api_group_has_csrf_guard_and_no_out_data(): void

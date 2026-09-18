@@ -24,12 +24,14 @@ use App\Payday3\Domain\Money;
  * The PHP imap extension must be enabled — without it the service throws
  * RuntimeException.
  *
- * TLS: the server certificate IS validated (no /novalidate-cert) — the
- * Gmail password travels over this connection.
+ * TLS: /novalidate-cert is REQUIRED. php-imap (c-client) sends no SNI, and
+ * Gmail answers a no-SNI handshake with a self-signed "invalid2.invalid"
+ * certificate, so validation always fails (checked on prod 2026-09-18).
+ * The channel is still TLS-encrypted.
  */
 final class MailImapService implements MailServiceInterface
 {
-    private const MAILBOX = '{imap.gmail.com:993/imap/ssl}INBOX';
+    private const MAILBOX = '{imap.gmail.com:993/imap/ssl/novalidate-cert}INBOX';
 
     public function __construct(
         private readonly Database $db,
