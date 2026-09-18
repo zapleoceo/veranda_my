@@ -179,6 +179,8 @@
     font: inherit;
 }
 .pd3-date.is-hidden { display: none; }
+/* ‹ / › day-step buttons around the date input (ui/dateForm.js). */
+.pd3-date-step { font-size: var(--pd3-fs-2xl); font-weight: 700; line-height: 1; }
 .pd3-btn {
     background: var(--accent);
     color: #000;

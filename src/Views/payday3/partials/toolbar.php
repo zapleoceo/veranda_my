@@ -44,7 +44,13 @@ declare(strict_types=1);
              explicit "Открыть" button. The hidden dateTo carries the
              same value so DateRange::fromQuery still gets a complete
              range without exposing a second input to the operator. -->
+        <button type="button" class="pd3-icon-btn pd3-icon-btn--small pd3-date-step" data-date-step="-1"
+                title="Предыдущий день" aria-label="Предыдущий день"
+                data-help-abs="Перейти на день назад.">‹</button>
         <input type="date" name="dateFrom" class="pd3-date" value="<?= htmlspecialchars($range->from) ?>" required>
+        <button type="button" class="pd3-icon-btn pd3-icon-btn--small pd3-date-step" data-date-step="1"
+                title="Следующий день" aria-label="Следующий день"
+                data-help-abs="Перейти на день вперёд.">›</button>
         <input type="hidden" name="dateTo" class="pd3-date--to" value="<?= htmlspecialchars($range->from) ?>">
         <span class="pd3-spinner is-hidden" id="pd3DateSpinner" aria-hidden="true">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M21 12a9 9 0 1 1-6.219-8.56"></path></svg>
