@@ -23,7 +23,10 @@ const { linkPlan } = await import(new URL('./selection.js' + _qs, import.meta.ur
  */
 export async function runSides(tasks) {
     const live = tasks.filter(([, fn]) => typeof fn === 'function');
-    const results = await Promise.allSettled(live.map(([, fn]) => fn()));
+    // Promise.resolve().then(fn): a side that throws synchronously (e.g. a
+    // missing adapter method) becomes a rejection of ITS OWN promise —
+    // it can't abort the map and orphan the other side's in-flight request.
+    const results = await Promise.allSettled(live.map(([, fn]) => Promise.resolve().then(fn)));
     return results.flatMap((r, i) =>
         r.status === 'rejected' ? [`${live[i][0]}: ${r.reason?.message || r.reason || 'ошибка'}`] : []);
 }

@@ -20,6 +20,42 @@ test('runSides: выполняет обе стороны и возвращает
     assert.deepEqual(errors, ['Расходы: IMAP down']);
 });
 
+test('runSides: синхронная ошибка одной стороны не обрывает вторую', async () => {
+    let otherDone = false;
+    const errors = await runSides([
+        ['Расходы', () => { throw new TypeError('outLinks is null'); }],
+        ['Приходы', async () => { await new Promise((r) => setTimeout(r, 5)); otherDone = true; }],
+    ]);
+    assert.equal(otherDone, true, 'приходы довыполнились');
+    assert.deepEqual(errors, ['Расходы: outLinks is null']);
+});
+
+test('🎯 без адаптера расходов: приходы связываются, ошибка показывается', async () => {
+    const handlers = {};
+    const btn = (id) => ({ id, disabled: false, classList: { add() {}, remove() {} },
+        addEventListener: (type, fn) => { handlers[id] = fn; } });
+    const buttons = Object.fromEntries(['pd3LinkAutoBtn', 'pd3LinkMakeBtn', 'pd3LinkClearBtn'].map((i) => [i, btn(i)]));
+    globalThis.document = { getElementById: (id) => buttons[id] ?? null };
+    const alerts = [];
+    globalThis.alert = (m) => alerts.push(m);
+    const log = [];
+    initLinkPanel({
+        state: { get: () => ({ from: '2026-09-18', to: '2026-09-18' }) },
+        inLinks: adapter('in', log),
+        outLinks: null,                                   // initOutMode() вернул null
+        selection: {
+            counts: () => ({ sepay: 1, poster: 1, mail: 1, finance: 1 }),
+            sets: { sepay: new Set([1]), poster: new Set([2]), mail: new Set([3]), finance: new Set([4]) },
+            reset() {},
+        },
+        confirmFn: () => true,
+    });
+    await handlers.pd3LinkMakeBtn();
+    assert.deepEqual(log, [['in', 'manual', [1], [2]]]);
+    assert.equal(alerts.length, 1);
+    assert.match(alerts[0], /^Расходы: /);
+});
+
 function adapter(name, log, { failOn = '' } = {}) {
     const rec = (op) => async (...args) => {
         log.push([name, op, ...args]);
