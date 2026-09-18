@@ -53,6 +53,48 @@ final class DateRange
         return self::of($from, $to);
     }
 
+    /** Reads / syncs / check search: at most a month per request. */
+    public const MAX_READ_DAYS = 31;
+    /** Destructive endpoints (clear day / clear links): one day only. */
+    public const MAX_DESTRUCTIVE_DAYS = 1;
+
+    /** fromQuery() + the read-span guard (heavy endpoints). */
+    public static function forRead(array $query): self
+    {
+        return self::fromQuery($query)->limitedTo(self::MAX_READ_DAYS);
+    }
+
+    /** fromQuery() + the single-day guard (clear endpoints). */
+    public static function forDestructive(array $query): self
+    {
+        return self::fromQuery($query)->limitedTo(self::MAX_DESTRUCTIVE_DAYS);
+    }
+
+    /** Inclusive number of calendar days (a single day = 1). */
+    public function days(): int
+    {
+        $a = new \DateTimeImmutable($this->from);
+        $b = new \DateTimeImmutable($this->to);
+        return (int)$a->diff($b)->days + 1;
+    }
+
+    /**
+     * Span guard. A dateFrom=2000-01-01&dateTo=2099-12-31 request would
+     * otherwise wipe every link (clear) or page through Poster for
+     * minutes (checks/find).
+     *
+     * @throws \InvalidArgumentException (→ 400 via JsonResponder)
+     */
+    public function limitedTo(int $maxDays): self
+    {
+        if ($this->days() > $maxDays) {
+            throw new \InvalidArgumentException($maxDays === 1
+                ? 'Эта операция работает только с одним днём: выберите dateFrom = dateTo.'
+                : sprintf('Слишком большой период: максимум %d дн. (запрошено %d).', $maxDays, $this->days()));
+        }
+        return $this;
+    }
+
     public function isSingleDay(): bool { return $this->from === $this->to; }
 
     public function asArray(): array { return ['from' => $this->from, 'to' => $this->to]; }

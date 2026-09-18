@@ -10,6 +10,7 @@ use App\Payday3\Domain\DateRange;
 use App\Payday3\Http\JsonResponder;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
+use App\Payday3\Services\ManualLinker;
 
 /**
  * POST /payday3/api/out/links/manual
@@ -20,33 +21,29 @@ final class OutManualLinkAction
     public function __construct(
         private readonly OutReconciliationServiceInterface $service,
         private readonly OutLinkRepositoryInterface        $links,
+        private readonly ManualLinker                      $linker,
     ) {}
 
     public function __invoke(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
     {
-        $body = (array)$request->getParsedBody();
-        $mailUids   = array_values(array_filter(array_map('intval', (array)($body['mailUids']   ?? [])), static fn($i) => $i > 0));
-        $financeIds = array_values(array_filter(array_map('intval', (array)($body['financeIds'] ?? [])), static fn($i) => $i > 0));
+        $body       = (array)$request->getParsedBody();
+        $mailUids   = ManualLinker::ids($body['mailUids']   ?? []);
+        $financeIds = ManualLinker::ids($body['financeIds'] ?? []);
         if ($mailUids === [] || $financeIds === []) {
             return JsonResponder::error($response, 'Select at least one mail and one finance row.', 400);
         }
         try {
-            $range = DateRange::fromQuery($request->getQueryParams());
-        } catch (\InvalidArgumentException $e) {
-            return JsonResponder::error($response, $e->getMessage(), 400);
-        }
-        $added = 0;
-        foreach ($mailUids as $uid) {
-            foreach ($financeIds as $fid) {
-                try {
-                    $this->service->manualLink($uid, $fid, $range->to);
-                    $added++;
-                } catch (\Throwable $e) { /* per-pair swallow */ }
-            }
+            $range  = DateRange::forRead($request->getQueryParams());
+            $result = $this->linker->link($mailUids, $financeIds,
+                fn(int $uid, int $fid) => $this->service->manualLink($uid, $fid, $range->to));
+            $links  = JsonResponder::shapes($this->links->listInRange($range));
+        } catch (\Throwable $e) {
+            return JsonResponder::fromException($response, $e);
         }
         return JsonResponder::ok($response, [
-            'added' => $added,
-            'links' => array_map(static fn($l) => $l->toJsonShape(), $this->links->listInRange($range)),
+            'added'  => $result['added'],
+            'errors' => $result['errors'],
+            'links'  => $links,
         ]);
     }
 }

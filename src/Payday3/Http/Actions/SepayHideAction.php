@@ -39,7 +39,7 @@ final class SepayHideAction
                 $this->sepay->unhide($sepayId);
             }
         } catch (\Throwable $e) {
-            return JsonResponder::error($response, $e->getMessage(), 500);
+            return JsonResponder::fromException($response, $e);
         }
         return JsonResponder::ok($response, [
             'sepayId' => $sepayId,

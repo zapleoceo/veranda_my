@@ -7,57 +7,40 @@
 
 'use strict';
 
-// Cache-bust cross-module imports — see comment in out/bootstrap.js.
-const _v = new URL(import.meta.url).searchParams.get('v') || '';
-const _qs = _v ? '?v=' + encodeURIComponent(_v) : '';
-const { api }              = await import(new URL('../api.js'        + _qs, import.meta.url).href);
+const _i = (await import(new URL('../ui/cacheBust.js' + new URL(import.meta.url).search, import.meta.url).href)).importer(import.meta.url);
+const { api }              = await _i('../api.js');
 const { renderSepay,
         renderPoster,
-        updateInFooters }  = await import(new URL('./renderTables.js' + _qs, import.meta.url).href);
-const { refreshStats }     = await import(new URL('../ui/stats.js'   + _qs, import.meta.url).href);
-const { SEPAY_TBODY }      = await import(new URL('../ui/bankTable.js' + _qs, import.meta.url).href);
-
-function dateQuery(range) {
-    const p = new URLSearchParams();
-    if (range?.from) p.set('dateFrom', range.from);
-    if (range?.to)   p.set('dateTo',   range.to);
-    return p.toString();
-}
-
-let inFlight = null;
+        updateInFooters }  = await _i('./renderTables.js');
+const { SEPAY_TBODY }      = await _i('../ui/bankTable.js');
+const { withRange }        = await _i('../ui/format.js');
+const { coalesce }         = await _i('../ui/coalesce.js');
 
 /**
  * @param {{state:object, renderer:object|null, onRendered?:()=>void}} deps
  *   onRendered — after the incoming rows and checks are re-rendered
- *   (selection reset, eye-toggle re-apply) — owned by index.js.
+ *   (selection reset, row colours, footers, eye toggles) — owned by index.js.
+ * @returns {() => Promise<void>}  latest-wins: a call made while a load is
+ *   in flight gets a fresh load that starts after it (SePay ↻ + Poster ↻
+ *   fired together must both see their own writes).
  */
 export function makeInLoader({ state, renderer, onRendered }) {
-    return async function loadInData() {
-        // Coalesce overlapping calls — sync + clearDay can both fire.
-        if (inFlight) return inFlight;
-        const promise = (async () => {
-            const qs = dateQuery(state.get('range') || {});
-            const data = await api.get('/payday3/api/data' + (qs ? '?' + qs : ''));
-            if (!data) return;
-            const sepayOpen   = data.sepay        || [];
-            const sepayHidden = data.sepayHidden  || [];
-            const poster      = data.poster       || [];
-            const links       = data.links        || [];
+    return coalesce(async () => {
+        const data = await api.get(withRange('/payday3/api/data', state.get('range')));
+        if (!data) return;
+        const sepayOpen   = data.sepay        || [];
+        const sepayHidden = data.sepayHidden  || [];
+        const poster      = data.poster       || [];
+        const links       = data.links        || [];
 
-            renderSepay(sepayOpen, sepayHidden, links);
-            renderPoster(poster, links);
-            updateInFooters(sepayOpen, sepayHidden, poster);
+        renderSepay(sepayOpen, sepayHidden, links);
+        renderPoster(poster, links);
+        updateInFooters(sepayOpen, sepayHidden, poster);
 
-            state.set('links', links);
-            if (renderer) {
-                renderer.setLinks(links);
-            }
-            refreshStats();
-            onRendered?.();
-        })();
-        inFlight = promise.finally(() => { inFlight = null; });
-        return inFlight;
-    };
+        state.set('links', links);
+        renderer?.setLinks(links);
+        onRendered?.();
+    });
 }
 
 /**

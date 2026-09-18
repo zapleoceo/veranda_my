@@ -18,10 +18,10 @@ final class PosterSuppliesListAction
     public function __invoke(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
     {
         try {
-            $range = DateRange::fromQuery($request->getQueryParams());
+            $range = DateRange::forRead($request->getQueryParams());
             $data  = $this->service->listWithAccounts($range);
         } catch (\Throwable $e) {
-            return JsonResponder::error($response, $e->getMessage(), 500);
+            return JsonResponder::fromException($response, $e, 502);
         }
         return JsonResponder::ok($response, $data + ['range' => $range->asArray()]);
     }

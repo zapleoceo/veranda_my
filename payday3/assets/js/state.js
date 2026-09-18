@@ -1,6 +1,8 @@
-// Tiny event-bus + central state. Replaces payday2's window globals.
-// Every module subscribes to the keys it cares about; nothing else
-// reaches across modules.
+// Central page state (range, links, outLinks, incomeLinks, csrf, …).
+// Replaces payday2's window globals. Modules write their link sets
+// here and index.js repaints through explicit callbacks; the
+// `change` / `change:<key>` events are available but currently have
+// no subscribers.
 
 'use strict';
 

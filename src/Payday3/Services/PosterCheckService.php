@@ -4,12 +4,16 @@ declare(strict_types=1);
 
 namespace App\Payday3\Services;
 
+use App\Payday3\Contracts\AuditLogInterface;
 use App\Payday3\Contracts\LocalSettingsRepositoryInterface;
 use App\Payday3\Contracts\PosterApiProviderInterface;
 use App\Payday3\Contracts\PosterCheckServiceInterface;
+use App\Payday3\Contracts\SessionStoreInterface;
 use App\Payday3\Contracts\TelegramNotifierInterface;
 use App\Payday3\Domain\DateRange;
 use App\Payday3\Domain\Money;
+use App\Payday3\Domain\PosterIds;
+use App\Payday3\Domain\PosterTime;
 
 /**
  * Two operations on Poster checks:
@@ -18,20 +22,31 @@ use App\Payday3\Domain\Money;
  *     Paginated walk over transactions.getTransactions (per_page = 1000,
  *     hard cap 50 pages) looking for an exact transaction_id match.
  *
- *   remove(transactionId, byLabel)
- *     Calls transactions.removeTransaction with the service-user id
- *     from local settings; on success, fires a Telegram audit note
- *     to the configured chat/thread.
+ *   remove(transactionId, byLabel, userEmail)
+ *     Fetches the check first (dash.getTransaction) and refuses unless it
+ *     was closed within the last MAX_AGE_DAYS days; writes an audit row
+ *     to payday_audit_log, then calls transactions.removeTransaction with
+ *     the service-user id from local settings; on success, fires a
+ *     Telegram note to the configured chat/thread.
  *
  * No payday2 imports anywhere — service-user, chat-id, thread-id all
  * come from the injected LocalSettings repository.
  */
 final class PosterCheckService implements PosterCheckServiceInterface
 {
+    /** A check can be deleted only if it was closed today or up to N days ago. */
+    public const MAX_AGE_DAYS = 3;
+
+    private const TABLES_CACHE_KEY   = 'pd3_tables_cache';
+    private const PRODUCTS_CACHE_KEY = 'pd3_products_cache';
+    private const CACHE_TTL_S        = 6 * 3600;
+
     public function __construct(
         private readonly PosterApiProviderInterface       $poster,
         private readonly TelegramNotifierInterface        $tg,
         private readonly LocalSettingsRepositoryInterface $settings,
+        private readonly SessionStoreInterface            $session,
+        private readonly AuditLogInterface                $audit,
     ) {}
 
     public function find(int $transactionId, DateRange $range): array
@@ -209,7 +224,7 @@ final class PosterCheckService implements PosterCheckServiceInterface
                     'transaction_id' => (int)($row['transaction_id'] ?? 0),
                     'receipt_number' => (int)($row['receipt_number'] ?? $row['transaction_id'] ?? 0),
                     'date_close'     => (string)($row['date_close'] ?? $row['date_close_date'] ?? ''),
-                    // vndFromV3, НЕ posterMinorToVnd: этот метод читает
+                    // Money::toInt (бывш. vndFromV3), НЕ posterMinorToVnd: этот метод читает
                     // transactions.getTransactions, а он отдаёт донги строкой с
                     // копейками в дробной части ("495000.00" = 495 000 ₫), тогда
                     // как dash.* отдаёт минорные единицы (49500000). Деление на
@@ -218,8 +233,8 @@ final class PosterCheckService implements PosterCheckServiceInterface
                     // transactions.getTransactions="495000.00" — обе ветки должны
                     // давать 495000. То же самое уже чинили в find() (строка 60),
                     // до этой ветки правка не доехала.
-                    'sum'            => self::vndFromV3($sumRaw),
-                    'payed_sum'      => self::vndFromV3($sumRaw),
+                    'sum'            => Money::toInt($sumRaw),
+                    'payed_sum'      => Money::toInt($sumRaw),
                     'pay_type'       => (int)($row['pay_type'] ?? 0),
                     'status'         => 2,
                     'spot_id'        => (int)($row['spot_id'] ?? 0),
@@ -239,7 +254,7 @@ final class PosterCheckService implements PosterCheckServiceInterface
      * Build a {spot_id: {table_id: title}} map by walking each spot's
      * halls via spots.getSpotTablesHalls + spots.getTableHallTables.
      * Falls back to a flat spots.getTableHallTables call if a spot
-     * exposes no halls. Cached in $_SESSION for 6 hours — same TTL
+     * exposes no halls. Cached in the session for 6 hours — same TTL
      * payday2 used. Without this map the Check Finder modal shows
      * raw table_id integers instead of the operator-friendly title
      * ("Бар 1", "ВИП", etc.).
@@ -253,12 +268,12 @@ final class PosterCheckService implements PosterCheckServiceInterface
     private function tableTitleMap($api, array $spotIds): array
     {
         if ($spotIds === []) return [];
-        \App\Infrastructure\Session::start();
-
-        $cache = $_SESSION['pd3_tables_cache'] ?? null;
+        // Session is touched only for the read and the final write — the
+        // Poster calls below run with the session lock released.
+        $cache = $this->session->get(self::TABLES_CACHE_KEY);
         $cacheTs    = is_array($cache) ? (int)($cache['ts']    ?? 0)    : 0;
         $cacheSpots = is_array($cache) ? ($cache['spots'] ?? null) : null;
-        $spotMaps   = (is_array($cacheSpots) && $cacheTs > 0 && (time() - $cacheTs) < 6 * 3600)
+        $spotMaps   = (is_array($cacheSpots) && $cacheTs > 0 && (time() - $cacheTs) < self::CACHE_TTL_S)
             ? $cacheSpots
             : [];
 
@@ -318,7 +333,7 @@ final class PosterCheckService implements PosterCheckServiceInterface
             $changed = true;
         }
         if ($changed) {
-            $_SESSION['pd3_tables_cache'] = ['ts' => time(), 'spots' => $spotMaps];
+            $this->session->set(self::TABLES_CACHE_KEY, ['ts' => time(), 'spots' => $spotMaps]);
         }
         return $spotMaps;
     }
@@ -333,9 +348,8 @@ final class PosterCheckService implements PosterCheckServiceInterface
      */
     private function productNameMap($api): array
     {
-        \App\Infrastructure\Session::start();
-        $cache = $_SESSION['pd3_products_cache'] ?? null;
-        if (is_array($cache) && (time() - (int)($cache['ts'] ?? 0)) < 6 * 3600 && is_array($cache['map'] ?? null)) {
+        $cache = $this->session->get(self::PRODUCTS_CACHE_KEY);
+        if (is_array($cache) && (time() - (int)($cache['ts'] ?? 0)) < self::CACHE_TTL_S && is_array($cache['map'] ?? null)) {
             return $cache['map'];
         }
         try {
@@ -352,7 +366,7 @@ final class PosterCheckService implements PosterCheckServiceInterface
                 if ($pid > 0 && $name !== '') $map[$pid] = $name;
             }
         }
-        $_SESSION['pd3_products_cache'] = ['ts' => time(), 'map' => $map];
+        $this->session->set(self::PRODUCTS_CACHE_KEY, ['ts' => time(), 'map' => $map]);
         return $map;
     }
 
@@ -374,7 +388,7 @@ final class PosterCheckService implements PosterCheckServiceInterface
                   'payed_third_party', 'payed_cert', 'payed_bonus',
                   'tip_sum', 'discount', 'round_sum', 'pay_sum'] as $k) {
             if (array_key_exists($k, $row)) {
-                $row[$k] = self::vndFromV3($row[$k]);
+                $row[$k] = Money::toInt($row[$k]);
             }
         }
         return $row;
@@ -390,39 +404,54 @@ final class PosterCheckService implements PosterCheckServiceInterface
             if (!is_array($p)) return $p;
             foreach (['product_sum', 'payed_sum', 'unit_price', 'total', 'price'] as $k) {
                 if (array_key_exists($k, $p)) {
-                    $p[$k] = self::vndFromV3($p[$k]);
+                    $p[$k] = Money::toInt($p[$k]);
                 }
             }
             return $p;
         }, $products);
     }
 
-    /**
-     * Parse a v3-endpoint money field (VND with decimals, e.g. "35000.00")
-     * into an integer VND amount. Does NOT divide by 100 — the v3 endpoint
-     * is not in kopecks.
-     */
-    private static function vndFromV3(mixed $raw): int
-    {
-        if ($raw === null || $raw === '') return 0;
-        if (is_int($raw))   return $raw;
-        if (is_float($raw)) return (int)round($raw);
-        if (is_string($raw)) {
-            $t = str_replace(',', '.', trim($raw));
-            if ($t === '' || !is_numeric($t)) return 0;
-            return (int)round((float)$t);
-        }
-        return 0;
-    }
-
-    public function remove(int $transactionId, string $byLabel): array
+    public function remove(int $transactionId, string $byLabel, string $userEmail = ''): array
     {
         if ($transactionId <= 0) {
             throw new \InvalidArgumentException('Invalid transaction_id');
         }
         $settings = $this->settings->load();
-        $resp = $this->poster->client()->request('transactions.removeTransaction', [
-            'spot_tablet_id' => 1,
+        $api      = $this->poster->client();
+
+        // 1. Date guard: fetch the check and refuse anything older than
+        //    MAX_AGE_DAYS — before, ANY check id (months-old, closed and
+        //    paid) could be deleted with one DELETE request.
+        $check = self::firstRow($api->request('dash.getTransaction', [
+            'transaction_id'   => $transactionId,
+            'include_history'  => 0,
+            'include_products' => 0,
+        ]));
+        if ($check === null) {
+            throw new \DomainException('Чек ' . $transactionId . ' не найден в Poster.');
+        }
+        $closedTs = self::checkTs($check);
+        if ($closedTs === null) {
+            throw new \DomainException('Не удалось определить дату чека ' . $transactionId . ' — удаление отменено.');
+        }
+        if (!self::isWithinMaxAge($closedTs, time())) {
+            throw new \DomainException(sprintf(
+                'Чек %d от %s: удалять можно только чеки за последние %d дн.',
+                $transactionId, date('Y-m-d', $closedTs), self::MAX_AGE_DAYS,
+            ));
+        }
+
+        // 2. Audit row BEFORE the destructive call (survives a crash mid-way;
+        //    unlike the Telegram note its destination can't be re-pointed).
+        $this->audit->record($userEmail !== '' ? $userEmail : $byLabel, 'poster_check.remove', [
+            'transaction_id' => $transactionId,
+            'closed_at'      => date('Y-m-d H:i:s', $closedTs),
+            'sum'            => Money::posterMinorToVnd($check['sum'] ?? $check['payed_sum'] ?? 0),
+            'by'             => $byLabel,
+        ]);
+
+        $resp = $api->request('transactions.removeTransaction', [
+            'spot_tablet_id' => PosterIds::SPOT_TABLET_ID,
             'transaction_id' => $transactionId,
             'user_id'        => $settings->serviceUserId,
         ], 'POST');
@@ -439,5 +468,32 @@ final class PosterCheckService implements PosterCheckServiceInterface
             'telegram_ok'    => (bool)($tg['ok'] ?? false),
             'telegram_error' => $tg['error'] ?? '',
         ];
+    }
+
+    /** Calendar-day rule: closed today or within the previous MAX_AGE_DAYS days. */
+    public static function isWithinMaxAge(int $closedTs, int $nowTs): bool
+    {
+        $oldestAllowed = date('Y-m-d', (int)strtotime('-' . self::MAX_AGE_DAYS . ' days', $nowTs));
+        return date('Y-m-d', $closedTs) >= $oldestAllowed;
+    }
+
+    /** dash.getTransaction answers with the row itself or a one-item list. */
+    private static function firstRow(mixed $resp): ?array
+    {
+        if (!is_array($resp) || $resp === []) return null;
+        if (array_is_list($resp)) return is_array($resp[0] ?? null) ? $resp[0] : null;
+        return $resp;
+    }
+
+    /** Close time of a check; an open check falls back to its start time. */
+    private static function checkTs(array $check): ?int
+    {
+        foreach (['date_close', 'date_close_date', 'dateClose', 'date_start', 'dateStart'] as $k) {
+            $v = $check[$k] ?? null;
+            if ($v === null || $v === '' || $v === '0' || $v === 0) continue;
+            $t = PosterTime::toUnix($v);
+            if ($t !== null) return $t;
+        }
+        return null;
     }
 }

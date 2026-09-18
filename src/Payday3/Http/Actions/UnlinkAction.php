@@ -30,10 +30,13 @@ final class UnlinkAction
         if ($sid <= 0 || $pid <= 0) {
             return JsonResponder::error($response, 'Invalid ids.', 400);
         }
-        $this->service->unlink($sid, $pid);
-        $range = DateRange::fromQuery($request->getQueryParams());
-        return JsonResponder::ok($response, [
-            'links' => array_map(static fn($l) => $l->toJsonShape(), $this->links->listInRange($range)),
-        ]);
+        try {
+            $this->service->unlink($sid, $pid);
+            $range = DateRange::forRead($request->getQueryParams());
+            $links = JsonResponder::shapes($this->links->listInRange($range));
+        } catch (\Throwable $e) {
+            return JsonResponder::fromException($response, $e);
+        }
+        return JsonResponder::ok($response, ['links' => $links]);
     }
 }

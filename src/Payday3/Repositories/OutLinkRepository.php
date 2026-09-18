@@ -11,8 +11,8 @@ use App\Payday3\Domain\OutLink;
 
 /**
  * Persistence for OUT-direction reconciliation edges (mail ↔ Poster
- * finance tx). The 'out_links' table is created by payday2's bootstrap
- * (see payday2/functions.php) — we read/write the same schema.
+ * finance tx). The 'out_links' table is declared in
+ * Database::createPaydayTables() (legacy schema kept as-is).
  *
  * Range filtering is by date_to (the upper end of the visible window
  * when the link was created); a row is included if its date_to falls
@@ -47,13 +47,13 @@ final class OutLinkRepository implements OutLinkRepositoryInterface
         return $row !== false && $row !== null;
     }
 
-    public function add(OutLink $link, ?string $dateTo = null): void
+    public function add(OutLink $link, string $dateTo): void
     {
         $ol = $this->db->t('out_links');
         $this->db->query(
             "INSERT IGNORE INTO {$ol} (mail_uid, finance_id, link_type, date_to)
              VALUES (?, ?, ?, ?)",
-            [$link->mailUid, $link->financeId, $link->linkType, $dateTo ?? date('Y-m-d')]
+            [$link->mailUid, $link->financeId, $link->linkType, $dateTo]
         );
     }
 

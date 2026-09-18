@@ -8,6 +8,7 @@ use App\Payday3\Contracts\PosterCheckServiceInterface;
 use App\Payday3\Http\JsonResponder;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
+use App\Payday3\Http\CurrentUser;
 
 /**
  * DELETE /payday3/api/poster/checks/{id}
@@ -27,14 +28,10 @@ final class PosterCheckRemoveAction
         if ($id <= 0) {
             return JsonResponder::error($response, 'Invalid transaction id.', 400);
         }
-        $by = trim(
-            (string)($_SESSION['user_name']  ?? '') . ' ' .
-            (string)($_SESSION['user_email'] ?? '')
-        );
         try {
-            $res = $this->service->remove($id, $by);
+            $res = $this->service->remove($id, CurrentUser::label(), CurrentUser::email());
         } catch (\Throwable $e) {
-            return JsonResponder::error($response, $e->getMessage(), 500);
+            return JsonResponder::fromException($response, $e, 502);
         }
         return JsonResponder::ok($response, $res);
     }

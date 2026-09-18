@@ -8,11 +8,14 @@
 //   * ResizeObserver fires the redraw on container resize.
 //   * MutationObserver fires it when rows are sorted/hidden/added.
 //   * Scroll listeners (passive) cover the two per-pane vertical
-//     scrollers and the horizontal container scroller.
-//   * Every redraw is rAF-batched.
-//   * Anchors are read with getBoundingClientRect once per redraw —
-//     not per link — so a hundred links don't trigger a hundred
-//     layout passes.
+//     scrollers and the horizontal container scroller; window scroll
+//     and the font-scale event are ONE listener shared by all renderers.
+//   * Redraws of ALL renderers share one rAF (frames scheduler below)
+//     and run in two phases: every renderer reads its rects first,
+//     then every renderer writes paths / × buttons — no read after a
+//     write inside a frame, so no forced synchronous layout per link.
+//   * SVG paths and × buttons are kept per link key and updated in
+//     place, not recreated on every scroll frame.
 
 'use strict';
 
@@ -22,11 +25,53 @@ const DEFAULT_COLOR_FOR = (link) => {
     if (link.is_manual)                 return '#9aa4b2';
     switch (link.link_type) {
         case 'auto_green':              return '#10b981';
-        case 'auto_yellow':              return '#f59e0b';
-        case 'auto_red':                  return '#ef4444';
-        default:                          return '#9aa4b2';
+        case 'auto_yellow':             return '#f59e0b';
+        case 'auto_red':                return '#ef4444';
+        default:                        return '#9aa4b2';
     }
 };
+
+/**
+ * One rAF for any number of renderers. Each flush runs phase 1
+ * (`_measure()`, reads only) for every dirty renderer, then phase 2
+ * (`_apply(plan)`, writes only). Exported for tests.
+ *
+ * @param {(cb:()=>void)=>any} [raf]
+ */
+export function createFrameScheduler(raf = (cb) => requestAnimationFrame(cb)) {
+    const dirty = new Set();
+    let pending = false;
+    const flush = () => {
+        pending = false;
+        const batch = [...dirty];
+        dirty.clear();
+        const plans = batch.map((r) => r._measure());
+        batch.forEach((r, i) => { if (plans[i]) r._apply(plans[i]); });
+    };
+    return {
+        schedule(r) {
+            dirty.add(r);
+            if (!pending) { pending = true; raf(flush); }
+        },
+        cancel(r) { dirty.delete(r); },
+    };
+}
+
+const frames = createFrameScheduler();
+
+// Page-wide triggers shared by every live renderer (window scroll, the
+// «Aa» font-scale event) — bound once, not once per renderer.
+const live = new Set();
+let windowBound = false;
+function bindWindowOnce() {
+    if (windowBound || typeof window === 'undefined') return;
+    windowBound = true;
+    const all = () => live.forEach((r) => r._schedule());
+    window.addEventListener('scroll', all, { passive: true });
+    // ResizeObserver doesn't reliably fire under CSS `zoom`, so
+    // fontScale.js dispatches an explicit event.
+    window.addEventListener('pd3:font-scale-changed', all);
+}
 
 export class LineRenderer {
     constructor({
@@ -38,30 +83,28 @@ export class LineRenderer {
         rightTbody,                      // right tbody
         leftAnchorId   = null,           // (link) => element id of the left anchor
         rightAnchorId  = null,           // (link) => element id of the right anchor
-        linkKey        = null,           // (link) => unique string for close-button reuse
+        linkKey        = null,           // (link) => unique string for path / button reuse
         colorFor       = DEFAULT_COLOR_FOR,
         onUnlink       = null,           // (link) => void — called by × button
         horizontalScroller = null,
-        // Legacy aliases kept for the existing IN-mode bootstrap.
-        sepayScroll = null, posterScroll = null, sepayTbody = null, posterTbody = null,
     }) {
         this._container = container;
         this._layer     = layer;
-        this._leftScroll   = leftScroll  ?? sepayScroll;
-        this._rightScroll  = rightScroll ?? posterScroll;
-        this._leftTbody    = leftTbody   ?? sepayTbody;
-        this._rightTbody   = rightTbody  ?? posterTbody;
+        this._leftScroll   = leftScroll;
+        this._rightScroll  = rightScroll;
+        this._leftTbody    = leftTbody;
+        this._rightTbody   = rightTbody;
         this._horizontalScroller = horizontalScroller || container;
         this._colorFor  = colorFor;
         this._onUnlink  = onUnlink;
-        // Default selectors keep IN-mode backward compatibility.
+        // Defaults: incoming SePay row ↔ Poster check.
         this._leftAnchorId  = leftAnchorId  || ((l) => 'pd3-sepay-anchor-'  + l.sepay_id);
         this._rightAnchorId = rightAnchorId || ((l) => 'pd3-poster-anchor-' + l.poster_transaction_id);
         this._linkKey       = linkKey       || ((l) => l.sepay_id + ':' + l.poster_transaction_id);
 
         this._links     = [];
         this._buttons   = new Map();      // key → close-button DOM node (reused across redraws)
-        this._raf       = 0;
+        this._paths     = new Map();      // key → [halo, line] SVG paths (reused across redraws)
         this._destroyed = false;
 
         this._mountSvg();
@@ -77,24 +120,25 @@ export class LineRenderer {
     /** Public API: force a redraw without changing the link set. */
     redraw() { this._schedule(); }
 
+    /** Public API: (re)bind the × button handler — `(link) => void`. */
+    setOnUnlink(fn) { this._onUnlink = typeof fn === 'function' ? fn : null; }
+
     /** Public API: tear everything down. */
     destroy() {
         if (this._destroyed) return;
         this._destroyed = true;
-        if (this._raf) cancelAnimationFrame(this._raf);
+        frames.cancel(this);
+        live.delete(this);
         this._resizeObserver?.disconnect();
         this._mutationObserver?.disconnect();
         for (const { el, fn } of this._scrollListeners) {
             el.removeEventListener('scroll', fn);
         }
         this._scrollListeners = [];
-        if (this._fontScaleListener) {
-            window.removeEventListener('pd3:font-scale-changed', this._fontScaleListener);
-            this._fontScaleListener = null;
-        }
         try { this._svg?.remove(); } catch (_) {}
         for (const btn of this._buttons.values()) btn.remove();
         this._buttons.clear();
+        this._paths.clear();
     }
 
     // ─── internals ─────────────────────────────────────────────────────
@@ -135,31 +179,23 @@ export class LineRenderer {
             if (this._rightTbody) this._mutationObserver.observe(this._rightTbody, opts);
         }
 
-        // Scroll on per-pane vertical scrollers and the horizontal container.
-        const targets = new Set([this._horizontalScroller, this._leftScroll, this._rightScroll, window]);
+        // Scroll on per-pane vertical scrollers and the horizontal container
+        // (window scroll + font-scale are shared — bindWindowOnce()).
+        const targets = new Set([this._horizontalScroller, this._leftScroll, this._rightScroll]);
         this._scrollListeners = [];
         for (const el of targets) {
             if (!el) continue;
-            const fn = () => this._schedule();
-            el.addEventListener('scroll', fn, { passive: true });
-            this._scrollListeners.push({ el, fn });
+            el.addEventListener('scroll', trigger, { passive: true });
+            this._scrollListeners.push({ el, fn: trigger });
         }
 
-        // Font-scale changes (.pd3-page zoom toggle). ResizeObserver
-        // doesn't reliably fire under CSS `zoom` so we listen for an
-        // explicit event from fontScale.js — both IN and OUT mode
-        // renderers receive it.
-        this._fontScaleListener = () => this._schedule();
-        window.addEventListener('pd3:font-scale-changed', this._fontScaleListener);
+        live.add(this);
+        bindWindowOnce();
     }
 
     _schedule() {
         if (this._destroyed) return;
-        if (this._raf) return;
-        this._raf = requestAnimationFrame(() => {
-            this._raf = 0;
-            if (!this._destroyed) this._redraw();
-        });
+        frames.schedule(this);
     }
 
     /**
@@ -178,7 +214,12 @@ export class LineRenderer {
         return 1;
     }
 
-    _redraw() {
+    /**
+     * Phase 1 — reads only (rects, scroll offsets). Returns the plan
+     * `_apply()` writes, or null when destroyed.
+     */
+    _measure() {
+        if (this._destroyed) return null;
         const scale = this._getScale();
         const rootRect = this._container.getBoundingClientRect();
         // BCR returns visual (post-zoom) pixels — same coord system every
@@ -186,23 +227,11 @@ export class LineRenderer {
         // px and the viewBox uses that same unit.
         const w = rootRect.width  || this._container.scrollWidth;
         const h = rootRect.height || this._container.scrollHeight;
-        this._svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
-        // The SVG element lives INSIDE the zoomed .pd3-page, so any CSS
-        // pixel value we set on it is multiplied by `scale` on paint.
-        // Dividing the visual dimensions by `scale` cancels that out and
-        // the element ends up exactly covering the container visually.
-        this._svg.style.width  = (w / scale) + 'px';
-        this._svg.style.height = (h / scale) + 'px';
-
-        // Clear paths but keep close-button nodes for reuse — we hide
-        // them and re-show only the ones we actually re-render.
-        while (this._group.firstChild) this._group.removeChild(this._group.firstChild);
-        for (const btn of this._buttons.values()) btn.style.display = 'none';
+        const scroll = { left: this._container.scrollLeft, top: this._container.scrollTop };
 
         const leftClip  = this._scrollRect(this._leftScroll);
         const rightClip = this._scrollRect(this._rightScroll);
-        const keep = new Set();
-
+        const items = [];
         for (const link of this._links) {
             const aEl = document.getElementById(this._leftAnchorId(link));
             const bEl = document.getElementById(this._rightAnchorId(link));
@@ -214,28 +243,64 @@ export class LineRenderer {
             if (leftClip  && !isInClipY(aRect, leftClip))  continue;
             if (rightClip && !isInClipY(bRect, rightClip)) continue;
 
-            const a = pointOf(aRect, rootRect, this._container);
-            const b = pointOf(bRect, rootRect, this._container);
+            items.push({
+                key:   this._linkKey(link),
+                link,
+                a:     pointOf(aRect, rootRect, scroll),
+                b:     pointOf(bRect, rootRect, scroll),
+                color: this._colorFor(link),
+            });
+        }
+        return { w, h, scale, items };
+    }
 
-            const color = this._colorFor(link);
+    /** Phase 2 — writes only: viewBox, paths (reused per key), × buttons. */
+    _apply({ w, h, scale, items }) {
+        if (this._destroyed) return;
+        setAttr(this._svg, 'viewBox', `0 0 ${w} ${h}`);
+        // The SVG element lives INSIDE the zoomed .pd3-page, so any CSS
+        // pixel value we set on it is multiplied by `scale` on paint.
+        // Dividing the visual dimensions by `scale` cancels that out and
+        // the element ends up exactly covering the container visually.
+        this._svg.style.width  = (w / scale) + 'px';
+        this._svg.style.height = (h / scale) + 'px';
+
+        const drawn = new Set();
+        for (const { key, link, a, b, color } of items) {
+            if (drawn.has(key)) continue;
+            drawn.add(key);
             const d = bezierPath(a, b);
-
-            // White halo outline for visibility on any background.
-            this._group.appendChild(svgPath(d, 'rgba(255,255,255,0.65)', 4));
-            this._group.appendChild(svgPath(d, color, 2));
-
-            const key = this._linkKey(link);
-            this._placeRemoveButton(link, a, b, key);
-            keep.add(key);
+            let pair = this._paths.get(key);
+            if (!pair) {
+                // White halo outline for visibility on any background.
+                pair = [svgPath('rgba(255,255,255,0.65)', 4), svgPath(color, 2)];
+                this._group.appendChild(pair[0]);
+                this._group.appendChild(pair[1]);
+                this._paths.set(key, pair);
+            }
+            setAttr(pair[0], 'd', d);
+            setAttr(pair[1], 'd', d);
+            setAttr(pair[1], 'stroke', color);
+            this._placeRemoveButton(link, a, b, key, scale);
         }
 
-        // Drop close-buttons whose link disappeared.
+        // Paths of links that are gone or scrolled out of view.
+        for (const [key, pair] of this._paths) {
+            if (drawn.has(key)) continue;
+            pair[0].remove();
+            pair[1].remove();
+            this._paths.delete(key);
+        }
+        // × buttons: hide while scrolled out, drop once the link is gone.
+        const current = new Set(this._links.map((l) => this._linkKey(l)));
         for (const [key, btn] of this._buttons) {
-            if (!keep.has(key)) { btn.remove(); this._buttons.delete(key); }
+            if (drawn.has(key)) continue;
+            if (current.has(key)) { if (btn.style.display !== 'none') btn.style.display = 'none'; }
+            else { btn.remove(); this._buttons.delete(key); }
         }
     }
 
-    _placeRemoveButton(link, a, b, key) {
+    _placeRemoveButton(link, a, b, key, scale) {
         let btn = this._buttons.get(key);
         if (!btn) {
             btn = document.createElement('button');
@@ -245,14 +310,15 @@ export class LineRenderer {
             btn.textContent = '×';
             btn.addEventListener('click', (e) => {
                 e.preventDefault();
-                // The handler receives the full link record — IN-mode
-                // adapter unpacks {sepay_id, poster_transaction_id};
+                // The handler receives the full (latest) link record —
+                // IN-mode adapter unpacks {sepay_id, poster_transaction_id};
                 // OUT-mode adapter unpacks {mail_uid, finance_id}.
-                this._onUnlink?.(link);
+                this._onUnlink?.(btn._link);
             });
             this._layer.appendChild(btn);
             this._buttons.set(key, btn);
         }
+        btn._link = link;
         // The × sits near the END of the bezier (poster side), not at
         // the midpoint — that's how payday2 placed it. Clamping to
         // [0.92, 0.98] keeps it visibly attached to the line without
@@ -266,7 +332,6 @@ export class LineRenderer {
         // .pd3-page, so the CSS px we set here are re-multiplied by the
         // active scale on paint — divide by it to keep the button on
         // the line.
-        const scale = this._getScale();
         btn.style.left = Math.round((pt.x - 8) / scale) + 'px';
         btn.style.top  = Math.round((pt.y - 8) / scale) + 'px';
         btn.style.display = 'flex';
@@ -288,9 +353,9 @@ function isInClipY(rect, clip) {
     return rect.bottom >= clip.top && rect.top <= clip.bottom;
 }
 
-function pointOf(anchorRect, rootRect, container) {
-    const cx = anchorRect.left + anchorRect.width  / 2 - rootRect.left + container.scrollLeft;
-    const cy = anchorRect.top  + anchorRect.height / 2 - rootRect.top  + container.scrollTop;
+function pointOf(anchorRect, rootRect, scroll) {
+    const cx = anchorRect.left + anchorRect.width  / 2 - rootRect.left + scroll.left;
+    const cy = anchorRect.top  + anchorRect.height / 2 - rootRect.top  + scroll.top;
     // Snap to half-pixel so 1px lines render crisply.
     return { x: Math.round(cx) + 0.5, y: Math.round(cy) + 0.5 };
 }
@@ -324,9 +389,13 @@ function cubicPoint(a, b, t) {
     };
 }
 
-function svgPath(d, stroke, width) {
+/** Skip identical writes — cheaper than letting the SVG re-parse `d`. */
+function setAttr(el, name, value) {
+    if (el.getAttribute(name) !== value) el.setAttribute(name, value);
+}
+
+function svgPath(stroke, width) {
     const p = document.createElementNS(SVG_NS, 'path');
-    p.setAttribute('d', d);
     p.setAttribute('fill', 'none');
     p.setAttribute('stroke', stroke);
     p.setAttribute('stroke-width', String(width));

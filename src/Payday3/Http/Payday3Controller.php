@@ -4,6 +4,10 @@ declare(strict_types=1);
 
 namespace App\Payday3\Http;
 
+use App\Infrastructure\Permissions;
+use App\Infrastructure\Session;
+use App\Infrastructure\SessionCsrf;
+use App\Middleware\CsrfGuard;
 use App\Payday3\Domain\DateRange;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
@@ -23,11 +27,17 @@ final class Payday3Controller
 
     public function index(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
     {
-        $perms = $_SESSION['user_permissions'] ?? null;
-        if (is_array($perms) && empty($perms['payday'])) {
-            $response->getBody()->write('Forbidden');
-            return $response->withStatus(403)->withHeader('Content-Type', 'text/plain');
+        // Strict (fail-closed) check — the route gate covers this too,
+        // but the controller must not be permissive on its own.
+        if (!Permissions::can('payday')) {
+            return Permissions::denyHtml($response);
         }
+
+        // Per-session CSRF token for /payday3/api (CsrfGuard). Token
+        // creation may write the session — release the lock right after
+        // so parallel XHRs from the freshly loaded page don't queue.
+        $csrfToken = SessionCsrf::token(CsrfGuard::PAYDAY3);
+        Session::close();
 
         $range = DateRange::fromQuery($request->getQueryParams());
         $data  = $this->assembler->assemble($range);
@@ -37,7 +47,7 @@ final class Payday3Controller
         $currentPath  = '/payday3';
         $headExtra    = '<link rel="stylesheet" href="/payday3/assets/css/payday3.css?v=' . self::assetVersion() . '">';
 
-        $viewVars = $data + ['range' => $range];
+        $viewVars = $data + ['range' => $range, 'csrfToken' => $csrfToken];
         ob_start();
         // Extract DTOs for the partial.
         extract($viewVars, EXTR_SKIP);
@@ -49,7 +59,12 @@ final class Payday3Controller
         $html = (string)ob_get_clean();
 
         $response->getBody()->write($html);
-        return $response->withHeader('Content-Type', 'text/html; charset=utf-8');
+        // Anti-clickjacking: the page drives money operations, never let
+        // a foreign site frame it.
+        return $response
+            ->withHeader('Content-Type', 'text/html; charset=utf-8')
+            ->withHeader('X-Frame-Options', 'SAMEORIGIN')
+            ->withHeader('Content-Security-Policy', "frame-ancestors 'self'");
     }
 
     private static function assetVersion(): string

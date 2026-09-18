@@ -11,6 +11,7 @@ use App\Payday3\Contracts\ReconciliationServiceInterface;
 use App\Payday3\Contracts\SepayRepositoryInterface;
 use App\Payday3\Domain\AmountTimeMatcher;
 use App\Payday3\Domain\DateRange;
+use App\Payday3\Domain\PosterIds;
 use App\Payday3\Domain\ReconciliationLink;
 
 /**
@@ -30,8 +31,6 @@ use App\Payday3\Domain\ReconciliationLink;
 final class ReconciliationService implements ReconciliationServiceInterface
 {
     /** Poster payment-method id for «Vietnam Company» — excluded from auto-match. */
-    private const METHOD_VIETNAM = 11;
-
     public function __construct(
         private readonly SepayRepositoryInterface             $sepay,
         private readonly PosterRepositoryInterface            $poster,
@@ -63,7 +62,7 @@ final class ReconciliationService implements ReconciliationServiceInterface
                 'id'       => $p->transactionId,
                 'amount'   => $p->payedCard->plus($p->payedThirdParty)->plus($p->tipSum)->amount,
                 'ts'       => AmountTimeMatcher::ts($p->dateClose),
-                'eligible' => $p->posterPaymentMethodId !== self::METHOD_VIETNAM
+                'eligible' => $p->posterPaymentMethodId !== PosterIds::METHOD_VIETNAM
                               && !isset($linkedP[$p->transactionId]),
             ];
         }

@@ -8,6 +8,7 @@ use App\Payday3\Contracts\PosterTransactionCreateServiceInterface;
 use App\Payday3\Http\JsonResponder;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
+use App\Payday3\Http\CurrentUser;
 
 /**
  * POST /payday3/api/poster/finance/transactions
@@ -34,11 +35,9 @@ final class PosterTransactionCreateAction
             return JsonResponder::error($response, 'Invalid JSON', 400);
         }
         try {
-            $result = $this->service->create($payload);
-        } catch (\InvalidArgumentException $e) {
-            return JsonResponder::error($response, $e->getMessage(), 400);
-        } catch (\RuntimeException $e) {
-            return JsonResponder::error($response, $e->getMessage(), 502);
+            $result = $this->service->create($payload, CurrentUser::actor());
+        } catch (\Throwable $e) {
+            return JsonResponder::fromException($response, $e, 502);
         }
         return JsonResponder::ok($response, $result);
     }

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Payday3\Http\Actions;
 
 use App\Payday3\Domain\DateRange;
+use App\Payday3\Domain\PosterIds;
 use App\Payday3\Domain\PosterTransaction;
 use App\Payday3\Domain\SepayTransaction;
 use App\Payday3\Http\JsonResponder;
@@ -30,12 +31,10 @@ final class InDataAction
     public function __invoke(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
     {
         try {
-            $range = DateRange::fromQuery($request->getQueryParams());
+            $range = DateRange::forRead($request->getQueryParams());
             $data  = $this->assembler->assemble($range);
-        } catch (\InvalidArgumentException $e) {
-            return JsonResponder::error($response, $e->getMessage(), 400);
         } catch (\Throwable $e) {
-            return JsonResponder::error($response, $e->getMessage(), 500);
+            return JsonResponder::fromException($response, $e);
         }
 
         $sepay = array_map(
@@ -88,9 +87,11 @@ final class InDataAction
         $cardPlusTip  = $cardCombined->plus($p->tipSum);
         $time  = $p->dateClose !== '' ? substr($p->dateClose, 11, 8) : '';
         $pmFull = (string)($p->paymentMethodDisplay ?? '—');
-        $pmLite = $pmFull;
-        if (stripos($pmFull, 'vietnam') !== false)      $pmLite = 'VC';
-        elseif (stripos($pmFull, 'bybit') !== false)    $pmLite = 'BB';
+        // VC / BB by payment-method ID (PosterIds), not by a substring of
+        // the name — a rename in Poster no longer changes the bucket and
+        // the JSON agrees with the server-rendered table.
+        $pmId   = $p->posterPaymentMethodId;
+        $pmLite = PosterIds::methodLite($pmId) ?? $pmFull;
         return [
             'transaction_id'    => $p->transactionId,
             'receipt_number'    => $p->receiptNumber,
@@ -104,6 +105,7 @@ final class InDataAction
             'total_fmt'         => $cardPlusTip->format(),
             'payment_method'    => $pmFull,
             'payment_method_lite' => $pmLite,
+            'payment_method_id' => $pmId,
             'waiter_name'       => $p->waiterName,
             'table_id'          => $p->tableId,
             'spot_id'           => $p->spotId,

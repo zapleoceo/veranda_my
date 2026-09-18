@@ -32,10 +32,8 @@ final class BalanceSyncCommitAction
 
         try {
             $result = $this->service->commit($nonce);
-        } catch (\InvalidArgumentException $e) {
-            return JsonResponder::error($response, $e->getMessage(), 400);
-        } catch (\RuntimeException $e) {
-            return JsonResponder::error($response, $e->getMessage(), 500);
+        } catch (\Throwable $e) {
+            return JsonResponder::fromException($response, $e, 502);
         }
         return JsonResponder::ok($response, $result);
     }

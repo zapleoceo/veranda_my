@@ -4,22 +4,14 @@
 
 'use strict';
 
-// Cache-bust cross-module imports — see comment in out/bootstrap.js.
-const _v = new URL(import.meta.url).searchParams.get('v') || '';
-const _qs = _v ? '?v=' + encodeURIComponent(_v) : '';
-const { createTxButtonHtml, TX_TYPE } = await import(new URL('../ui/rowCreateTx.js' + _qs, import.meta.url).href);
-const { BANK_COLUMNS, MAIL_TBODY, byTimeAsc } = await import(new URL('../ui/bankTable.js' + _qs, import.meta.url).href);
-const { classify: rowState } = await import(new URL('../ui/rowStates.js' + _qs, import.meta.url).href);
+const _i = (await import(new URL('../ui/cacheBust.js' + new URL(import.meta.url).search, import.meta.url).href)).importer(import.meta.url);
+const { createTxButtonHtml, TX_TYPE } = await _i('../ui/rowCreateTx.js');
+const { BANK_COLUMNS, MAIL_TBODY, byTimeAsc } = await _i('../ui/bankTable.js');
+const { classify: rowState }  = await _i('../ui/rowStates.js');
+const { esc, fmtVnd: fmt }    = await _i('../ui/format.js');
 
-const fmt = (n) => {
-    const v = Math.round(Number(n) || 0);
-    try { return new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(v).replace(/,/g, ' '); }
-    catch (_) { return String(v).replace(/\B(?=(\d{3})+(?!\d))/g, ' '); }
-};
-
-const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({
-    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
-})[c]);
+/** Cells per finance row — see renderOutFinance(). */
+export const FINANCE_COLUMNS = 7;
 
 export function renderOutMail(rows, links, { showHidden = false } = {}) {
     const byMail = new Map();
@@ -39,23 +31,24 @@ export function renderOutMail(rows, links, { showHidden = false } = {}) {
         const state = r.is_hidden ? 'row-hidden' : rowState(byMail.get(r.mail_uid));
         const time  = (r.date || '').slice(11, 19);
         const cls   = ['pd3-row', state, r.is_hidden && !showHidden ? 'is-hidden' : ''].filter(Boolean).join(' ');
-        return `<tr id="pd3-out-mail-${r.mail_uid}" class="${cls}"
-                    data-mail-uid="${r.mail_uid}"
+        const uid   = esc(r.mail_uid);
+        return `<tr id="pd3-out-mail-${uid}" class="${cls}"
+                    data-mail-uid="${uid}"
                     data-ts="${esc(r.date)}"
-                    data-sum="${r.amount}"
+                    data-sum="${esc(r.amount)}"
                     data-content="${esc((r.content || '').toLowerCase())}">
             <td class="pd3-col pd3-col--hide">
-                <button type="button" class="pd3-row-hide pd3-out-mail-hide" data-mail-uid="${r.mail_uid}" title="Скрыть/восстановить">−</button>
+                <button type="button" class="pd3-row-hide pd3-out-mail-hide" data-mail-uid="${uid}" title="Скрыть/восстановить">−</button>
             </td>
             <td class="pd3-col pd3-col--content">${esc(r.content)}</td>
             <td class="pd3-col pd3-col--time nowrap">${esc(time)}</td>
             <td class="pd3-col pd3-col--sum  nowrap right">${esc(r.amount_fmt)}</td>
             <td class="pd3-col pd3-col--create">${createTxButtonHtml({ amount: r.amount, date: r.date, type: TX_TYPE.EXPENSE })}</td>
             <td class="pd3-col pd3-col--cb">
-                <input type="checkbox" class="pd3-cb pd3-cb--out-mail" data-mail-uid="${r.mail_uid}" data-sum="${r.amount}">
+                <input type="checkbox" class="pd3-cb pd3-cb--out-mail" data-mail-uid="${uid}" data-sum="${esc(r.amount)}">
             </td>
             <td class="pd3-col pd3-col--anchor">
-                <span class="pd3-anchor" id="pd3-out-mail-anchor-${r.mail_uid}"></span>
+                <span class="pd3-anchor" id="pd3-out-mail-anchor-${uid}"></span>
             </td>
         </tr>`;
     }).join('');
@@ -70,19 +63,20 @@ export function renderOutFinance(rows, links) {
     const tbody = document.querySelector('#pd3OutFinanceTable tbody');
     if (!tbody) return;
     if (!rows.length) {
-        tbody.innerHTML = '<tr class="pd3-empty"><td colspan="7">Транзакций за период не найдено.</td></tr>';
+        tbody.innerHTML = `<tr class="pd3-empty"><td colspan="${FINANCE_COLUMNS}">Транзакций за период не найдено.</td></tr>`;
         return;
     }
     tbody.innerHTML = rows.map((r) => {
         const state = rowState(byFin.get(r.transaction_id));
-        return `<tr id="pd3-out-finance-${r.transaction_id}" class="pd3-row ${state}"
-                    data-finance-id="${r.transaction_id}"
+        const id    = esc(r.transaction_id);
+        return `<tr id="pd3-out-finance-${id}" class="pd3-row ${state}"
+                    data-finance-id="${id}"
                     data-ts="${esc(r.date)}"
-                    data-amount="${r.amount}">
+                    data-amount="${esc(r.amount)}">
             <td class="pd3-col pd3-col--lead">
                 <div class="pd3-lead">
-                    <span class="pd3-anchor" id="pd3-out-finance-anchor-${r.transaction_id}"></span>
-                    <input type="checkbox" class="pd3-cb pd3-cb--out-finance" data-finance-id="${r.transaction_id}" data-sum="${r.amount}">
+                    <span class="pd3-anchor" id="pd3-out-finance-anchor-${id}"></span>
+                    <input type="checkbox" class="pd3-cb pd3-cb--out-finance" data-finance-id="${id}" data-sum="${esc(r.amount)}">
                 </div>
             </td>
             <td class="pd3-col pd3-col--time   nowrap">${esc(r.date)}</td>

@@ -96,6 +96,31 @@ class Database
         return $this->pdo;
     }
 
+    /**
+     * Run $fn inside one transaction (commit on success, rollback + rethrow
+     * on any Throwable). Re-entrant: when a transaction is already open the
+     * callback simply joins it.
+     *
+     * @template T
+     * @param callable(): T $fn
+     * @return T
+     */
+    public function transaction(callable $fn): mixed
+    {
+        if ($this->pdo->inTransaction()) {
+            return $fn();
+        }
+        $this->pdo->beginTransaction();
+        try {
+            $result = $fn();
+            $this->pdo->commit();
+            return $result;
+        } catch (\Throwable $e) {
+            if ($this->pdo->inTransaction()) $this->pdo->rollBack();
+            throw $e;
+        }
+    }
+
     public function lastInsertId(): string
     {
         return $this->pdo->lastInsertId();

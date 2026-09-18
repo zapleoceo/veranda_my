@@ -26,9 +26,6 @@ final class PosterBalanceService implements PosterBalanceServiceInterface
         private readonly LocalSettingsRepositoryInterface $settings,
     ) {}
 
-    /** payday2 hard-codes "Касса" as Poster account_id = 2. */
-    private const CASH_ACCOUNT_ID = 2;
-
     public function snapshot(): array
     {
         $rows = $this->poster->client()->request('finance.getAccounts', []);
@@ -53,7 +50,7 @@ final class PosterBalanceService implements PosterBalanceServiceInterface
         // Rows of the card:
         //   Андрей   = accountAndreyId + accountTipsId combined
         //   Вьет.    = accountVietnamId
-        //   Касса    = account_id 2 (hard-coded in payday2)
+        //   Касса    = accountCashId (default 2, as payday2 hard-coded)
         //   Заначка  = accountStashId
         //   Total    = SUM of every account Poster returned
         $andreyParts = [];
@@ -62,7 +59,7 @@ final class PosterBalanceService implements PosterBalanceServiceInterface
         $a = $andreyParts === [] ? null : array_sum($andreyParts);
 
         $v = $byId[$cfg->accountVietnamId]  ?? null;
-        $c = $byId[self::CASH_ACCOUNT_ID]   ?? null;
+        $c = $byId[$cfg->accountCashId]     ?? null;
         $s = $byId[$cfg->accountStashId]    ?? null;
 
         // Total: sum of EVERY account, not just the rows above. Факт. Total
@@ -74,7 +71,7 @@ final class PosterBalanceService implements PosterBalanceServiceInterface
 
         $mappedIds = [
             $cfg->accountAndreyId, $cfg->accountTipsId, $cfg->accountVietnamId,
-            self::CASH_ACCOUNT_ID, $cfg->accountStashId,
+            $cfg->accountCashId, $cfg->accountStashId,
         ];
         $unmapped = array_values(array_filter(
             $accounts,

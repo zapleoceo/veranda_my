@@ -16,27 +16,16 @@
 
 'use strict';
 
-// Cache-bust cross-module imports — see comment in out/bootstrap.js.
-const _v = new URL(import.meta.url).searchParams.get('v') || '';
-const _qs = _v ? '?v=' + encodeURIComponent(_v) : '';
-const { api } = await import(new URL('../api.js' + _qs, import.meta.url).href);
-const { TX_TYPE, CREATE_TX_SELECTOR, readCreateTxTrigger, splitDateTime } =
-    await import(new URL('./rowCreateTx.js' + _qs, import.meta.url).href);
+const _i = (await import(new URL('./cacheBust.js' + new URL(import.meta.url).search, import.meta.url).href)).importer(import.meta.url);
+const { api } = await _i('../api.js');
+const { TX_TYPE, CREATE_TX_SELECTOR, readCreateTxTrigger, splitDateTime } = await _i('./rowCreateTx.js');
+const { esc, fmtVnd, parseVnd } = await _i('./format.js');
+const { setStatus }  = await _i('./busy.js');
+const { buildCategoryTree, walkCategories, customName } = await _i('./categoryTree.js');
 
-const fmtVndInt = (n) => {
-    const v = Math.round(Number(n) || 0);
-    if (!Number.isFinite(v) || v <= 0) return '';
-    try { return new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(v).replace(/,/g, ' '); }
-    catch (_) { return String(v).replace(/\B(?=(\d{3})+(?!\d))/g, ' '); }
-};
-const parseVndInt = (raw) => {
-    const cleaned = String(raw ?? '').replaceAll(' ', '').replaceAll(' ', '').replace(/[^\d-]/g, '');
-    const n = parseInt(cleaned, 10);
-    return Number.isFinite(n) ? n : 0;
-};
-const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({
-    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
-})[c]);
+// The amount input shows positive VND only; empty for 0 / negative.
+const fmtVndInt   = (n) => { const v = Math.round(Number(n) || 0); return v > 0 ? fmtVnd(v) : ''; };
+const parseVndInt = (raw) => parseVnd(raw) ?? 0;
 
 /** Read the visible text of the currently-selected option in a <select>. */
 function labelOf(sel) {
@@ -95,16 +84,20 @@ async function loadOptions() {
     // category whitelist) *does* change whenever the operator hits
     // Save in ⚙ — refetch every open so the popup picks up new
     // entries without a hard page reload.
+    // A failed fetch is NOT cached (retried on the next open) and is
+    // reported in the status strip instead of leaving an empty list.
+    const failed = [];
+    const orNull = (label) => (e) => { failed.push(`${label}: ${e?.message || 'ошибка'}`); return null; };
     const [acc, cat, set] = await Promise.all([
-        _accountsMap   ? Promise.resolve(_accountsMap)
-                       : api.get('/payday3/api/poster/finance/accounts').catch(() => ({})),
-        _categoriesMap ? Promise.resolve(_categoriesMap)
-                       : api.get('/payday3/api/poster/finance/categories').catch(() => ({})),
-        api.get('/payday3/api/settings').catch(() => _settings),
+        _accountsMap   ?? api.get('/payday3/api/poster/finance/accounts').catch(orNull('счета')),
+        _categoriesMap ?? api.get('/payday3/api/poster/finance/categories').catch(orNull('категории')),
+        api.get('/payday3/api/settings').catch(orNull('настройки')),
     ]);
-    _accountsMap   = acc && typeof acc === 'object' ? acc : {};
-    _categoriesMap = cat && typeof cat === 'object' ? cat : {};
+    const asMap = (v) => (v && typeof v === 'object' ? v : null);
+    _accountsMap   = asMap(acc);
+    _categoriesMap = asMap(cat);
     _settings      = set || _settings || {};
+    if (failed.length) status('Не загрузились ' + failed.join('; '), 'error');
 }
 
 function fillAccountSelect(sel) {
@@ -128,28 +121,14 @@ function fillCategorySelect(sel) {
     const custom  = _settings?.custom_category_names || {};
 
     // Same tree walk as the settings modal — depth-indented options.
-    const byId  = {};
-    const roots = [];
-    for (const [idStr, data] of Object.entries(_categoriesMap || {})) {
-        const id = Number(idStr);
-        byId[id] = { id, name: String(data?.name || ''), parent_id: Number(data?.parent_id || 0), children: [] };
-    }
-    for (const id in byId) {
-        const n = byId[id];
-        if (n.parent_id && byId[n.parent_id]) byId[n.parent_id].children.push(n);
-        else                                   roots.push(n);
-    }
-    const walk = (node, depth) => {
-        if (allowed.has(node.id)) {
-            const label = custom[node.id] || custom[String(node.id)] || node.name;
-            const opt = document.createElement('option');
-            opt.value = String(node.id);
-            opt.textContent = '— '.repeat(depth) + label;
-            sel.appendChild(opt);
-        }
-        for (const c of node.children) walk(c, depth + 1);
-    };
-    for (const r of roots) walk(r, 0);
+    const { roots, byId } = buildCategoryTree(_categoriesMap);
+    walkCategories(roots, (node, depth) => {
+        if (!allowed.has(node.id)) return;
+        const opt = document.createElement('option');
+        opt.value = String(node.id);
+        opt.textContent = '— '.repeat(depth) + (customName(custom, node.id) || node.name);
+        sel.appendChild(opt);
+    });
 
     // Safety net: any allowed id not seen via the tree (orphans) still
     // appears as a flat option so the operator's whitelist is respected.
@@ -158,7 +137,7 @@ function fillCategorySelect(sel) {
         if (!seen.has(id) && byId[id]) {
             const opt = document.createElement('option');
             opt.value = String(id);
-            opt.textContent = custom[id] || custom[String(id)] || byId[id].name || ('#' + id);
+            opt.textContent = customName(custom, id) || byId[id].name || ('#' + id);
             sel.appendChild(opt);
         }
     }
@@ -175,13 +154,7 @@ function applyTypeVisibility(form) {
     if (toWrap)   toWrap.hidden   = (type === 2);
 }
 
-function status(text, kind = '') {
-    const el = document.getElementById('pd3CreateTxStatus');
-    if (!el) return;
-    el.textContent = text || '';
-    el.classList.remove('is-ok', 'is-error');
-    if (kind) el.classList.add(kind === 'ok' ? 'is-ok' : 'is-error');
-}
+const status = (text, kind = '') => setStatus(document.getElementById('pd3CreateTxStatus'), text, kind);
 
 export function initCreateTx({ state, host, openModal, closeModal, onCreated }) {
     const form = document.getElementById('pd3CreateTxForm');
@@ -249,7 +222,8 @@ export function initCreateTx({ state, host, openModal, closeModal, onCreated }) 
             // linked to anything — IN links bank rows to sales checks.
             // Fire-and-forget — the user is already looking at the
             // success modal, no need to block on the refetch.
-            try { onCreated?.(); } catch (_) { /* swallow */ }
+            Promise.resolve().then(() => onCreated?.())
+                .catch((e) => console.error('[payday3] refresh after create failed', e));
         } catch (err) {
             status(err.message || 'Ошибка', 'error');
         } finally {

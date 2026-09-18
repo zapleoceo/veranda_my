@@ -41,11 +41,26 @@ final class Money
         if (is_int($raw))   return self::fromPosterCents($raw)->amount;
         if (is_float($raw)) return self::fromPosterCents((int)round($raw))->amount;
         if (is_string($raw)) {
-            $t = trim($raw);
-            if ($t === '') return 0;
-            $t = str_replace(',', '.', $t);
-            if (!is_numeric($t)) return 0;
+            $t = self::normaliseNumeric($raw);
+            if ($t === null) return 0;
             return self::fromPosterCents((int)round((float)$t))->amount;
+        }
+        return 0;
+    }
+
+    /**
+     * Lenient integer for any wire value that is ALREADY in the target unit
+     * (Poster dash.* raw minor units kept as-is, SePay VND, Poster v3
+     * "35000.00" VND strings). Non-scalars / garbage → 0.
+     *
+     * Replaces the private moneyToInt()/vndFromV3() copies that lived in
+     * PosterSyncService, SepaySyncService, FinanceTransferService and
+     * PosterCheckService.
+     */
+    public static function toInt(mixed $raw): int
+    {
+        if (is_int($raw) || is_float($raw) || is_string($raw) || $raw === null) {
+            return self::parse($raw)->amount;
         }
         return 0;
     }
@@ -56,13 +71,17 @@ final class Money
         if (is_int($v))   return new self($v);
         if (is_float($v)) return new self((int)round($v));
         if (is_string($v)) {
-            $t = trim($v);
-            if ($t === '') return new self(0);
-            $t = str_replace(',', '.', $t);
-            if (is_numeric($t)) return new self((int)round((float)$t));
-            return new self(0);
+            $t = self::normaliseNumeric($v);
+            return new self($t === null ? 0 : (int)round((float)$t));
         }
         return new self(0);
+    }
+
+    /** "1 234,50" → "1234.50"; null when not numeric. */
+    private static function normaliseNumeric(string $s): ?string
+    {
+        $t = str_replace([' ', "\u{00A0}", "\u{202F}", ','], ['', '', '', '.'], trim($s));
+        return ($t !== '' && is_numeric($t)) ? $t : null;
     }
 
     public function plus(self $other): self { return new self($this->amount + $other->amount); }

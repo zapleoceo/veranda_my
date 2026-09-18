@@ -26,19 +26,28 @@ final class RequestThrottle
      */
     public static function guard(string $key, int $cooldownSeconds): void
     {
+        // AuthMiddleware has already released the session lock for
+        // /payday3; reopen it only for the bucket write and release it
+        // again in `finally` — otherwise the lock would be held through
+        // the whole IMAP / Poster sync (2–10 s) and every parallel
+        // request from the same operator would queue behind it.
         \App\Infrastructure\Session::start();
-        $bucketKey = '__pd3_throttle__';
-        $now    = time();
-        $bucket = $_SESSION[$bucketKey] ?? [];
-        $last   = (int)($bucket[$key] ?? 0);
-        $elapsed = $now - $last;
-        if ($last > 0 && $elapsed < $cooldownSeconds) {
-            throw new TooManyRequestsException(
-                'Слишком часто. Подожди ' . ($cooldownSeconds - $elapsed) . ' сек.',
-                $cooldownSeconds - $elapsed,
-            );
+        try {
+            $bucketKey = '__pd3_throttle__';
+            $now    = time();
+            $bucket = $_SESSION[$bucketKey] ?? [];
+            $last   = (int)($bucket[$key] ?? 0);
+            $elapsed = $now - $last;
+            if ($last > 0 && $elapsed < $cooldownSeconds) {
+                throw new TooManyRequestsException(
+                    'Слишком часто. Подожди ' . ($cooldownSeconds - $elapsed) . ' сек.',
+                    $cooldownSeconds - $elapsed,
+                );
+            }
+            $bucket[$key] = $now;
+            $_SESSION[$bucketKey] = $bucket;
+        } finally {
+            \App\Infrastructure\Session::close();
         }
-        $bucket[$key] = $now;
-        $_SESSION[$bucketKey] = $bucket;
     }
 }

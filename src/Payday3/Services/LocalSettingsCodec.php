@@ -40,8 +40,10 @@ final class LocalSettingsCodec
             customCategoryNames:  is_array($raw['custom_category_names'] ?? null)
                                        ? self::normaliseCustomNames($raw['custom_category_names'])
                                        : $d->customCategoryNames,
-            posterAdmin:          self::mergePosterAdmin($raw['poster_admin'] ?? [], $d->posterAdmin),
+            // `poster_admin` (Poster back-office cookies) is deliberately NOT
+            // read any more — see LocalSettings docblock.
             accountStashId:       self::positiveInt($acc['stash'] ?? null, $d->accountStashId),
+            accountCashId:        self::positiveInt($acc['cash']  ?? null, $d->accountCashId),
         );
     }
 
@@ -61,11 +63,13 @@ final class LocalSettingsCodec
                 'tips'    => (int)($accIn['tips']    ?? 0),
                 'vietnam' => (int)($accIn['vietnam'] ?? 0),
                 'stash'   => (int)($accIn['stash']   ?? 0),
+                // Optional: the modal doesn't send it yet → 0 → default on read.
+                'cash'    => (int)($accIn['cash']    ?? 0),
             ],
             'balance_sinc_account_id'    => (int)($payload['balance_sinc_account_id'] ?? 0),
             'allowed_categories'         => array_values(array_map('intval', $payload['allowed_categories'] ?? [])),
             'custom_category_names'      => self::normaliseCustomNames($payload['custom_category_names'] ?? []),
-            'poster_admin'               => self::mergePosterAdmin($payload['poster_admin'] ?? [], LocalSettings::emptyPosterAdmin()),
+            // poster_admin is dropped on purpose: saving erases the stored cookies.
         ];
     }
 
@@ -90,6 +94,9 @@ final class LocalSettingsCodec
             if ($n <= 0 || $n > 999_999_999) {
                 return 'Неверный ID счёта: ' . $label;
             }
+        }
+        if (isset($acc['cash']) && ((int)$acc['cash'] < 0 || (int)$acc['cash'] > 999_999_999)) {
+            return 'Неверный ID счёта: cash';
         }
         $bs = (int)($p['balance_sinc_account_id'] ?? 0);
         if ($bs <= 0 || $bs > 999_999_999) {
@@ -149,16 +156,6 @@ final class LocalSettingsCodec
                 $out[$id] = trim($v);
             }
         }
-        return $out;
-    }
-
-    /** @return array<string,string> */
-    private static function mergePosterAdmin(mixed $in, array $defaults): array
-    {
-        if (!is_array($in)) return $defaults;
-        $keys = ['account', 'pos_session', 'ssid', 'csrf', 'cookie', 'user_agent'];
-        $out = [];
-        foreach ($keys as $k) $out[$k] = trim((string)($in[$k] ?? $defaults[$k] ?? ''));
         return $out;
     }
 }

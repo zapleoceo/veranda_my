@@ -10,6 +10,7 @@ use App\Payday3\Domain\DateRange;
 use App\Payday3\Http\JsonResponder;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
+use App\Payday3\Services\ManualLinker;
 
 /**
  * POST /payday3/api/links/manual
@@ -24,37 +25,31 @@ final class ManualLinkAction
     public function __construct(
         private readonly ReconciliationServiceInterface $service,
         private readonly LinkRepositoryInterface        $links,
+        private readonly ManualLinker                   $linker,
     ) {}
 
     public function __invoke(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
     {
-        $body = (array)$request->getParsedBody();
-        $sepayIds  = array_map('intval', (array)($body['sepayIds']  ?? []));
-        $posterIds = array_map('intval', (array)($body['posterIds'] ?? []));
-        $sepayIds  = array_values(array_filter($sepayIds,  static fn($i) => $i > 0));
-        $posterIds = array_values(array_filter($posterIds, static fn($i) => $i > 0));
-
+        $body      = (array)$request->getParsedBody();
+        $sepayIds  = ManualLinker::ids($body['sepayIds']  ?? []);
+        $posterIds = ManualLinker::ids($body['posterIds'] ?? []);
         if ($sepayIds === [] || $posterIds === []) {
             return JsonResponder::error($response, 'Select at least one sepay row and one poster row.', 400);
         }
 
-        $added = 0;
-        foreach ($sepayIds as $sid) {
-            foreach ($posterIds as $pid) {
-                try {
-                    $this->service->manualLink($sid, $pid);
-                    $added++;
-                } catch (\Throwable $e) {
-                    // Swallow per-pair errors and continue; the client
-                    // will reload the link set and see the result.
-                }
-            }
+        try {
+            $range  = DateRange::forRead($request->getQueryParams());
+            $result = $this->linker->link($sepayIds, $posterIds,
+                fn(int $sid, int $pid) => $this->service->manualLink($sid, $pid));
+            $links  = JsonResponder::shapes($this->links->listInRange($range));
+        } catch (\Throwable $e) {
+            return JsonResponder::fromException($response, $e);
         }
-
-        $range = DateRange::fromQuery($request->getQueryParams());
+        // `errors` lists per-pair failures (previously swallowed → "added 0").
         return JsonResponder::ok($response, [
-            'added' => $added,
-            'links' => array_map(static fn($l) => $l->toJsonShape(), $this->links->listInRange($range)),
+            'added'  => $result['added'],
+            'errors' => $result['errors'],
+            'links'  => $links,
         ]);
     }
 }

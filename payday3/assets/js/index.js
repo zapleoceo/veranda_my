@@ -5,16 +5,14 @@
 // Cache-busting strategy: the <script> tag in content.php is loaded as
 //   index.js?v=<filemtime>
 // We forward that `v=` query string to every submodule import via
-// dynamic `import()` calls below. That way a single mtime bump on
-// index.js invalidates every cached module in one shot — no need to
-// version each path separately.
+// dynamic `import()` (ui/cacheBust.js; every module does the same for
+// its own imports). That way a single mtime bump on index.js
+// invalidates every cached module in one shot.
 
 'use strict';
 
-const _selfUrl = new URL(import.meta.url);
-const _v = _selfUrl.searchParams.get('v') || '';
-const _qs = _v ? '?v=' + encodeURIComponent(_v) : '';
-const _i = (p) => import(new URL(p + _qs, import.meta.url).href);
+const _v = new URL(import.meta.url).searchParams.get('v') || '';
+const _i = (await import(new URL('./ui/cacheBust.js' + new URL(import.meta.url).search, import.meta.url).href)).importer(import.meta.url);
 
 const [
     { State },
@@ -33,7 +31,7 @@ const [
     { initLinkPanel },
     { initDataActions },
     { BANK_TABLE, BANK_SCROLL, SEPAY_TBODY },
-    { initModals },
+    { initModals, modalHost },
     { initOutMode },
     { initBalances },
     { makeInLoader, initSepayHide },
@@ -80,8 +78,9 @@ const state = new State({
     userEmail: raw.userEmail || '',
     endpoints: raw.endpoints || {},
 });
+// Before any module can send a request: every POST/DELETE under
+// /payday3/api must carry X-CSRF-Token (api.js adds it).
 setCsrf(state.get('csrf'));
-window.__pd3 = state;
 
 initModeToggle();
 const selection = initSelection();
@@ -94,15 +93,15 @@ initModals({ state });
 // Row colours come from ALL link kinds at once (a SePay row is linked by
 // a check OR a Poster income; a finance row by an expense OR an income),
 // so after any change every table is repainted from the union, then the
-// footers and eye toggles follow.
+// eye toggles, then the footers — computed ONCE, from the final classes.
 const repaint = () => {
     paintRowStates({
         checkLinks:  state.get('links')       || [],
         mailLinks:   state.get('outLinks')    || [],
         incomeLinks: state.get('incomeLinks') || [],
     });
-    refreshStats();
     eyes.reapply();
+    refreshStats();
 };
 
 // After a side re-renders its rows its old ticks are gone. Each side
@@ -125,13 +124,15 @@ const renderer = grid ? new LineRenderer({
     leftTbody:          document.querySelector(BANK_TABLE),
     rightTbody:         document.getElementById('pd3RightColumn'),
     horizontalScroller: document.getElementById('pd3GraphRoot'),
-    onUnlink: null,            // wired below, once the adapter exists
+    leftAnchorId:       (l) => 'pd3-sepay-anchor-'  + l.sepay_id,
+    rightAnchorId:      (l) => 'pd3-poster-anchor-' + l.poster_transaction_id,
+    linkKey:            (l) => l.sepay_id + ':' + l.poster_transaction_id,
 }) : null;
 if (!renderer) console.warn('[payday3] grid not found, LineRenderer disabled');
 
 const inLinks = createInLinks({ state, renderer, onChanged: afterSideRender('in') });
 if (renderer) {
-    renderer._onUnlink = inLinks.onUnlink;   // late-bind the × button handler
+    renderer.setOnUnlink(inLinks.onUnlink);   // late-bind the × button handler
     renderer.setLinks(state.get('links'));
 }
 
@@ -146,9 +147,7 @@ const incomeLinks = initIncomeLinks({ state, onChanged: repaint });
 // Balances BEFORE createTx: the «+» popups refresh the Poster column
 // after finance.createTransactions succeeds.
 const balances = initBalances({ state });
-// Import the modal host helpers AFTER initModals so initCreateTx can
-// route open/close through the same code path as the toolbar buttons.
-const { modalHost } = await _i('./ui/modals.js');
+// Same modal host as the toolbar buttons (set up by initModals above).
 initCreateTx({
     state,
     host:       modalHost,
@@ -172,29 +171,28 @@ initFontScale();
 // AJAX refresh of the incoming side — replaces window.location.reload().
 const loadInData = makeInLoader({ state, renderer, onRendered: afterSideRender('in') });
 const finance    = initFinanceTransfers({ state });
-initDataActions({
+const dataActions = initDataActions({
     state,
     refresh: async () => {
         await loadInData();
         finance.reload();
     },
+    // «Деньги» ↻ also reloads the outgoing block — one listener, one spinner.
+    reloadOut: outMode ? () => outMode.reload() : null,
 });
 // Per-row hide/restore of incoming rows — reuses loadInData so the eye
 // toggle picks up the change without a full page reload.
 initSepayHide({ reload: loadInData });
 
 // First-paint auto-fill: incoming rows and checks are server-rendered
-// from the DB. If both came back empty (a fresh day), fire SePay + Poster
-// sync — the buttons own the busy spinner + refresh flow, and no-op
-// while busy. The outgoing side needs no kick: it always loads live.
+// from the DB. If both came back empty (a fresh day), sync SePay + Poster
+// (with the buttons' spinners). The outgoing side needs no kick — it
+// already loads live — so this does NOT reload it a second time.
 (function autoFillTables() {
     const inEmpty =
         document.querySelector(`${SEPAY_TBODY} .pd3-empty`) &&
         document.querySelector('#pd3PosterTable .pd3-empty');
-    if (inEmpty) {
-        document.getElementById('pd3SepaySyncBtn')?.click();
-        document.getElementById('pd3PosterSyncBtn')?.click();
-    }
+    if (inEmpty) dataActions.autoFill();
 })();
 
 console.info('[payday3] ready', {

@@ -23,7 +23,7 @@ final class PosterBalanceSnapshotAction
     public function __invoke(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
     {
         try { $snap = $this->service->snapshot(); }
-        catch (\Throwable $e) { return JsonResponder::error($response, $e->getMessage(), 500); }
+        catch (\Throwable $e) { return JsonResponder::fromException($response, $e, 502); }
         return JsonResponder::ok($response, $snap);
     }
 }

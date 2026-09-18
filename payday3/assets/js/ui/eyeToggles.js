@@ -1,22 +1,26 @@
 // Eye toggles (👁).
 //
 //   #pd3SepayHiddenToggle  — show/hide hidden incoming rows (CSS class `is-hidden` on .row-hidden).
-//                            The same button also refetches hidden mail rows — see out/bootstrap.js.
+//                            Its aria-pressed is the ONE source of truth for «show hidden»:
+//                            out/bootstrap.js reads it (showHiddenFrom) to refetch hidden mail.
 //   #pd3HideLinkedBtn      — show/hide already-linked rows in every table (.row-green/.row-yellow/.row-gray)
-//   #pd3VietnamToggle      — show/hide poster rows where payment method begins with "Vietnam"
+//   #pd3VietnamToggle      — show/hide Vietnam Company poster rows (by payment-method id)
 //
 // Each toggle is a self-contained controller; they don't share state.
 // initEyeToggles() returns reapply(): tables re-rendered from scratch
-// (the outgoing side, after every load / link change) lose the
-// `is-hidden` flags, so the owner re-applies the current toggle states.
+// lose the `is-hidden` flags, so the owner re-applies the current
+// toggle states. reapply() does NOT recompute the Poster footer — the
+// page repaint does that once, after every toggle is applied.
 
 'use strict';
 
-// Cache-bust cross-module imports — see comment in out/bootstrap.js.
-const _v = new URL(import.meta.url).searchParams.get('v') || '';
-const _qs = _v ? '?v=' + encodeURIComponent(_v) : '';
-const { recomputePosterFooter } = await import(new URL('../in/renderTables.js' + _qs, import.meta.url).href);
-const { SEPAY_TBODY }           = await import(new URL('./bankTable.js'       + _qs, import.meta.url).href);
+const _i = (await import(new URL('./cacheBust.js' + new URL(import.meta.url).search, import.meta.url).href)).importer(import.meta.url);
+const { recomputePosterFooter }  = await _i('../in/renderTables.js');
+const { SEPAY_TBODY }            = await _i('./bankTable.js');
+const { isVietnam, methodOfRow } = await _i('./paymentMethods.js');
+
+/** «Show hidden rows» is on when the eye is NOT pressed (pressed = hide). */
+export const showHiddenFrom = (btn) => btn?.getAttribute('aria-pressed') === 'false';
 
 function makeToggle(btnId, getRows, initialPressed = false) {
     const btn = document.getElementById(btnId);
@@ -24,21 +28,23 @@ function makeToggle(btnId, getRows, initialPressed = false) {
     let pressed = initialPressed;
     const apply = () => {
         btn.setAttribute('aria-pressed', pressed ? 'true' : 'false');
+        // toggle(…, force) is a no-op for rows already in that state —
+        // no attribute mutation, no renderer wake-up.
         getRows().forEach((row) => row.classList.toggle('is-hidden', pressed));
-        // Hiding rows changes Итого / связи / несвязи — refresh.
-        recomputePosterFooter();
     };
     apply();
-    btn.addEventListener('click', () => { pressed = !pressed; apply(); });
+    btn.addEventListener('click', () => {
+        pressed = !pressed;
+        apply();
+        // Hiding rows changes Итого / связи / несвязи — refresh.
+        recomputePosterFooter();
+    });
     return apply;
 }
 
 export function initEyeToggles() {
     const appliers = [
         // Hidden incoming rows — start hidden (matches payday2 default).
-        // NB: the same button has a SECOND listener in out/bootstrap.js that
-        // refetches hidden mail rows; both flip on every click — don't add a
-        // guard/early return to only one of them.
         makeToggle(
             'pd3SepayHiddenToggle',
             () => document.querySelectorAll(`${SEPAY_TBODY} tr.row-hidden`),
@@ -56,10 +62,11 @@ export function initEyeToggles() {
         makeToggle(
             'pd3VietnamToggle',
             () => Array.from(document.querySelectorAll('#pd3PosterTable tr.pd3-row'))
-                .filter((r) => (r.dataset.method || '').toLowerCase().startsWith('vietnam')),
+                .filter((r) => isVietnam(methodOfRow(r))),
             true,
         ),
     ].filter(Boolean);
 
+    recomputePosterFooter();
     return { reapply: () => appliers.forEach((apply) => apply()) };
 }

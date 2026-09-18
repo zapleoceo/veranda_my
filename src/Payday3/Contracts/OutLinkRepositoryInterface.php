@@ -13,7 +13,12 @@ interface OutLinkRepositoryInterface
     public function listInRange(DateRange $range): array;
 
     public function exists(int $mailUid, int $financeId): bool;
-    public function add(OutLink $link): void;
+    /**
+     * Idempotent insert (INSERT IGNORE on the unique pair). $dateTo is the
+     * day the edge belongs to (upper end of the visible range) — required,
+     * so a back-dated manual link can't silently land on "today".
+     */
+    public function add(OutLink $link, string $dateTo): void;
     public function remove(int $mailUid, int $financeId): void;
     public function clearInRange(DateRange $range): int;
 }

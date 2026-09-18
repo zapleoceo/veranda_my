@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Payday3\Services;
 
-use App\Infrastructure\Config;
 use App\Payday3\Contracts\LocalSettingsRepositoryInterface;
 use App\Payday3\Contracts\TelegramNotifierInterface;
 
@@ -15,15 +14,19 @@ use App\Payday3\Contracts\TelegramNotifierInterface;
  * (operator-tuned in payday3/local_config.json). Callers can override
  * per-call to send to a different room.
  *
- * Reads .env: TELEGRAM_BOT_TOKEN (or legacy TG_BOT_TOKEN).
+ * Bot token (.env TELEGRAM_BOT_TOKEN, or legacy TG_BOT_TOKEN) is injected
+ * by the container.
  */
 final class TelegramNotifier implements TelegramNotifierInterface
 {
-    public function __construct(private readonly LocalSettingsRepositoryInterface $settings) {}
+    public function __construct(
+        private readonly LocalSettingsRepositoryInterface $settings,
+        private readonly string                           $botToken,
+    ) {}
 
     public function sendText(string $text, ?string $chatId = null, ?string $threadId = null): array
     {
-        $token = self::token();
+        $token = trim($this->botToken);
         if ($token === '') return ['ok' => false, 'error' => 'TELEGRAM_BOT_TOKEN missing'];
 
         [$chatId, $threadId] = $this->resolveTarget($chatId, $threadId);
@@ -44,7 +47,7 @@ final class TelegramNotifier implements TelegramNotifierInterface
     {
         if ($bytes === '') return ['ok' => false, 'error' => 'empty image'];
 
-        $token = self::token();
+        $token = trim($this->botToken);
         if ($token === '') return ['ok' => false, 'error' => 'TELEGRAM_BOT_TOKEN missing'];
 
         [$chatId, $threadId] = $this->resolveTarget($chatId, $threadId);
@@ -85,14 +88,6 @@ final class TelegramNotifier implements TelegramNotifierInterface
 
     // ─── internals ──────────────────────────────────────────────
 
-    private static function token(): string
-    {
-        return trim((string)(
-            $_ENV['TELEGRAM_BOT_TOKEN']
-            ?? $_ENV['TG_BOT_TOKEN']
-            ?? Config::get('TELEGRAM_BOT_TOKEN')
-        ));
-    }
 
     /** @return array{0:string,1:?string}  resolved chat / thread, settings as fallback */
     private function resolveTarget(?string $chatId, ?string $threadId): array

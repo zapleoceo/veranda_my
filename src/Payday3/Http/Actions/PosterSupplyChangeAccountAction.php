@@ -24,10 +24,8 @@ final class PosterSupplyChangeAccountAction
         $accountId = (int)($body['account_id'] ?? 0);
         try {
             $resp = $this->service->changeAccount($supplyId, $accountId);
-        } catch (\InvalidArgumentException $e) {
-            return JsonResponder::error($response, $e->getMessage(), 400);
         } catch (\Throwable $e) {
-            return JsonResponder::error($response, $e->getMessage(), 500);
+            return JsonResponder::fromException($response, $e, 502);
         }
         return JsonResponder::ok($response, ['response' => $resp]);
     }

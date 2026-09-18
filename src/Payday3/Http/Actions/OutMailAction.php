@@ -8,7 +8,6 @@ use App\Payday3\Contracts\MailServiceInterface;
 use App\Payday3\Domain\DateRange;
 use App\Payday3\Http\JsonResponder;
 use App\Payday3\Http\RequestThrottle;
-use App\Payday3\Http\TooManyRequestsException;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
 
@@ -28,23 +27,20 @@ final class OutMailAction
     public function __invoke(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
     {
         try {
+            $q = $request->getQueryParams();
+            $range = DateRange::forRead($q);
             // IMAP is slow; throttle to once-per-5s per session so a
             // double-click doesn't open two parallel IMAP sessions.
+            // (guard() releases the session lock before we go to IMAP.)
             RequestThrottle::guard('out-mail', 5);
-            $q = $request->getQueryParams();
-            $range = DateRange::fromQuery($q);
             $includeHidden = (string)($q['include_hidden'] ?? '') === '1';
             $rows = $this->mail->fetch($range, $includeHidden);
-        } catch (TooManyRequestsException $e) {
-            return JsonResponder::tooManyRequests($response, $e->getMessage(), $e->retryAfter);
-        } catch (\InvalidArgumentException $e) {
-            return JsonResponder::error($response, $e->getMessage(), 400);
-        } catch (\RuntimeException $e) {
-            return JsonResponder::error($response, $e->getMessage(), 500);
+        } catch (\Throwable $e) {
+            return JsonResponder::fromException($response, $e, 502);
         }
         return JsonResponder::ok($response, [
             'range' => $range->asArray(),
-            'mail'  => array_map(static fn($m) => $m->toJsonShape(), $rows),
+            'mail'  => JsonResponder::shapes($rows),
         ]);
     }
 }

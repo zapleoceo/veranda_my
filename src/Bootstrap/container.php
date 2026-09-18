@@ -46,7 +46,6 @@ use App\Payday3\Services\MailImapService;
 use App\Payday3\Services\FinancePosterService;
 use App\Payday3\Services\OutReconciliationService;
 use App\Payday3\Repositories\OutLinkRepository;
-use App\Payday3\Http\Actions\OutDataAction;
 use App\Payday3\Http\Actions\OutAutoLinkAction;
 use App\Payday3\Http\Actions\OutManualLinkAction;
 use App\Payday3\Http\Actions\OutUnlinkAction;
@@ -183,7 +182,17 @@ return [
         fn($c) => new \App\Payday3\Http\Actions\IncomeLinksController(
             $c->get(\App\Payday3\Contracts\IncomeFinanceReconciliationServiceInterface::class),
             $c->get(\App\Payday3\Contracts\IncomeFinanceLinkRepositoryInterface::class),
+            $c->get(\App\Payday3\Services\ManualLinker::class),
         ),
+    // Shared infrastructure for the payday3 money/destructive operations.
+    \App\Payday3\Services\ManualLinker::class =>
+        fn($c) => new \App\Payday3\Services\ManualLinker($c->get(Database::class)),
+    \App\Payday3\Contracts\AuditLogInterface::class =>
+        fn($c) => new \App\Payday3\Repositories\AuditLogRepository($c->get(Database::class)),
+    \App\Payday3\Contracts\NamedLockInterface::class =>
+        fn($c) => new \App\Payday3\Repositories\MysqlNamedLock($c->get(Database::class)),
+    \App\Payday3\Contracts\SessionStoreInterface::class =>
+        fn() => new \App\Payday3\Http\PhpSessionStore(),
     LinksAction::class      => fn($c) => new LinksAction($c->get(LinkRepositoryInterface::class)),
     AutoLinkAction::class   => fn($c) => new AutoLinkAction(
         $c->get(ReconciliationServiceInterface::class),
@@ -192,6 +201,7 @@ return [
     ManualLinkAction::class => fn($c) => new ManualLinkAction(
         $c->get(ReconciliationServiceInterface::class),
         $c->get(LinkRepositoryInterface::class),
+        $c->get(\App\Payday3\Services\ManualLinker::class),
     ),
     UnlinkAction::class     => fn($c) => new UnlinkAction(
         $c->get(ReconciliationServiceInterface::class),
@@ -202,13 +212,25 @@ return [
     ),
     DayResetServiceInterface::class => fn($c) => new DayResetService($c->get(Database::class)),
     ClearDayAction::class    => fn($c) => new ClearDayAction($c->get(DayResetServiceInterface::class)),
-    SepaySyncServiceInterface::class  => fn($c) => new SepaySyncService($c->get(Database::class)),
+    // Credentials are read here, once — services never touch $_ENV.
+    SepaySyncServiceInterface::class  => fn($c) => new SepaySyncService(
+        $c->get(Database::class),
+        Config::get('SEPAY_API_TOKEN'),
+        Config::get('SEPAY_ACCOUNT_NUMBER'),
+    ),
     SepaySyncAction::class            => fn($c) => new SepaySyncAction($c->get(SepaySyncServiceInterface::class)),
-    PosterSyncServiceInterface::class => fn($c) => new PosterSyncService($c->get(Database::class)),
+    PosterSyncServiceInterface::class => fn($c) => new PosterSyncService(
+        $c->get(Database::class),
+        $c->get(PosterApiProviderInterface::class),
+    ),
     PosterSyncAction::class           => fn($c) => new PosterSyncAction($c->get(PosterSyncServiceInterface::class)),
 
     // ─── Payday3 OUT mode ──────────────────────────────────────
-    MailServiceInterface::class       => fn($c) => new MailImapService($c->get(Database::class)),
+    MailServiceInterface::class       => fn($c) => new MailImapService(
+        $c->get(Database::class),
+        Config::get('MAIL_USER'),
+        Config::get('MAIL_PASS'),
+    ),
     FinanceServiceInterface::class    => fn($c) => new FinancePosterService(
         $c->get(PosterApiProviderInterface::class),
         $c->get(LocalSettingsRepositoryInterface::class),
@@ -220,12 +242,7 @@ return [
         $c->get(OutLinkRepositoryInterface::class),
         $c->get(\App\Payday3\Contracts\IncomeFinanceLinkRepositoryInterface::class),
     ),
-    OutDataAction::class       => fn($c) => new OutDataAction(
-        $c->get(MailServiceInterface::class),
-        $c->get(FinanceServiceInterface::class),
-        $c->get(OutLinkRepositoryInterface::class),
-    ),
-    // Split OutDataAction into three so the JS can fan out — IMAP
+    // OUT side is three endpoints so the JS can fan out — IMAP
     // ( ~2s ), Poster finance ( ~500ms ) and the DB link query
     // ( ~50ms ) now run concurrently instead of summing.
     \App\Payday3\Http\Actions\OutMailAction::class    => fn($c) => new \App\Payday3\Http\Actions\OutMailAction(
@@ -244,6 +261,7 @@ return [
     OutManualLinkAction::class => fn($c) => new OutManualLinkAction(
         $c->get(OutReconciliationServiceInterface::class),
         $c->get(OutLinkRepositoryInterface::class),
+        $c->get(\App\Payday3\Services\ManualLinker::class),
     ),
     OutUnlinkAction::class     => fn($c) => new OutUnlinkAction(
         $c->get(OutReconciliationServiceInterface::class),
@@ -262,7 +280,7 @@ return [
     ActualBalanceAction::class              => fn($c) => new ActualBalanceAction($c->get(ActualBalanceRepositoryInterface::class)),
 
     // ─── Payday3 Poster integrations (replaces payday2 fallbacks) ─
-    PosterApiProviderInterface::class       => fn()   => new PosterApiProvider(),
+    PosterApiProviderInterface::class       => fn()   => new PosterApiProvider(Config::get('POSTER_API_TOKEN')),
 
     // LocalSettings — DB-backed (payday3_settings.config_json). On the
     // first boot the table is empty so DbLocalSettingsRepository pulls
@@ -274,7 +292,10 @@ return [
         );
         return new DbLocalSettingsRepository($c->get(Database::class), $json);
     },
-    TelegramNotifierInterface::class        => fn($c) => new TelegramNotifier($c->get(LocalSettingsRepositoryInterface::class)),
+    TelegramNotifierInterface::class        => fn($c) => new TelegramNotifier(
+        $c->get(LocalSettingsRepositoryInterface::class),
+        Config::get('TELEGRAM_BOT_TOKEN') !== '' ? Config::get('TELEGRAM_BOT_TOKEN') : Config::get('TG_BOT_TOKEN'),
+    ),
 
     PosterCashShiftServiceInterface::class  => fn($c) => new PosterCashShiftService($c->get(PosterApiProviderInterface::class)),
     PosterSuppliesServiceInterface::class   => fn($c) => new PosterSuppliesService($c->get(PosterApiProviderInterface::class)),
@@ -282,6 +303,8 @@ return [
         $c->get(PosterApiProviderInterface::class),
         $c->get(TelegramNotifierInterface::class),
         $c->get(LocalSettingsRepositoryInterface::class),
+        $c->get(\App\Payday3\Contracts\SessionStoreInterface::class),
+        $c->get(\App\Payday3\Contracts\AuditLogInterface::class),
     ),
     PosterLookupServiceInterface::class     => fn($c) => new PosterLookupService($c->get(PosterApiProviderInterface::class)),
 
@@ -300,14 +323,24 @@ return [
         $c->get(LocalSettingsRepositoryInterface::class),
     ),
     PosterBalanceSnapshotAction::class      => fn($c) => new PosterBalanceSnapshotAction($c->get(PosterBalanceServiceInterface::class)),
-    SettingsAction::class                   => fn($c) => new SettingsAction($c->get(LocalSettingsRepositoryInterface::class)),
+    SettingsAction::class                   => fn($c) => new SettingsAction(
+        $c->get(LocalSettingsRepositoryInterface::class),
+        $c->get(\App\Payday3\Contracts\AuditLogInterface::class),
+    ),
 
     // ─── Payday3 IN AJAX-refresh + Финансовые транзакции ──────
     InDataAction::class => fn($c) => new InDataAction($c->get(PageDataAssembler::class)),
-    FinanceTransferServiceInterface::class => fn($c) => new FinanceTransferService(
-        $c->get(Database::class),
+    // Request-scoped memo of Poster reads (shared by vietnam()/tips()
+    // and the UPLD duplicate check) — one instance per request.
+    \App\Payday3\Services\FinanceTransferFetcher::class => fn($c) => new \App\Payday3\Services\FinanceTransferFetcher(
         $c->get(PosterApiProviderInterface::class),
+    ),
+    FinanceTransferServiceInterface::class => fn($c) => new FinanceTransferService(
+        $c->get(\App\Payday3\Services\FinanceTransferFetcher::class),
+        $c->get(LinkRepositoryInterface::class),
         $c->get(LocalSettingsRepositoryInterface::class),
+        $c->get(PosterApiProviderInterface::class),
+        $c->get(\App\Payday3\Contracts\NamedLockInterface::class),
     ),
     FinanceTransfersAction::class => fn($c) => new FinanceTransfersAction(
         $c->get(FinanceTransferServiceInterface::class),
@@ -326,6 +359,10 @@ return [
     BalanceSyncServiceInterface::class => fn($c) => new BalanceSyncService(
         $c->get(PosterApiProviderInterface::class),
         $c->get(LocalSettingsRepositoryInterface::class),
+        $c->get(\App\Payday3\Contracts\SessionStoreInterface::class),
+        $c->get(ActualBalanceRepositoryInterface::class),
+        $c->get(PosterBalanceServiceInterface::class),
+        $c->get(\App\Payday3\Services\FinanceTransferFetcher::class),
     ),
     BalanceSyncPlanAction::class => fn($c) => new BalanceSyncPlanAction(
         $c->get(BalanceSyncServiceInterface::class),
@@ -337,6 +374,9 @@ return [
     // ─── "+" create Poster transaction from an OUT-mail row ───
     PosterTransactionCreateServiceInterface::class => fn($c) => new PosterTransactionCreateService(
         $c->get(PosterApiProviderInterface::class),
+        $c->get(LocalSettingsRepositoryInterface::class),
+        $c->get(\App\Payday3\Contracts\AuditLogInterface::class),
+        $c->get(\App\Payday3\Contracts\NamedLockInterface::class),
     ),
     PosterTransactionCreateAction::class => fn($c) => new PosterTransactionCreateAction(
         $c->get(PosterTransactionCreateServiceInterface::class),

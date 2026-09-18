@@ -6,8 +6,12 @@ namespace Tests\Unit\Payday3;
 
 use App\Classes\PosterAPI;
 use App\Payday3\Contracts\PosterApiProviderInterface;
+use App\Payday3\Domain\Actor;
 use App\Payday3\Services\PosterTransactionCreateService;
 use PHPUnit\Framework\TestCase;
+use Tests\Unit\Payday3\Fakes\FixedSettings;
+use Tests\Unit\Payday3\Fakes\InMemoryAuditLog;
+use Tests\Unit\Payday3\Fakes\PassThroughLock;
 
 /**
  * Кнопка «+» в payday3: создание финансовой транзакции в Poster.
@@ -17,11 +21,22 @@ use PHPUnit\Framework\TestCase;
  * переводится в формат Poster (UI 1/2/3 → wire 1/0/2) и какие поля счёта и
  * суммы уходят для каждого типа. Ошибка в маппинге = приход, записанный
  * расходом, или деньги на не тот счёт — баланс в Poster поедет молча.
+ *
+ * Плюс защиты из аудита безопасности: только настроенные счета, лимит
+ * суммы, формат даты, идемпотентность (двойной клик) и audit-строка.
  */
 final class PosterTransactionCreateServiceTest extends TestCase
 {
     /** @var list<array{method:string, params:array<string,mixed>, http:string}> */
     private array $calls = [];
+    private InMemoryAuditLog $audit;
+
+    private function make(PosterApiProviderInterface $provider): PosterTransactionCreateService
+    {
+        $this->audit = new InMemoryAuditLog();
+        // Default settings: accounts 1 (Андрей), 8 (Tips), 9, 11, 2 are configured.
+        return new PosterTransactionCreateService($provider, FixedSettings::defaults(), $this->audit, new PassThroughLock());
+    }
 
     private function service(): PosterTransactionCreateService
     {
@@ -35,7 +50,7 @@ final class PosterTransactionCreateServiceTest extends TestCase
         );
         $provider = $this->createMock(PosterApiProviderInterface::class);
         $provider->method('client')->willReturn($api);
-        return new PosterTransactionCreateService($provider);
+        return $this->make($provider);
     }
 
     /** @return array<string,mixed> параметры единственного вызова Poster */
@@ -110,10 +125,15 @@ final class PosterTransactionCreateServiceTest extends TestCase
     public static function invalidInputs(): array
     {
         return [
-            'неизвестный тип'  => [['type' => 9, 'amount' => 1000, 'date' => '2026-09-18', 'account_to' => 1]],
-            'нулевая сумма'    => [['type' => 1, 'amount' => 0,    'date' => '2026-09-18', 'account_to' => 1]],
-            'без даты'         => [['type' => 1, 'amount' => 1000, 'date' => '',           'account_to' => 1]],
-            'перевод сам в себя' => [['type' => 3, 'amount' => 1000, 'date' => '2026-09-18', 'account_from' => 1, 'account_to' => 1]],
+            'неизвестный тип'       => [['type' => 9, 'amount' => 1000, 'date' => '2026-09-18 10:00:00', 'account_to' => 1]],
+            'нулевая сумма'         => [['type' => 1, 'amount' => 0,    'date' => '2026-09-18 10:00:00', 'account_to' => 1]],
+            'без даты'              => [['type' => 1, 'amount' => 1000, 'date' => '',                    'account_to' => 1]],
+            'перевод сам в себя'    => [['type' => 3, 'amount' => 1000, 'date' => '2026-09-18 10:00:00', 'account_from' => 1, 'account_to' => 1]],
+            'сумма больше лимита'   => [['type' => 1, 'amount' => 1_000_000_001, 'date' => '2026-09-18 10:00:00', 'account_to' => 1]],
+            'дата не в формате'     => [['type' => 1, 'amount' => 1000, 'date' => '18.09.2026',          'account_to' => 1]],
+            'несуществующая дата'   => [['type' => 1, 'amount' => 1000, 'date' => '2026-02-30 10:00:00', 'account_to' => 1]],
+            'счёт не из настроек'   => [['type' => 2, 'amount' => 1000, 'date' => '2026-09-18 10:00:00', 'account_from' => 555]],
+            'перевод на чужой счёт' => [['type' => 3, 'amount' => 1000, 'date' => '2026-09-18 10:00:00', 'account_from' => 1, 'account_to' => 555]],
         ];
     }
 
@@ -138,8 +158,49 @@ final class PosterTransactionCreateServiceTest extends TestCase
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('Poster: Poster down');
-        (new PosterTransactionCreateService($provider))->create([
+        $this->make($provider)->create([
             'type' => 1, 'amount' => 1000, 'date' => '2026-09-18 09:00:00', 'account_to' => 1,
         ]);
+    }
+
+    public function test_identical_request_from_same_session_within_window_is_rejected(): void
+    {
+        $svc   = $this->service();
+        $actor = new Actor('op@example.com', 'sess-1');
+        $input = ['type' => 2, 'amount' => 120000, 'date' => '2026-09-18 09:00:00', 'account_from' => 1, 'comment' => 'x'];
+
+        $svc->create($input, $actor);
+        try {
+            $svc->create($input, $actor);
+            $this->fail('двойной клик должен отклоняться');
+        } catch (\DomainException $e) {
+            $this->assertStringContainsString('повтор', $e->getMessage());
+        }
+        $this->assertCount(1, $this->calls, 'в Poster ушла только одна транзакция');
+    }
+
+    public function test_same_request_from_another_session_or_with_other_amount_passes(): void
+    {
+        $svc   = $this->service();
+        $input = ['type' => 2, 'amount' => 120000, 'date' => '2026-09-18 09:00:00', 'account_from' => 1];
+
+        $svc->create($input, new Actor('a@example.com', 'sess-1'));
+        $svc->create($input, new Actor('b@example.com', 'sess-2'));
+        $svc->create(['amount' => 120001] + $input, new Actor('a@example.com', 'sess-1'));
+        $this->assertCount(3, $this->calls);
+    }
+
+    public function test_created_transaction_is_audited_with_user_email(): void
+    {
+        $this->service()->create(
+            ['type' => 1, 'amount' => 5000, 'date' => '2026-09-18 09:00', 'account_to' => 8],
+            new Actor('op@example.com', 'sess-1'),
+        );
+        $this->assertCount(1, $this->audit->rows);
+        $row = $this->audit->rows[0];
+        $this->assertSame('op@example.com', $row['email']);
+        $this->assertSame('poster_tx.create', $row['action']);
+        $this->assertSame(8, $row['payload']['request']['account_to']);
+        $this->assertNotNull($row['fingerprint']);
     }
 }

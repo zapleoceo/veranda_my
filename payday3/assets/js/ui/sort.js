@@ -10,6 +10,9 @@
 
 'use strict';
 
+// One collator for every comparison (localeCompare(…, 'ru') builds one per call).
+const COLLATOR = new Intl.Collator('ru');
+
 const NUMERIC_KEYS = new Set(['sum', 'total', 'card', 'tips', 'num', 'ts', 'table']);
 
 function compare(a, b, key) {
@@ -22,7 +25,7 @@ function compare(a, b, key) {
         if (an > bn) return 1;
         return 0;
     }
-    return String(av ?? '').localeCompare(String(bv ?? ''), 'ru');
+    return COLLATOR.compare(String(av ?? ''), String(bv ?? ''));
 }
 
 /**

@@ -6,7 +6,12 @@ namespace App\Payday3\Domain;
 
 /**
  * Immutable snapshot of operator-tunable settings (Telegram targets,
- * Poster account IDs, finance categories, poster-admin credentials).
+ * Poster account IDs, finance categories).
+ *
+ * Poster back-office cookies/CSRF («poster_admin») used to live here and
+ * were returned to every payday user by GET /settings. Nothing on the
+ * server used them any more — the field is gone: it is no longer read,
+ * and the next save rewrites the stored blob without it.
  *
  * Persisted as payday3/local_config.json. The repository layer owns
  * read/write/validate; this class only carries the fields and ships
@@ -19,7 +24,6 @@ final class LocalSettings
 {
     /** @param array<int,int>      $allowedCategories     finance.getCategories whitelist */
     /** @param array<int,string>   $customCategoryNames   id → operator-renamed label */
-    /** @param array<string,string> $posterAdmin          cookies/CSRF for admin scrape */
     public function __construct(
         public readonly string $telegramChatId,
         public readonly string $telegramThreadId,
@@ -30,11 +34,27 @@ final class LocalSettings
         public readonly int    $balanceSyncAccountId,
         public readonly array  $allowedCategories,
         public readonly array  $customCategoryNames,
-        public readonly array  $posterAdmin,
         // «Заначка» — cash stash account added in Poster 2026-09.
-        // Last + defaulted so existing named-arg constructors keep working.
+        // Defaulted so existing named-arg constructors keep working.
         public readonly int    $accountStashId = 11,
+        // «Касса» — was hard-coded as 2 in PosterBalanceService (payday2).
+        public readonly int    $accountCashId = 2,
     ) {}
+
+    /**
+     * Every Poster account id the operator has configured — the allow-list
+     * for finance transactions created from the payday3 UI.
+     *
+     * @return list<int>
+     */
+    public function configuredAccountIds(): array
+    {
+        $ids = [
+            $this->accountAndreyId, $this->accountTipsId, $this->accountVietnamId,
+            $this->accountStashId, $this->accountCashId, $this->balanceSyncAccountId,
+        ];
+        return array_values(array_unique(array_filter($ids, static fn(int $i) => $i > 0)));
+    }
 
     public static function defaults(): self
     {
@@ -51,17 +71,9 @@ final class LocalSettings
             balanceSyncAccountId: 8,
             allowedCategories:    [],
             customCategoryNames:  [],
-            posterAdmin:          self::emptyPosterAdmin(),
             accountStashId:       11,
+            accountCashId:        2,
         );
-    }
-
-    public static function emptyPosterAdmin(): array
-    {
-        return [
-            'account' => '', 'pos_session' => '', 'ssid' => '',
-            'csrf'    => '', 'cookie'      => '', 'user_agent' => '',
-        ];
     }
 
     /** Shape returned to the client (Settings modal + bootstrap). */
@@ -76,11 +88,11 @@ final class LocalSettings
                 'tips'    => $this->accountTipsId,
                 'vietnam' => $this->accountVietnamId,
                 'stash'   => $this->accountStashId,
+                'cash'    => $this->accountCashId,
             ],
             'balance_sinc_account_id' => $this->balanceSyncAccountId,
             'allowed_categories'      => array_values($this->allowedCategories),
             'custom_category_names'   => (object)$this->customCategoryNames,
-            'poster_admin'            => $this->posterAdmin,
         ];
     }
 }

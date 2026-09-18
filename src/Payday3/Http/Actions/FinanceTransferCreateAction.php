@@ -9,6 +9,7 @@ use App\Payday3\Domain\DateRange;
 use App\Payday3\Http\JsonResponder;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
+use App\Payday3\Http\CurrentUser;
 
 /**
  * POST /payday3/api/finance/transfers/create
@@ -36,16 +37,13 @@ final class FinanceTransferCreateAction
         }
         $kind = (string)($payload['kind'] ?? '');
         try {
-            $range = DateRange::fromQuery([
+            $range = DateRange::forRead([
                 'dateFrom' => (string)($payload['dateFrom'] ?? ''),
                 'dateTo'   => (string)($payload['dateTo']   ?? ''),
             ]);
-            $by = trim((string)($_SESSION['user_email'] ?? $_SESSION['user_name'] ?? ''));
-            $result = $this->service->createTransfer($kind, $range, $by);
-        } catch (\InvalidArgumentException $e) {
-            return JsonResponder::error($response, $e->getMessage(), 400);
-        } catch (\RuntimeException $e) {
-            return JsonResponder::error($response, $e->getMessage(), 502);
+            $result = $this->service->createTransfer($kind, $range, CurrentUser::email());
+        } catch (\Throwable $e) {
+            return JsonResponder::fromException($response, $e, 502);
         }
         return JsonResponder::ok($response, $result);
     }

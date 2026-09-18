@@ -23,10 +23,12 @@ final class ClearDayAction
     public function __invoke(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
     {
         try {
-            $range  = DateRange::fromQuery($request->getQueryParams());
+            // Destructive: one day only (a 2000..2099 range would soft-
+            // delete the whole history).
+            $range  = DateRange::forDestructive($request->getQueryParams());
             $result = $this->reset->softReset($range);
-        } catch (\InvalidArgumentException $e) {
-            return JsonResponder::error($response, $e->getMessage(), 400);
+        } catch (\Throwable $e) {
+            return JsonResponder::fromException($response, $e);
         }
         return JsonResponder::ok($response, [
             'range'  => $range->asArray(),

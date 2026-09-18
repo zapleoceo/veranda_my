@@ -24,6 +24,9 @@ use Psr\Log\LoggerInterface;
  */
 final class BalanceScreenshotAction
 {
+    /** Decoded image cap. html2canvas PNGs of the card are ~200–800 KB. */
+    public const MAX_BYTES = 5 * 1024 * 1024;
+
     public function __construct(
         private readonly TelegramNotifierInterface $tg,
         private readonly ?LoggerInterface          $log = null,
@@ -43,14 +46,12 @@ final class BalanceScreenshotAction
         try {
             return $this->run($request, $response);
         } catch (\Throwable $e) {
-            // Catch-all so any fatal still produces a proper JSON
-            // body — the front-end can show the message instead of
-            // falling back to "HTTP 502".
+            // Catch-all so any fatal still produces a proper JSON body.
             $this->log?->error('payday3 balance screenshot fatal', [
                 'message' => $e->getMessage(),
                 'file'    => $e->getFile() . ':' . $e->getLine(),
             ]);
-            return JsonResponder::error($response, $e->getMessage(), 500);
+            return JsonResponder::fromException($response, $e);
         }
     }
 
@@ -62,15 +63,9 @@ final class BalanceScreenshotAction
             $payload = json_decode($raw, true);
         }
         $img = is_array($payload) ? (string)($payload['image'] ?? '') : '';
-        if ($img === '' || !preg_match('#^data:image/(png|jpeg);base64,#', $img, $m)) {
-            return JsonResponder::error($response, 'Invalid image payload', 400);
-        }
-        $mime  = 'image/' . ($m[1] === 'jpeg' ? 'jpeg' : 'png');
-        $bytes = base64_decode(substr($img, strpos($img, ',') + 1) ?: '', true);
-        if ($bytes === false || $bytes === '') {
-            return JsonResponder::error($response, 'base64_decode failed', 400);
-        }
+        $bytes = self::decodeImage($img);   // throws InvalidArgumentException → 400
 
+        $mime   = self::sniffMime($bytes);
         $result = $this->tg->sendPhoto($bytes, $mime, 'Итоговый баланс');
         if (!($result['ok'] ?? false)) {
             $err = (string)($result['error'] ?? 'Telegram error');
@@ -79,8 +74,48 @@ final class BalanceScreenshotAction
                 'image_kb'   => intdiv(strlen($bytes), 1024),
                 'mime'       => $mime,
             ]);
-            return JsonResponder::error($response, $err, 502);
+            // Telegram's own description (chat not found, too big…) is
+            // operator-actionable and contains no secrets.
+            return JsonResponder::error($response, 'Telegram: ' . $err, 502);
         }
         return JsonResponder::ok($response);
+    }
+
+    /**
+     * data:image/(png|jpeg);base64,… → raw bytes, validated:
+     * ≤ MAX_BYTES decoded, and getimagesizefromstring() must recognise a
+     * real PNG or JPEG (not just trust the data-URL prefix).
+     *
+     * @throws \InvalidArgumentException
+     */
+    public static function decodeImage(string $dataUrl): string
+    {
+        if ($dataUrl === '' || !preg_match('#^data:image/(png|jpeg);base64,#', $dataUrl)) {
+            throw new \InvalidArgumentException('Invalid image payload');
+        }
+        $b64 = substr($dataUrl, strpos($dataUrl, ',') + 1);
+        // Cheap pre-check before allocating the decoded copy (base64 = 4/3).
+        if (strlen($b64) > intdiv(self::MAX_BYTES * 4, 3) + 4) {
+            throw new \InvalidArgumentException('Изображение больше 5 МБ');
+        }
+        $bytes = base64_decode($b64, true);
+        if ($bytes === false || $bytes === '') {
+            throw new \InvalidArgumentException('base64_decode failed');
+        }
+        if (strlen($bytes) > self::MAX_BYTES) {
+            throw new \InvalidArgumentException('Изображение больше 5 МБ');
+        }
+        $info = @getimagesizefromstring($bytes);
+        if ($info === false || !in_array($info[2] ?? 0, [IMAGETYPE_PNG, IMAGETYPE_JPEG], true)) {
+            throw new \InvalidArgumentException('Это не PNG/JPEG изображение');
+        }
+        return $bytes;
+    }
+
+    /** MIME from the actual bytes, not from the client's data-URL prefix. */
+    private static function sniffMime(string $bytes): string
+    {
+        $info = @getimagesizefromstring($bytes);
+        return ($info !== false && ($info[2] ?? 0) === IMAGETYPE_JPEG) ? 'image/jpeg' : 'image/png';
     }
 }

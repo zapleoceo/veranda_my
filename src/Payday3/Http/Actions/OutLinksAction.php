@@ -24,16 +24,14 @@ final class OutLinksAction
     public function __invoke(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
     {
         try {
-            $range = DateRange::fromQuery($request->getQueryParams());
+            $range = DateRange::forRead($request->getQueryParams());
             $rows  = $this->links->listInRange($range);
-        } catch (\InvalidArgumentException $e) {
-            return JsonResponder::error($response, $e->getMessage(), 400);
-        } catch (\RuntimeException $e) {
-            return JsonResponder::error($response, $e->getMessage(), 500);
+        } catch (\Throwable $e) {
+            return JsonResponder::fromException($response, $e);
         }
         return JsonResponder::ok($response, [
             'range' => $range->asArray(),
-            'links' => array_map(static fn($l) => $l->toJsonShape(), $rows),
+            'links' => JsonResponder::shapes($rows),
         ]);
     }
 }

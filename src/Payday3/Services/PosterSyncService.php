@@ -5,10 +5,12 @@ declare(strict_types=1);
 namespace App\Payday3\Services;
 
 use App\Classes\PosterAPI;
-use App\Infrastructure\Config;
 use App\Infrastructure\Database;
+use App\Payday3\Contracts\PosterApiProviderInterface;
 use App\Payday3\Contracts\PosterSyncServiceInterface;
 use App\Payday3\Domain\DateRange;
+use App\Payday3\Domain\Money;
+use App\Payday3\Domain\PosterTime;
 
 /**
  * Cleaned-up port of payday2/post/load_poster_checks.php (265 → 150 lines).
@@ -27,15 +29,14 @@ use App\Payday3\Domain\DateRange;
  */
 final class PosterSyncService implements PosterSyncServiceInterface
 {
-    public function __construct(private readonly Database $db) {}
+    public function __construct(
+        private readonly Database                   $db,
+        private readonly PosterApiProviderInterface $poster,
+    ) {}
 
     public function sync(DateRange $range): array
     {
-        $token = (string)($_ENV['POSTER_API_TOKEN'] ?? Config::get('POSTER_API_TOKEN'));
-        if ($token === '') {
-            throw new \RuntimeException('POSTER_API_TOKEN is not configured');
-        }
-        $api = new PosterAPI($token);
+        $api = $this->poster->client();
 
         $methodsCount = $this->syncPaymentMethods($api);
 
@@ -81,55 +82,51 @@ final class PosterSyncService implements PosterSyncServiceInterface
                 was_deleted = 0, deleted_at = NULL"
         );
 
-        $exists = $this->db->getPdo()->prepare(
-            "SELECT 1 FROM {$pc} WHERE transaction_id = ? LIMIT 1"
-        );
+        // One transaction for the whole batch (one fsync instead of one per
+        // row). The old per-row `SELECT 1` exists-probe is gone: MySQL's
+        // affected-rows for INSERT … ON DUPLICATE KEY UPDATE already says
+        // 1 = inserted, 2 = updated, 0 = existing row unchanged (counted
+        // as "updated", like the exists-probe did).
+        $this->db->transaction(function () use ($txs, $upsert, &$inserted, &$updated, &$skipped): void {
+            foreach ($txs as $tx) {
+                if (!is_array($tx)) { $skipped++; continue; }
 
-        foreach ($txs as $tx) {
-            if (!is_array($tx)) { $skipped++; continue; }
+                $txId    = (int)($tx['transaction_id'] ?? $tx['id'] ?? 0);
+                $payType = (int)($tx['pay_type'] ?? $tx['payType'] ?? 0);
+                if ($txId <= 0 || ($payType !== 2 && $payType !== 3)) { $skipped++; continue; }
 
-            $txId    = (int)($tx['transaction_id'] ?? $tx['id'] ?? 0);
-            $payType = (int)($tx['pay_type'] ?? $tx['payType'] ?? 0);
-            if ($txId <= 0 || ($payType !== 2 && $payType !== 3)) { $skipped++; continue; }
+                $closeAt = self::parseDateTime($tx);
+                if ($closeAt === null) { $skipped++; continue; }
 
-            $closeAt = self::parseDateTime($tx);
-            if ($closeAt === null) { $skipped++; continue; }
+                $payedCard        = Money::toInt($tx['payed_card']        ?? $tx['payedCard']       ?? 0);
+                $payedThirdParty  = Money::toInt($tx['payed_third_party'] ?? $tx['payedThirdParty'] ?? 0);
+                $tipSum           = self::tipSum($tx);
+                if (($payedCard + $payedThirdParty + $tipSum) <= 0) { $skipped++; continue; }
 
-            $payedCard        = self::moneyToInt($tx['payed_card']        ?? $tx['payedCard']       ?? 0);
-            $payedThirdParty  = self::moneyToInt($tx['payed_third_party'] ?? $tx['payedThirdParty'] ?? 0);
-            $serviceTip       = self::moneyToInt($tx['tip_sum'] ?? $tx['tipSum'] ?? 0);
-            $tipsCard         = self::moneyToInt($tx['tips_card'] ?? $tx['tipsCard'] ?? 0);
-            $tipsCash         = self::moneyToInt($tx['tips_cash'] ?? $tx['tipsCash'] ?? 0);
-            $tipSum           = $serviceTip + $tipsCard + $tipsCash;
-            if (($payedCard + $payedThirdParty + $tipSum) <= 0) { $skipped++; continue; }
+                $dayDate     = substr($closeAt, 0, 10);
+                $waiterName  = trim((string)($tx['waiter_name'] ?? $tx['name'] ?? ''));
+                $receiptNum  = (int)($tx['receipt_number'] ?? $tx['receiptNumber'] ?? $txId);
+                $tableId     = isset($tx['table_id']) ? (int)$tx['table_id'] : null;
+                $spotId      = isset($tx['spot_id'])  ? (int)$tx['spot_id']  : null;
+                $sum         = Money::toInt($tx['sum'] ?? 0);
+                $payedSum    = Money::toInt($tx['payed_sum']   ?? $tx['payedSum']  ?? 0);
+                $payedCash   = Money::toInt($tx['payed_cash']  ?? $tx['payedCash'] ?? 0);
+                $payedCert   = Money::toInt($tx['payed_cert']  ?? $tx['payedCert'] ?? 0);
+                $payedBonus  = Money::toInt($tx['payed_bonus'] ?? $tx['payedBonus']?? 0);
+                $discount    = (float)($tx['discount'] ?? 0);
+                $reason      = isset($tx['reason']) ? (int)$tx['reason'] : null;
+                $pmId        = (int)($tx['payment_method_id'] ?? $tx['paymentMethodId'] ?? 0);
 
-            $dayDate     = substr($closeAt, 0, 10);
-            $waiterName  = trim((string)($tx['waiter_name'] ?? $tx['name'] ?? ''));
-            $receiptNum  = (int)($tx['receipt_number'] ?? $tx['receiptNumber'] ?? $txId);
-            $tableId     = isset($tx['table_id']) ? (int)$tx['table_id'] : null;
-            $spotId      = isset($tx['spot_id'])  ? (int)$tx['spot_id']  : null;
-            $sum         = self::moneyToInt($tx['sum'] ?? 0);
-            $payedSum    = self::moneyToInt($tx['payed_sum']   ?? $tx['payedSum']  ?? 0);
-            $payedCash   = self::moneyToInt($tx['payed_cash']  ?? $tx['payedCash'] ?? 0);
-            $payedCert   = self::moneyToInt($tx['payed_cert']  ?? $tx['payedCert'] ?? 0);
-            $payedBonus  = self::moneyToInt($tx['payed_bonus'] ?? $tx['payedBonus']?? 0);
-            $discount    = (float)($tx['discount'] ?? 0);
-            $reason      = isset($tx['reason']) ? (int)$tx['reason'] : null;
-            $pmId        = (int)($tx['payment_method_id'] ?? $tx['paymentMethodId'] ?? 0);
-
-            $exists->execute([$txId]);
-            $isUpdate = (bool)$exists->fetchColumn();
-            $exists->closeCursor();
-
-            $upsert->execute([
-                $txId, $receiptNum ?: null, $tableId, $spotId, $sum, $payedSum,
-                $payedCash, $payedCard, $payedCert, $payedBonus, $payedThirdParty,
-                $payType, $reason, $tipSum, $discount, $closeAt,
-                $pmId > 0 ? $pmId : null,
-                $waiterName !== '' ? $waiterName : null, $dayDate,
-            ]);
-            $isUpdate ? $updated++ : $inserted++;
-        }
+                $upsert->execute([
+                    $txId, $receiptNum ?: null, $tableId, $spotId, $sum, $payedSum,
+                    $payedCash, $payedCard, $payedCert, $payedBonus, $payedThirdParty,
+                    $payType, $reason, $tipSum, $discount, $closeAt,
+                    $pmId > 0 ? $pmId : null,
+                    $waiterName !== '' ? $waiterName : null, $dayDate,
+                ]);
+                $upsert->rowCount() === 1 ? $inserted++ : $updated++;
+            }
+        });
 
         return [
             'inserted' => $inserted,
@@ -181,12 +178,16 @@ final class PosterSyncService implements PosterSyncServiceInterface
         return $count;
     }
 
-    private static function moneyToInt(mixed $v): int
+    /**
+     * Stored tip = service tip_sum + tips_card + tips_cash (raw Poster
+     * minor units). Public so FinanceTransferFetcher's live Vietnam/Tips
+     * sums use the SAME formula as the IN table — one definition.
+     */
+    public static function tipSum(array $tx): int
     {
-        if (is_int($v)) return $v;
-        if (is_float($v)) return (int)round($v);
-        if (is_string($v) && is_numeric($v)) return (int)round((float)$v);
-        return 0;
+        return Money::toInt($tx['tip_sum']   ?? $tx['tipSum']   ?? 0)
+             + Money::toInt($tx['tips_card'] ?? $tx['tipsCard'] ?? 0)
+             + Money::toInt($tx['tips_cash'] ?? $tx['tipsCash'] ?? 0);
     }
 
     private static function parseDateTime(array $tx): ?string
@@ -195,16 +196,9 @@ final class PosterSyncService implements PosterSyncServiceInterface
         foreach ($candidates as $key) {
             $v = $tx[$key] ?? null;
             if ($v === null || $v === '') continue;
-            if (is_numeric($v)) {
-                $n = (int)$v;
-                if ($n > 20_000_000_000) $n = (int)round($n / 1000);
-                if ($n > 0) return date('Y-m-d H:i:s', $n);
-            }
-            if (is_string($v)) {
-                $t = strtotime($v);
-                if ($t !== false && $t > 0 && (int)date('Y', $t) >= 2000) {
-                    return date('Y-m-d H:i:s', $t);
-                }
+            $t = PosterTime::toUnix($v);
+            if ($t !== null && (is_numeric($v) || (int)date('Y', $t) >= 2000)) {
+                return date('Y-m-d H:i:s', $t);
             }
         }
         return null;

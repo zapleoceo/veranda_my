@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Order\Infrastructure;
 
-use App\Infrastructure\Session;
+use App\Infrastructure\SessionCsrf;
 
 /**
  * Per-session CSRF token for /neworder.
@@ -21,28 +21,20 @@ use App\Infrastructure\Session;
  */
 final class Csrf
 {
-    private const SESSION_KEY = 'neworder_csrf';
+    public const SESSION_KEY = 'neworder_csrf';
 
     public static function token(): string
     {
-        Session::start();
-        if (empty($_SESSION[self::SESSION_KEY]) || !is_string($_SESSION[self::SESSION_KEY])) {
-            $_SESSION[self::SESSION_KEY] = bin2hex(random_bytes(32));
-        }
-        return (string)$_SESSION[self::SESSION_KEY];
+        return SessionCsrf::token(self::SESSION_KEY);
     }
 
     public static function verify(string $candidate): bool
     {
-        Session::start();
-        $real = (string)($_SESSION[self::SESSION_KEY] ?? '');
-        if ($real === '' || $candidate === '') return false;
-        return hash_equals($real, $candidate);
+        return SessionCsrf::verify(self::SESSION_KEY, $candidate);
     }
 
     public static function rotate(): void
     {
-        Session::start();
-        $_SESSION[self::SESSION_KEY] = bin2hex(random_bytes(32));
+        SessionCsrf::rotate(self::SESSION_KEY);
     }
 }

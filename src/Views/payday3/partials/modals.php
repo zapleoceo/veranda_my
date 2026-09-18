@@ -89,41 +89,6 @@ declare(strict_types=1);
             </details>
 
             <details class="pd3-settings__group">
-                <summary>Poster Admin (edit-check сессия)</summary>
-                <p class="muted pd3-settings__hint">Вставьте Cookie-строку из DevTools и нажмите «Разобрать» — поля заполнятся автоматически.</p>
-                <div class="pd3-form__row">
-                    <label class="pd3-field" style="flex:1">
-                        <span>Cookie</span>
-                        <input type="text" id="pd3SettCookie" autocomplete="off"
-                               placeholder="account_url=restpublica2; pos_session=...; ssid=...; csrf_cookie_poster=...">
-                    </label>
-                    <button type="button" class="pd3-btn pd3-btn--sm" id="pd3SettCookieParseBtn">Разобрать</button>
-                </div>
-                <div class="pd3-form__row">
-                    <label class="pd3-field">
-                        <span>account_url</span>
-                        <input type="text" name="poster_admin[account]" autocomplete="off" placeholder="restpublica2">
-                    </label>
-                    <label class="pd3-field">
-                        <span>ssid</span>
-                        <input type="text" name="poster_admin[ssid]" autocomplete="off">
-                    </label>
-                    <label class="pd3-field">
-                        <span>csrf_cookie_poster</span>
-                        <input type="text" name="poster_admin[csrf]" autocomplete="off">
-                    </label>
-                    <label class="pd3-field">
-                        <span>pos_session</span>
-                        <input type="text" name="poster_admin[pos_session]" autocomplete="off">
-                    </label>
-                    <label class="pd3-field" style="flex:1">
-                        <span>user_agent (опционально)</span>
-                        <input type="text" name="poster_admin[user_agent]" autocomplete="off">
-                    </label>
-                </div>
-            </details>
-
-            <details class="pd3-settings__group">
                 <summary>Категории Poster (whitelist + кастомные имена)</summary>
                 <p class="muted pd3-settings__hint">Чекбокс — пускать в выпадающие списки. Поле справа — кастомное имя (пусто = из Poster).</p>
                 <div class="pd3-settings__categories" id="pd3SettCategoriesList">

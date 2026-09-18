@@ -6,23 +6,16 @@
 
 'use strict';
 
-// Cache-bust cross-module imports — see comment in out/bootstrap.js.
-const _v = new URL(import.meta.url).searchParams.get('v') || '';
-const _qs = _v ? '?v=' + encodeURIComponent(_v) : '';
-const { api } = await import(new URL('../api.js' + _qs, import.meta.url).href);
+const _i = (await import(new URL('./cacheBust.js' + new URL(import.meta.url).search, import.meta.url).href)).importer(import.meta.url);
+const { api }            = await _i('../api.js');
+const { esc, fmtVnd, withRange } = await _i('./format.js');
+const { coalesce }       = await _i('./coalesce.js');
+const { withBusy }       = await _i('./busy.js');
 
 const KINDS = ['vietnam', 'tips'];
 
-const fmt = (n) => {
-    if (n === null || n === undefined) return '—';
-    const v = Math.round(Number(n) || 0);
-    try { return new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(v).replace(/,/g, ' '); }
-    catch (_) { return String(v).replace(/\B(?=(\d{3})+(?!\d))/g, ' '); }
-};
-
-const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({
-    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
-})[c]);
+// A missing total shows as a dash on this card.
+const fmt = (n) => fmtVnd(n, { empty: '—' });
 
 const fmtDate = (ts) => {
     const d = new Date((Number(ts) || 0) * 1000);
@@ -107,41 +100,35 @@ function renderRow(kind, payload) {
     if (btn) btn.disabled = disabled;
 }
 
-let inFlight = false;
 let lastAccounts = null;
 
-async function load(state) {
-    if (inFlight) return;
-    inFlight = true;
-    const btn = document.getElementById('pd3FinanceReloadBtn');
-    btn?.classList.add('is-busy');
-    if (btn) btn.disabled = true;
-    try {
-        const range = state.get('range') || {};
-        const p = new URLSearchParams();
-        if (range.from) p.set('dateFrom', range.from);
-        if (range.to)   p.set('dateTo',   range.to);
-        const data = await api.get('/payday3/api/finance/transfers?' + p.toString());
-        if (!data) return;
-        lastAccounts = data.accounts || null;
-        renderRow('vietnam', data.vietnam);
-        renderRow('tips',    data.tips);
-    } catch (e) {
-        for (const k of KINDS) {
-            const s = document.getElementById('pd3FinanceStatus_' + k);
-            if (s) s.textContent = 'Ошибка: ' + (e.message || 'load failed');
+/**
+ * Latest-wins loader: a reload requested while one is in flight (SePay ↻
+ * and Poster ↻ both refresh this card) runs once more afterwards instead
+ * of being dropped.
+ */
+function makeLoader(state) {
+    return coalesce(withBusy(document.getElementById('pd3FinanceReloadBtn'), async () => {
+        try {
+            const data = await api.get(withRange('/payday3/api/finance/transfers', state.get('range')));
+            if (!data) return;
+            lastAccounts = data.accounts || null;
+            renderRow('vietnam', data.vietnam);
+            renderRow('tips',    data.tips);
+        } catch (e) {
+            for (const k of KINDS) {
+                const s = document.getElementById('pd3FinanceStatus_' + k);
+                if (s) s.textContent = 'Ошибка: ' + (e.message || 'load failed');
+            }
         }
-    } finally {
-        inFlight = false;
-        btn?.classList.remove('is-busy');
-        if (btn) btn.disabled = false;
-    }
+    }));
 }
 
 export function initFinanceTransfers({ state }) {
-    if (!document.getElementById('pd3Finance')) return { reload: () => {} };
+    if (!document.getElementById('pd3Finance')) return { reload: async () => {} };
+    const load = makeLoader(state);
 
-    document.getElementById('pd3FinanceReloadBtn')?.addEventListener('click', () => load(state));
+    document.getElementById('pd3FinanceReloadBtn')?.addEventListener('click', () => load());
 
     // "Создать" buttons → POST /payday3/api/finance/transfers/create.
     // Server walks today's finance.getTransactions for an idempotent
@@ -168,15 +155,15 @@ export function initFinanceTransfers({ state }) {
                         ? '<span class="muted">Уже была создана сегодня.</span>'
                         : '<span class="muted">Создана в Poster. Обновляю…</span>';
                 }
-                await load(state);            // reload list so the new tx appears
+                await load();                 // reload list so the new tx appears
             } catch (err) {
                 if (status) status.innerHTML = '<span class="pd3-finance__empty">Ошибка: '
-                    + (err.message || 'не удалось создать').replace(/[<>&]/g, '') + '</span>';
+                    + esc(err.message || 'не удалось создать') + '</span>';
                 b.disabled = false;
             }
         });
     });
 
-    load(state);
-    return { reload: () => load(state) };
+    load();
+    return { reload: () => load() };
 }

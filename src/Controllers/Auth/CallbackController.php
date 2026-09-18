@@ -7,6 +7,7 @@ namespace App\Controllers\Auth;
 use App\Bloggers\Services\BloggerService;
 use App\Infrastructure\Config;
 use App\Infrastructure\Database;
+use App\Infrastructure\GoogleOAuth;
 use App\Infrastructure\ReturnPath;
 use App\Infrastructure\Session;
 use Psr\Http\Message\ResponseInterface;
@@ -30,6 +31,12 @@ class CallbackController
             return $response->withHeader('Location', '/login')->withStatus(302);
         }
 
+        // Login-CSRF: the code must come back with the `state` we issued
+        // to THIS session in GoogleOAuth::authorizeUrl().
+        if (!GoogleOAuth::consumeState((string) ($params['state'] ?? ''))) {
+            return $response->withHeader('Location', '/login?error=state')->withStatus(302);
+        }
+
         $userData = $this->_exchangeCode($code);
 
         if ($userData === null) {
@@ -41,11 +48,19 @@ class CallbackController
         $authNext = (string) ($_SESSION['auth_next'] ?? '');
         unset($_SESSION['auth_next']);
 
+        // Both realms (staff and blogger) bind identity to the email, so an
+        // unverified Google address must never log anyone in — otherwise an
+        // account created with a staff member's non-Gmail address would
+        // become that staff member.
+        if ($verified !== true) {
+            return $response->withHeader('Location', '/login?error=unverified')->withStatus(302);
+        }
+
         // If the login was initiated from /bloggers, check the blogger group
         // first — even if the person is also staff (owner testing their own
         // cabinet should land in the cabinet, not the admin panel). Blogger
         // identity is bound to a Google-verified email only.
-        if ($verified && str_starts_with($authNext, '/bloggers')) {
+        if (str_starts_with($authNext, '/bloggers')) {
             $resp = $this->_bloggerLogin($email, $userData, $response);
             if ($resp !== null) {
                 return $resp;
@@ -61,15 +76,14 @@ class CallbackController
 
         if (!$user) {
             // Not staff — maybe a blogger arriving via /login (not /bloggers).
-            if ($verified) {
-                $resp = $this->_bloggerLogin($email, $userData, $response);
-                if ($resp !== null) {
-                    return $resp;
-                }
+            $resp = $this->_bloggerLogin($email, $userData, $response);
+            if ($resp !== null) {
+                return $resp;
             }
             return $response->withHeader('Location', '/login?error=access')->withStatus(302);
         }
 
+        Session::regenerate();   // session fixation: new id on privilege change
         $_SESSION['user_email'] = $email;
         $_SESSION['user_name']  = trim((string) ($userData['name'] ?? $email));
         $pic = (string) ($userData['picture'] ?? '');
@@ -98,13 +112,15 @@ class CallbackController
         if ($bloggerId <= 0) {
             return null;
         }
+        Session::regenerate();
         $_SESSION['blogger_client_id'] = $bloggerId;
         $_SESSION['blogger_email']     = $email;
         $_SESSION['blogger_name']      = trim((string) ($userData['name'] ?? $email));
         return $response->withHeader('Location', '/bloggers')->withStatus(302);
     }
 
-    private function _exchangeCode(string $code): array|null
+    /** protected — overridden in tests to avoid the network. */
+    protected function _exchangeCode(string $code): array|null
     {
         $tokenData = $this->_post('https://oauth2.googleapis.com/token', [
             'client_id'     => Config::require('GOOGLE_CLIENT_ID'),

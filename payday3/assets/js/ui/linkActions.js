@@ -10,17 +10,9 @@
 
 'use strict';
 
-// Cache-bust cross-module imports — see comment in out/bootstrap.js.
-const _v = new URL(import.meta.url).searchParams.get('v') || '';
-const _qs = _v ? '?v=' + encodeURIComponent(_v) : '';
-const { api } = await import(new URL('../api.js' + _qs, import.meta.url).href);
-
-function dateQuery(range) {
-    const p = new URLSearchParams();
-    if (range?.from) p.set('dateFrom', range.from);
-    if (range?.to)   p.set('dateTo',   range.to);
-    return p.toString();
-}
+const _i = (await import(new URL('./cacheBust.js' + new URL(import.meta.url).search, import.meta.url).href)).importer(import.meta.url);
+const { api }       = await _i('../api.js');
+const { withRange } = await _i('./format.js');
 
 /**
  * @param {{state:object, renderer:object|null, onChanged?:(links:array)=>void}} deps
@@ -28,7 +20,7 @@ function dateQuery(range) {
  *   selection reset) so this adapter stays unaware of those modules.
  */
 export function createInLinks({ state, renderer, onChanged }) {
-    const qs = () => dateQuery(state.get('range') || {});
+    const url = (path) => withRange(path, state.get('range'));
 
     const apply = (result) => {
         const links = Array.isArray(result?.links) ? result.links : [];
@@ -39,17 +31,17 @@ export function createInLinks({ state, renderer, onChanged }) {
     };
 
     return {
-        autoLink:   async () => apply(await api.post('/payday3/api/links/auto?' + qs())),
+        autoLink:   async () => apply(await api.post(url('/payday3/api/links/auto'))),
         manualLink: async (sepayIds, posterIds) =>
-            apply(await api.post('/payday3/api/links/manual?' + qs(), { sepayIds, posterIds })),
-        clearLinks: async () => apply(await api.post('/payday3/api/links/clear?' + qs())),
+            apply(await api.post(url('/payday3/api/links/manual'), { sepayIds, posterIds })),
+        clearLinks: async () => apply(await api.post(url('/payday3/api/links/clear'))),
         /** Per-link unlink (LineRenderer × button). */
         onUnlink: async (link) => {
             const sid = Number(link?.sepay_id);
             const pid = Number(link?.poster_transaction_id);
             if (!sid || !pid) return;
             try {
-                apply(await api.delete(`/payday3/api/links/${sid}/${pid}?${qs()}`));
+                apply(await api.delete(url(`/payday3/api/links/${sid}/${pid}`)));
             } catch (e) {
                 console.error('[payday3]', e);
                 alert(e.message);

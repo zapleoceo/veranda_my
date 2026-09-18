@@ -20,12 +20,11 @@ final class PosterCheckFindAction
         $q   = $request->getQueryParams();
         $id  = (int)($q['id'] ?? $q['transaction_id'] ?? 0);
         try {
-            $range = DateRange::fromQuery($q);
+            // ≤ 31 days: find() pages through Poster (up to 50×1000 rows).
+            $range = DateRange::forRead($q);
             $res   = $this->service->find($id, $range);
-        } catch (\InvalidArgumentException $e) {
-            return JsonResponder::error($response, $e->getMessage(), 400);
         } catch (\Throwable $e) {
-            return JsonResponder::error($response, $e->getMessage(), 500);
+            return JsonResponder::fromException($response, $e, 502);
         }
         return JsonResponder::ok($response, $res);
     }

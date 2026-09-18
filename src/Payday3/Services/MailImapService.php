@@ -20,12 +20,22 @@ use App\Payday3\Domain\Money;
  * (mail_hidden table) are decorated server-side so the UI can paint
  * them correctly on first render.
  *
- * Requires .env: MAIL_USER, MAIL_PASS. The PHP imap extension must
- * be enabled — without it the service throws RuntimeException.
+ * Credentials (.env MAIL_USER / MAIL_PASS) are injected by the container.
+ * The PHP imap extension must be enabled — without it the service throws
+ * RuntimeException.
+ *
+ * TLS: the server certificate IS validated (no /novalidate-cert) — the
+ * Gmail password travels over this connection.
  */
 final class MailImapService implements MailServiceInterface
 {
-    public function __construct(private readonly Database $db) {}
+    private const MAILBOX = '{imap.gmail.com:993/imap/ssl}INBOX';
+
+    public function __construct(
+        private readonly Database $db,
+        private readonly string   $user,
+        private readonly string   $pass,
+    ) {}
 
     /** @return MailTransaction[] */
     public function fetch(DateRange $range, bool $includeHidden = false): array
@@ -33,13 +43,11 @@ final class MailImapService implements MailServiceInterface
         if (!extension_loaded('imap')) {
             throw new \RuntimeException('PHP imap extension is not available');
         }
-        $user = (string)($_ENV['MAIL_USER'] ?? '');
-        $pass = (string)($_ENV['MAIL_PASS'] ?? '');
-        if ($user === '' || $pass === '') {
+        if ($this->user === '' || $this->pass === '') {
             throw new \RuntimeException('MAIL_USER / MAIL_PASS not configured in .env');
         }
 
-        $inbox = @imap_open('{imap.gmail.com:993/imap/ssl/novalidate-cert}INBOX', $user, $pass);
+        $inbox = @imap_open(self::MAILBOX, $this->user, $this->pass);
         if (!$inbox) {
             $err = function_exists('imap_last_error') ? (string)imap_last_error() : '';
             throw new \RuntimeException('IMAP open failed' . ($err !== '' ? ': ' . $err : ''));

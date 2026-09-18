@@ -29,5 +29,12 @@ interface PosterCheckServiceInterface
      * Notifies Telegram on success. Returns
      * {ok:true, telegram_ok:bool, telegram_error?:string}.
      */
-    public function remove(int $transactionId, string $byLabel): array;
+    /**
+     * Only checks closed within the last PosterCheckService::MAX_AGE_DAYS
+     * days can be removed; an audit row (payday_audit_log) is written
+     * BEFORE the Poster call.
+     *
+     * @throws \DomainException when the check is too old / its date unknown
+     */
+    public function remove(int $transactionId, string $byLabel, string $userEmail = ''): array;
 }

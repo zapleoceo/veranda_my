@@ -33,7 +33,10 @@ class StaticController
         }
 
         $resolved = realpath($base . DIRECTORY_SEPARATOR . $relativePath);
-        if ($resolved === false || !str_starts_with($resolved, $base) || !is_file($resolved)) {
+        // Trailing separator: without it a sibling dir sharing the prefix
+        // (payday3/assets2/…) would pass the containment check.
+        $baseWithSep = rtrim($base, '\\/') . DIRECTORY_SEPARATOR;
+        if ($resolved === false || !str_starts_with($resolved, $baseWithSep) || !is_file($resolved)) {
             return $response->withStatus(404);
         }
 

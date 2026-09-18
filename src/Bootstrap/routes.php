@@ -13,7 +13,6 @@ use App\Payday3\Http\Actions\ClearLinksAction;
 use App\Payday3\Http\Actions\ClearDayAction;
 use App\Payday3\Http\Actions\SepaySyncAction;
 use App\Payday3\Http\Actions\PosterSyncAction;
-use App\Payday3\Http\Actions\OutDataAction;
 use App\Payday3\Http\Actions\OutAutoLinkAction;
 use App\Payday3\Http\Actions\OutManualLinkAction;
 use App\Payday3\Http\Actions\OutUnlinkAction;
@@ -255,10 +254,8 @@ $app->group('/payday3', function (RouteCollectorProxy $g) {
         $api->post(  '/sepay/hide',                                  \App\Payday3\Http\Actions\SepayHideAction::class);
         $api->post(  '/poster/sync',                                 PosterSyncAction::class);
         // OUT-direction reconciliation (BIDV mail ↔ Poster finance).
-        // /out/data kept for back-compat (single bundled response);
-        // /out/mail + /out/finance + /out/links are the new
-        // fan-out endpoints the front-end calls in parallel.
-        $api->get(   '/out/data',                                    OutDataAction::class);
+        // /out/mail + /out/finance + /out/links are fan-out endpoints
+        // the front-end calls in parallel.
         $api->get(   '/out/mail',                                    \App\Payday3\Http\Actions\OutMailAction::class);
         $api->get(   '/out/finance',                                 \App\Payday3\Http\Actions\OutFinanceAction::class);
         $api->get(   '/out/links',                                   \App\Payday3\Http\Actions\OutLinksAction::class);
@@ -309,7 +306,11 @@ $app->group('/payday3', function (RouteCollectorProxy $g) {
         // Финансовые транзакции (Vietnam + Tips) card.
         $api->get(   '/finance/transfers',                           FinanceTransfersAction::class);
         $api->post(  '/finance/transfers/create',                    \App\Payday3\Http\Actions\FinanceTransferCreateAction::class);
-    });
+    })
+        // CSRF: every non-GET call must echo the per-session token from the
+        // page bootstrap (X-CSRF-Token) and come from our own origin.
+        // SameSite=Lax alone doesn't stop same-site pages (/onlineorder…).
+        ->add(\App\Middleware\CsrfGuard::payday3());
 })
     // Право `payday` проверялось ТОЛЬКО при рендере страницы, а все 38
     // эндпоинтов /payday3/api/* оставались открытыми любому залогиненному

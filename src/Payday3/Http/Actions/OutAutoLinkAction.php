@@ -22,15 +22,16 @@ final class OutAutoLinkAction
     public function __invoke(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
     {
         try {
-            $range = DateRange::fromQuery($request->getQueryParams());
+            $range = DateRange::forRead($request->getQueryParams());
             $r     = $this->service->autoLink($range);
+            $links = JsonResponder::shapes($this->links->listInRange($range));
         } catch (\Throwable $e) {
-            return JsonResponder::error($response, $e->getMessage(), 500);
+            return JsonResponder::fromException($response, $e);
         }
         return JsonResponder::ok($response, [
             'added' => $r['added'],
             'total' => $r['total'],
-            'links' => array_map(static fn($l) => $l->toJsonShape(), $this->links->listInRange($range)),
+            'links' => $links,
         ]);
     }
 }

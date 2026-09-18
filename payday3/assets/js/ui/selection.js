@@ -13,15 +13,8 @@
 
 'use strict';
 
-const fmt = (n) => {
-    const v = Math.round(Number(n) || 0);
-    try {
-        return new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 })
-            .format(v).replace(/,/g, ' ');
-    } catch (_) {
-        return String(v).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
-    }
-};
+const _i = (await import(new URL('./cacheBust.js' + new URL(import.meta.url).search, import.meta.url).href)).importer(import.meta.url);
+const { fmtVnd: fmt } = await _i('./format.js');
 
 /** Checkbox dataset key → selection bucket. */
 const KINDS = { sepayId: 'sepay', posterId: 'poster', mailUid: 'mail', financeId: 'finance' };
@@ -78,6 +71,9 @@ export function matchState(leftSum, rightSum, leftCount, rightCount) {
 
 export function initSelection() {
     const sets = { sepay: new Set(), poster: new Set(), mail: new Set(), finance: new Set() };
+    // id → |sum| of every ticked row, per bucket — the sums come from
+    // here instead of re-querying every checkbox on each change.
+    const sums = { sepay: new Map(), poster: new Map(), mail: new Map(), finance: new Map() };
 
     const $left  = document.getElementById('pd3SelSepaySum');
     const $right = document.getElementById('pd3SelPosterSum');
@@ -85,10 +81,11 @@ export function initSelection() {
     const $diff  = document.getElementById('pd3SelDiff');
     const $make  = document.getElementById('pd3LinkMakeBtn');
 
-    // Finance amounts are signed (expenses negative) — compare magnitudes.
-    const sumOf = (sel) => Array.from(document.querySelectorAll(sel))
-        .filter((el) => el.checked)
-        .reduce((acc, el) => acc + Math.abs(Number(el.dataset.sum) || 0), 0);
+    const sumOf = (kind) => {
+        let acc = 0;
+        for (const v of sums[kind].values()) acc += v;
+        return acc;
+    };
 
     const counts = () => ({
         sepay: sets.sepay.size, poster: sets.poster.size,
@@ -96,8 +93,8 @@ export function initSelection() {
     });
 
     const recompute = () => {
-        const left  = sumOf('.pd3-cb--sepay') + sumOf('.pd3-cb--out-mail');
-        const right = sumOf('.pd3-cb--poster') + sumOf('.pd3-cb--out-finance');
+        const left  = sumOf('sepay')  + sumOf('mail');
+        const right = sumOf('poster') + sumOf('finance');
         const n = counts();
         if ($left)  $left.textContent  = fmt(left);
         if ($right) $right.textContent = fmt(right);
@@ -121,6 +118,7 @@ export function initSelection() {
         for (const kind of kinds) {
             document.querySelectorAll(CHECKBOX[kind]).forEach((cb) => { cb.checked = false; });
             sets[kind].clear();
+            sums[kind].clear();
         }
         recompute();
     };
@@ -131,7 +129,14 @@ export function initSelection() {
         for (const [key, kind] of Object.entries(KINDS)) {
             if (t.dataset[key] === undefined) continue;
             const id = Number(t.dataset[key]);
-            t.checked ? sets[kind].add(id) : sets[kind].delete(id);
+            if (t.checked) {
+                sets[kind].add(id);
+                // Finance amounts are signed (expenses negative) — compare magnitudes.
+                sums[kind].set(id, Math.abs(Number(t.dataset.sum) || 0));
+            } else {
+                sets[kind].delete(id);
+                sums[kind].delete(id);
+            }
         }
         recompute();
     });

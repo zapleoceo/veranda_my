@@ -14,10 +14,8 @@
 
 'use strict';
 
-// Cache-bust cross-module imports — see comment in out/bootstrap.js.
-const _v = new URL(import.meta.url).searchParams.get('v') || '';
-const _qs = _v ? '?v=' + encodeURIComponent(_v) : '';
-const { SEPAY_TBODY, MAIL_TBODY } = await import(new URL('./bankTable.js' + _qs, import.meta.url).href);
+const _i = (await import(new URL('./cacheBust.js' + new URL(import.meta.url).search, import.meta.url).href)).importer(import.meta.url);
+const { SEPAY_TBODY, MAIL_TBODY } = await _i('./bankTable.js');
 
 const STATES = ['row-red', 'row-green', 'row-yellow', 'row-gray'];
 
@@ -53,6 +51,8 @@ export function edgesBy(sources) {
 /**
  * Repaint every reconciliation table from the current link sets.
  * Hidden rows (row-hidden) keep their class — they are out of the game.
+ * Only rows whose colour actually changes are touched: every class
+ * write wakes the three LineRenderers' MutationObservers.
  *
  * @param {{checkLinks?:object[], mailLinks?:object[], incomeLinks?:object[]}} links
  */
@@ -60,8 +60,10 @@ export function paintRowStates({ checkLinks = [], mailLinks = [], incomeLinks = 
     const paint = (selector, idOf, edges) => {
         document.querySelectorAll(selector).forEach((tr) => {
             if (tr.classList.contains('row-hidden')) return;
-            tr.classList.remove(...STATES);
-            tr.classList.add(classify(edges.get(idOf(tr))));
+            const want = classify(edges.get(idOf(tr)));
+            const stale = STATES.filter((c) => c !== want && tr.classList.contains(c));
+            if (stale.length) tr.classList.remove(...stale);
+            if (!tr.classList.contains(want)) tr.classList.add(want);
         });
     };
     paint(`${SEPAY_TBODY} tr.pd3-row`, (tr) => Number(tr.dataset.sepayId),

@@ -4,6 +4,7 @@
 declare(strict_types=1);
 
 use App\Payday3\Domain\Money;
+use App\Payday3\Domain\PosterIds;
 
 // Sum buckets so the footer mirrors payday2:
 //   Итого  — total of card+third+tip EXCLUDING Vietnam Company
@@ -11,8 +12,6 @@ use App\Payday3\Domain\Money;
 //   VC     — same total but only for poster_payment_method_id = 11 (Vietnam)
 // Linked / unlinked / tips-on-linked are computed client-side in
 // updateInFooters() because they depend on the live row state.
-const METHOD_VIETNAM = 11;
-const METHOD_BYBIT   = 12;
 $total       = Money::vnd(0);
 $bybitTotal  = Money::vnd(0);
 $vietnamTotal = Money::vnd(0);
@@ -20,11 +19,11 @@ foreach ($poster as $p) {
     // payday2's Итого/BB/VC include Tips (Card+Third+Tip per row).
     $sum = $p->totalPayed()->plus($p->tipSum);
     $pmId = (int)$p->posterPaymentMethodId;
-    if ($pmId === METHOD_VIETNAM) {
+    if ($pmId === PosterIds::METHOD_VIETNAM) {
         $vietnamTotal = $vietnamTotal->plus($sum);
         continue;                              // doesn't roll into Итого
     }
-    if ($pmId === METHOD_BYBIT) $bybitTotal = $bybitTotal->plus($sum);
+    if ($pmId === PosterIds::METHOD_BYBIT) $bybitTotal = $bybitTotal->plus($sum);
     $total = $total->plus($sum);
 }
 ?>
@@ -86,6 +85,7 @@ foreach ($poster as $p) {
                         data-tips="<?= $p->tipSum->amount ?>"
                         data-total="<?= $cardPlusTip->amount ?>"
                         data-method="<?= htmlspecialchars((string)($p->paymentMethodDisplay ?? '')) ?>"
+                        data-method-id="<?= (int)$p->posterPaymentMethodId ?>"
                         data-waiter="<?= htmlspecialchars($p->waiterName) ?>"
                         data-table="<?= $p->tableId ?>">
                         <td class="pd3-col pd3-col--lead">

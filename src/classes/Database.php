@@ -382,6 +382,62 @@ class Database {
             KEY idx_date_to (date_to)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
 
+        // OUT-mode edges (BIDV mail ↔ Poster finance tx). Historically created
+        // by payday2's bootstrap, which no longer exists — a fresh DB had no
+        // table at all. Schema inferred from OutLinkRepository: INSERT IGNORE
+        // relies on the unique pair, range reads filter on date_to.
+        $ol = $this->t('out_links');
+        $this->pdo->exec("CREATE TABLE IF NOT EXISTS {$ol} (
+            id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            mail_uid BIGINT UNSIGNED NOT NULL,
+            finance_id BIGINT UNSIGNED NOT NULL,
+            link_type VARCHAR(16) NOT NULL DEFAULT 'manual',
+            date_to DATE NOT NULL,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE KEY uq_out_link_pair (mail_uid, finance_id),
+            KEY idx_out_links_date_to (date_to)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
+
+        // Hidden BIDV mails (MailImapService::hide/loadHidden): upsert on the
+        // (uid, day) pair, lookups by date_to.
+        $mh = $this->t('mail_hidden');
+        $this->pdo->exec("CREATE TABLE IF NOT EXISTS {$mh} (
+            id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            mail_uid BIGINT UNSIGNED NOT NULL,
+            date_to DATE NOT NULL,
+            comment VARCHAR(500) NULL,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE KEY uq_mail_hidden (mail_uid, date_to),
+            KEY idx_mail_hidden_date_to (date_to)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
+
+        // Hidden SePay rows (SepayRepository): INSERT IGNORE + NOT EXISTS by sepay_id.
+        $sh = $this->t('sepay_hidden');
+        $this->pdo->exec("CREATE TABLE IF NOT EXISTS {$sh} (
+            id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            sepay_id BIGINT UNSIGNED NOT NULL,
+            comment VARCHAR(500) NULL,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE KEY uq_sepay_hidden (sepay_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
+
+        // Audit trail for money-moving / destructive payday3 operations.
+        // Also self-created by AuditLogRepository::ddl() (payday3) — keep the
+        // two in sync; can't call it from here (this class must load
+        // without the composer autoloader, see LegacyDatabaseStandaloneTest).
+        $al = $this->t('payday_audit_log');
+        $this->pdo->exec("CREATE TABLE IF NOT EXISTS {$al} (
+            id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            user_email VARCHAR(190) NOT NULL DEFAULT '',
+            action VARCHAR(64) NOT NULL,
+            payload_json LONGTEXT NOT NULL,
+            fingerprint CHAR(64) NULL,
+            KEY idx_audit_created (created_at),
+            KEY idx_audit_action (action, created_at),
+            KEY idx_audit_fingerprint (fingerprint, created_at)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
+
         // «Заначка» (Poster account 11) row added to Итоговый баланс.
         try {
             if (!$this->pdo->query("SHOW COLUMNS FROM {$ab} LIKE 'bal_stash'")->fetch()) {

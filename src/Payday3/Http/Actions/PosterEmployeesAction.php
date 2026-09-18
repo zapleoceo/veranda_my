@@ -17,7 +17,7 @@ final class PosterEmployeesAction
     public function __invoke(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
     {
         try { $rows = $this->lookup->employees(); }
-        catch (\Throwable $e) { return JsonResponder::error($response, $e->getMessage(), 500); }
+        catch (\Throwable $e) { return JsonResponder::fromException($response, $e, 502); }
         return JsonResponder::ok($response, ['employees' => $rows]);
     }
 }

@@ -13,10 +13,13 @@
 
 'use strict';
 
-// Cache-bust cross-module imports — see comment in out/bootstrap.js.
-const _v = new URL(import.meta.url).searchParams.get('v') || '';
-const _qs = _v ? '?v=' + encodeURIComponent(_v) : '';
-const { api } = await import(new URL('../api.js' + _qs, import.meta.url).href);
+const _i = (await import(new URL('./cacheBust.js' + new URL(import.meta.url).search, import.meta.url).href)).importer(import.meta.url);
+const { api }                  = await _i('../api.js');
+const { esc, fmtVnd, parseVnd: parse } = await _i('./format.js');
+const { coalesce }             = await _i('./coalesce.js');
+const { withBusy, setStatus: setStatusOf } = await _i('./busy.js');
+const { splitDateTime }        = await _i('./rowCreateTx.js');
+const { loadHtml2Canvas }      = await _i('./html2canvasLoader.js');
 
 // Rows of the card. Факт. Total = sum of ROW_KEYS; Poster Total = every
 // Poster account — so a Poster account without a row skews Δ Total
@@ -24,25 +27,13 @@ const { api } = await import(new URL('../api.js' + _qs, import.meta.url).href);
 const ROW_KEYS = ['andrey', 'vietnam', 'cash', 'stash'];
 const KEYS     = [...ROW_KEYS, 'total'];
 
-const fmt = (n) => {
-    if (n === null || n === undefined || n === '') return '';
-    const v = Math.round(Number(n) || 0);
-    try { return new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(v).replace(/,/g, ' '); }
-    catch (_) { return String(v).replace(/\B(?=(\d{3})+(?!\d))/g, ' '); }
-};
+// Missing values render as '' in this card (empty input / no Δ).
+const fmt = (n) => fmtVnd(n, { empty: '' });
 
-const parse = (s) => {
-    const t = String(s ?? '').replace(/[^\d\-]/g, '');
-    return t === '' ? null : Number(t);
-};
+const setStatus = (msg, kind = '') => setStatusOf(document.getElementById('pd3BalancesStatus'), msg, kind);
 
-function setStatus(msg, kind = '') {
-    const el = document.getElementById('pd3BalancesStatus');
-    if (!el) return;
-    el.textContent = msg || '';
-    el.classList.remove('is-ok', 'is-error');
-    if (kind) el.classList.add(kind === 'ok' ? 'is-ok' : 'is-error');
-}
+/** Day the Факт. values belong to: range.to, else today in LOCAL time. */
+const targetDate = (state) => state.get('range')?.to || splitDateTime('').date;
 
 // Colour the Δ cell:
 //   ≥ 0  → green (Факт covers Poster; surplus is fine)
@@ -104,9 +95,6 @@ function renderAccountsList(accounts) {
         tbody.innerHTML = '';
         return;
     }
-    const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({
-        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
-    })[c]);
     tbody.innerHTML = accounts.map((a) => `<tr>
         <td class="right nowrap muted">${esc(a.account_id)}</td>
         <td class="nowrap">${esc(a.name)}</td>
@@ -116,14 +104,10 @@ function renderAccountsList(accounts) {
 }
 
 let posterCache = { andrey: null, vietnam: null, cash: null, stash: null, total: null, accounts: [], unmapped: [] };
-let reloadInFlight = false;
 
-async function reloadPoster() {
-    if (reloadInFlight) return;
-    reloadInFlight = true;
-    const btn = document.getElementById('pd3BalancesReloadBtn');
-    btn?.classList.add('is-busy');
-    if (btn) btn.disabled = true;
+// Latest-wins: a ↻ during a load (or a post-create refresh) gets a
+// fresh read after it instead of being dropped.
+const reloadPoster = coalesce(withBusy(document.getElementById('pd3BalancesReloadBtn'), async () => {
     try {
         const data = await api.get('/payday3/api/poster/balances');
         posterCache = data || posterCache;
@@ -138,22 +122,17 @@ async function reloadPoster() {
         refreshDiffs(posterCache);
     } catch (e) {
         setStatus('Poster balances: ' + (e.message || 'error'), 'error');
-    } finally {
-        reloadInFlight = false;
-        btn?.classList.remove('is-busy');
-        if (btn) btn.disabled = false;
     }
-}
+}));
 
 async function loadActual(state) {
-    const date = state.get('range')?.to || new Date().toISOString().slice(0, 10);
     try {
-        const data = await api.get('/payday3/api/balances?date=' + encodeURIComponent(date));
+        const data = await api.get('/payday3/api/balances?date=' + encodeURIComponent(targetDate(state)));
         for (const k of ROW_KEYS) {
             const input = document.getElementById('pd3BalActual_' + k);
             const v = data?.['bal_' + k] ?? null;
             if (input) input.value = fmt(v);
-            // Sync lastSavedKeys so saveActualNow doesn't see the initial
+            // Sync the sentinels so a save doesn't see the initial
             // undefined vs null as a "change" and insert a ghost null-row
             // before the user has touched anything (which would then mask
             // older real data via the latestFor DESC query).
@@ -162,6 +141,7 @@ async function loadActual(state) {
         // total is computed client-side; seed its sentinel too so a
         // beforeunload during page load can't write null for it.
         lastSavedKeys['total'] = data?.['bal_total'] ?? null;
+        lastSentKeys = { ...lastSavedKeys };
         refreshDiffs(posterCache);
     } catch (e) {
         setStatus('Факт: ' + (e.message || 'error'), 'error');
@@ -173,35 +153,46 @@ async function loadActual(state) {
 // We persist whenever a value actually changed AND the user has
 // committed it (blur, Enter, or 600 ms after the last keystroke).
 // Repeated blurs with no change are ignored — no UI flicker.
+//
+// Saves are latest-wins (ui/coalesce.js): an edit committed while a
+// save is in flight queues ONE more save that re-reads the inputs when
+// it starts — nothing is dropped, and `await saveActualNow()` resolves
+// only after the values on screen reached the server.
 
-let savingActual = false;
-let lastSavedKeys = {};
+let lastSavedKeys = {};   // what the server confirmed
+let lastSentKeys  = {};   // what is on its way (≥ lastSavedKeys)
 let saveTimer = 0;
 
-async function saveActualNow(state) {
-    if (savingActual) return;
-    savingActual = true;
-    const date = state.get('range')?.to || new Date().toISOString().slice(0, 10);
+/** Current inputs → POST body + whether it differs from what was sent. */
+function collectSave(state) {
+    const date = targetDate(state);
     const body = { target_date: date };
     let changed = false;
     for (const k of KEYS) {
         const input = document.getElementById('pd3BalActual_' + k);
         const v = input ? parse(input.value) : null;
         body['bal_' + k] = v;
-        if (lastSavedKeys[k] !== v) changed = true;
+        if (lastSentKeys[k] !== v) changed = true;
     }
-    if (!changed) { savingActual = false; return; }
+    return { date, body, changed };
+}
+
+const keysOf = (body) => Object.fromEntries(KEYS.map((k) => [k, body['bal_' + k]]));
+
+const saveActualNow = coalesce(async (state) => {
+    const { date, body, changed } = collectSave(state);
+    if (!changed) return;
+    lastSentKeys = keysOf(body);
     setStatus('Сохраняю…');
     try {
         await api.post('/payday3/api/balances', body);
-        for (const k of KEYS) lastSavedKeys[k] = body['bal_' + k];
+        lastSavedKeys = keysOf(body);
         setStatus('Сохранено в ' + date, 'ok');
     } catch (e) {
+        lastSentKeys = { ...lastSavedKeys };   // retry on the next commit
         setStatus('Ошибка: ' + (e.message || 'error'), 'error');
-    } finally {
-        savingActual = false;
     }
-}
+});
 
 function scheduleAutoSave(state, delay = 600) {
     clearTimeout(saveTimer);
@@ -255,7 +246,7 @@ async function runUpld(state) {
         // we use it as the source of truth.
         await saveActualNow(state);
 
-        const plan = await api.post('/payday3/api/balances/sync/plan', { diff_vnd: diff });
+        const plan = await api.post('/payday3/api/balances/sync/plan', { diff_vnd: diff, target_date: targetDate(state) });
         if (!plan?.nonce || !plan.plan) throw new Error('Plan empty');
         const p = plan.plan;
         const action = p.type === 1 ? 'Начислить' : 'Списать';
@@ -279,30 +270,9 @@ async function runUpld(state) {
 
 // ─── Telegram screenshot ───────────────────────────────────────
 
-let _h2cPromise = null;
-function loadHtml2Canvas() {
-    if (window.html2canvas) return Promise.resolve(window.html2canvas);
-    if (_h2cPromise) return _h2cPromise;
-    _h2cPromise = new Promise((resolve, reject) => {
-        const s = document.createElement('script');
-        s.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
-        s.crossOrigin = 'anonymous';
-        s.onload  = () => resolve(window.html2canvas);
-        s.onerror = () => {
-            _h2cPromise = null;
-            reject(new Error('html2canvas CDN заблокирован — проверь сеть/блокировщики'));
-        };
-        document.head.appendChild(s);
-    });
-    return _h2cPromise;
-}
-
 async function sendBalancesToTelegram(state) {
     const card = document.getElementById('pd3Balances');
-    const btn  = document.getElementById('pd3BalancesTelegramBtn');
-    if (!card || !btn || btn.disabled) return;
-    btn.disabled = true;
-    btn.classList.add('is-busy');
+    if (!card) return;
     setStatus('Готовлю снимок…');
     try {
         // Make sure any pending blur-save is committed first.
@@ -345,9 +315,6 @@ async function sendBalancesToTelegram(state) {
         }
     } catch (e) {
         setStatus('Telegram: ' + (e.message || 'error'), 'error');
-    } finally {
-        btn.disabled = false;
-        btn.classList.remove('is-busy');
     }
 }
 
@@ -368,6 +335,7 @@ export function initBalances({ state }) {
             el.value = v === null ? '' : fmt(v);
             refreshDiffs(posterCache);
             syncBtnRefresh();
+            clearTimeout(saveTimer);
             saveActualNow(state);
         });
         // Enter commits without losing focus.
@@ -379,14 +347,18 @@ export function initBalances({ state }) {
     });
 
     document.getElementById('pd3BalancesReloadBtn')?.addEventListener('click', reload);
-    document.getElementById('pd3BalancesTelegramBtn')?.addEventListener('click', () => sendBalancesToTelegram(state));
+    const tgBtn = document.getElementById('pd3BalancesTelegramBtn');
+    tgBtn?.addEventListener('click', withBusy(tgBtn, () => sendBalancesToTelegram(state)));
     document.getElementById('pd3BalancesUpldBtn')?.addEventListener('click', () => runUpld(state));
 
-    // Re-save before the user navigates away — guarantees the last
-    // edit makes it to the server even if they tab away in a hurry.
+    // Last edit before the user navigates away. An ordinary fetch is
+    // cancelled on unload; keepalive lets it finish, and unlike
+    // sendBeacon it still carries the X-CSRF-Token header (api.js).
     window.addEventListener('beforeunload', () => {
-        if (savingActual) return;
-        try { saveActualNow(state); } catch (_) {}
+        const { body, changed } = collectSave(state);
+        if (!changed) return;
+        lastSentKeys = keysOf(body);
+        api.post('/payday3/api/balances', body, { keepalive: true }).catch(() => {});
     });
 
     // Fire Poster (slow Poster API) and Факт (fast DB query) in parallel.
@@ -398,11 +370,7 @@ export function initBalances({ state }) {
     // load, and vice versa.
     Promise.allSettled([reloadPoster(), loadActual(state)]).finally(syncBtnRefresh);
 
-    // Pre-warm html2canvas in the background so the very first
-    // Telegram click doesn't feel sluggish while the CDN script loads.
-    // Failures here are silent — the actual click will retry and
-    // surface the error in the status strip.
-    setTimeout(() => { loadHtml2Canvas().catch(() => {}); }, 1500);
+    // html2canvas is loaded lazily on the first ✈ click (html2canvasLoader.js).
 
     return { reload };
 }

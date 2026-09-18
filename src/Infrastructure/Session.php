@@ -111,6 +111,19 @@ final class Session
         }
     }
 
+    /**
+     * Issue a new session id after a privilege change (login) so a
+     * pre-planted id (session fixation) is useless. Old session is
+     * destroyed; $_SESSION contents carry over.
+     */
+    public static function regenerate(): void
+    {
+        if (PHP_SAPI === 'cli') return;
+        if (session_status() === PHP_SESSION_ACTIVE && !headers_sent()) {
+            @session_regenerate_id(true);
+        }
+    }
+
     private static function isHttps(): bool
     {
         if (!empty($_SERVER['HTTPS']) && strtolower((string)$_SERVER['HTTPS']) !== 'off') return true;

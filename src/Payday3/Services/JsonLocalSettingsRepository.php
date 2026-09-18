@@ -62,7 +62,11 @@ final class JsonLocalSettingsRepository implements LocalSettingsRepositoryInterf
     /** Read raw JSON shape from disk (or null on missing/invalid) — used by the DB repository for one-time migration. */
     public function readRaw(): ?array
     {
-        return $this->readJson($this->primaryPath) ?? $this->readJson($this->fallbackPath);
+        // There is only one path (the payday2 fallback file is gone); the old
+        // `?? $this->fallbackPath` read an undeclared property and threw a
+        // TypeError on a fresh install where neither the DB row nor the
+        // JSON file exist.
+        return $this->readJson($this->primaryPath);
     }
 
     private function readJson(string $path): ?array

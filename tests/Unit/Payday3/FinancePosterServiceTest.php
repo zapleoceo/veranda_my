@@ -60,7 +60,6 @@ final class FinancePosterServiceTest extends TestCase
             balanceSyncAccountId: 1,
             allowedCategories:    [],
             customCategoryNames:  [],
-            posterAdmin:          [],
         ));
 
         return new FinancePosterService($provider, $settings);

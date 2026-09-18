@@ -16,10 +16,9 @@
 
 'use strict';
 
-// Cache-bust cross-module imports — see comment in out/bootstrap.js.
-const _v = new URL(import.meta.url).searchParams.get('v') || '';
-const _qs = _v ? '?v=' + encodeURIComponent(_v) : '';
-const { linkPlan } = await import(new URL('./selection.js' + _qs, import.meta.url).href);
+const _i = (await import(new URL('./cacheBust.js' + new URL(import.meta.url).search, import.meta.url).href)).importer(import.meta.url);
+const { linkPlan }       = await _i('./selection.js');
+const { withBusy: busy } = await _i('./busy.js');
 
 /**
  * Run labelled side-effects side by side; resolve to the failures only.
@@ -36,25 +35,12 @@ export async function runSides(tasks) {
         r.status === 'rejected' ? [`${live[i][0]}: ${r.reason?.message || r.reason || 'ошибка'}`] : []);
 }
 
-function withBusy(btn, fn) {
-    return async () => {
-        if (!btn || btn.disabled) return;
-        btn.disabled = true;
-        btn.classList.add('is-busy');
-        try {
-            const errors = await fn();
-            if (errors?.length) alert(errors.join('\n'));
-        } finally {
-            btn.classList.remove('is-busy');
-            btn.disabled = false;
-        }
-    };
-}
+/** Busy button whose action resolves to a list of failures to alert. */
+const withBusy = (btn, fn) => busy(btn, async () => {
+    const errors = await fn();
+    if (errors?.length) alert(errors.join('\n'));
+});
 
-/**
- * @param {{state:object, inLinks:object, outLinks:object|null, selection:object,
- *          confirmFn?:(msg:string)=>boolean}} deps
- */
 /**
  * @param {{state:object, inLinks:object, incomeLinks:object|null, outLinks:object|null,
  *          selection:object, confirmFn?:(msg:string)=>boolean}} deps

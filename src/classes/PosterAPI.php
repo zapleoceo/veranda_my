@@ -5,6 +5,12 @@ namespace App\Classes;
 class PosterAPI {
     private string $token;
     private string $baseUrl;
+    /**
+     * One curl handle per client instance: consecutive calls reuse the
+     * TLS connection to joinposter.com (keep-alive) instead of paying a
+     * fresh handshake (~100–300 ms) on every request.
+     */
+    private ?\CurlHandle $ch = null;
 
     public function __construct(string $token, string $baseUrl = 'https://joinposter.com/api') {
         $this->token = $token;
@@ -35,10 +41,14 @@ class PosterAPI {
             $url .= (strpos($url, '?') === false ? '?' : '&') . http_build_query(['token' => $this->token]);
         }
 
-        $ch = curl_init();
+        $ch = $this->handle();
         curl_setopt($ch, CURLOPT_URL, $url);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_TIMEOUT, 15);
+        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 5);
+        // '' = accept every encoding curl supports (gzip/deflate/br);
+        // dash.getTransactions shrinks ~10×.
+        curl_setopt($ch, CURLOPT_ENCODING, '');
         
         if ($isV3) {
             curl_setopt($ch, CURLOPT_HTTPHEADER, [
@@ -62,7 +72,6 @@ class PosterAPI {
         $response = curl_exec($ch);
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         $error = curl_error($ch);
-        curl_close($ch);
 
         if ($error) {
             throw new \Exception("CURL Error: " . $error);
@@ -108,6 +117,23 @@ class PosterAPI {
         }
 
         return $data['response'] ?? $data;
+    }
+
+    /** Reused handle, options reset between calls (POST fields, headers…). */
+    private function handle(): \CurlHandle
+    {
+        if ($this->ch === null) {
+            $ch = curl_init();
+            if ($ch === false) throw new \Exception('CURL Error: curl_init failed');
+            return $this->ch = $ch;
+        }
+        curl_reset($this->ch);
+        return $this->ch;
+    }
+
+    public function __destruct()
+    {
+        $this->ch = null;   // frees the handle / closes the connection
     }
 
     /**

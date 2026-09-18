@@ -3,11 +3,9 @@
 
 'use strict';
 
-// Cache-bust cross-module imports — see comment in out/bootstrap.js.
-const _v = new URL(import.meta.url).searchParams.get('v') || '';
-const _qs = _v ? '?v=' + encodeURIComponent(_v) : '';
-const { recomputePosterFooter } = await import(new URL('../in/renderTables.js' + _qs, import.meta.url).href);
-const { SEPAY_TBODY }           = await import(new URL('./bankTable.js'       + _qs, import.meta.url).href);
+const _i = (await import(new URL('./cacheBust.js' + new URL(import.meta.url).search, import.meta.url).href)).importer(import.meta.url);
+const { recomputePosterFooter } = await _i('../in/renderTables.js');
+const { SEPAY_TBODY }           = await _i('./bankTable.js');
 
 export function refreshStats() {
     // Sepay footer — linked / unlinked counts. Sum is server-rendered

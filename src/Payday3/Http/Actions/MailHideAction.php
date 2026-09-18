@@ -33,7 +33,7 @@ final class MailHideAction
             $range = DateRange::fromQuery($request->getQueryParams());
             $this->mail->hide($mailUid, $range->to, $comment);
         } catch (\Throwable $e) {
-            return JsonResponder::error($response, $e->getMessage(), 500);
+            return JsonResponder::fromException($response, $e);
         }
         return JsonResponder::ok($response, ['mailUid' => $mailUid]);
     }

@@ -8,13 +8,28 @@ const JSON_HEADERS = {
     'Content-Type': 'application/json',
 };
 
+// The server requires X-CSRF-Token on every POST/DELETE under
+// /payday3/api. index.js calls setCsrf() with the token from
+// #pd3-bootstrap before any module can send a request; every mutating
+// request in payday3 goes through this client (no raw fetch elsewhere).
 let _csrf = '';
-export function setCsrf(token) { _csrf = String(token || ''); }
+export function setCsrf(token) {
+    _csrf = String(token || '');
+    if (!_csrf) console.warn('[api] empty CSRF token — mutating requests will be rejected');
+}
 
-async function request(method, url, body) {
+/**
+ * @param {string} method
+ * @param {string} url
+ * @param {*} [body]
+ * @param {{keepalive?:boolean}} [opts]  keepalive — survive page unload
+ *   (beforeunload saves; unlike sendBeacon it can carry the CSRF header).
+ */
+async function request(method, url, body, { keepalive = false } = {}) {
     const init = { method, headers: { ...JSON_HEADERS } };
     if (_csrf) init.headers['X-CSRF-Token'] = _csrf;
     if (body !== undefined) init.body = JSON.stringify(body);
+    if (keepalive) init.keepalive = true;
     const res = await fetch(url, init);
 
     // Auth expired / never had a session: AuthMiddleware returns 401
@@ -54,6 +69,6 @@ async function request(method, url, body) {
 
 export const api = {
     get:    (url)        => request('GET',    url),
-    post:   (url, body)  => request('POST',   url, body ?? {}),
+    post:   (url, body, opts) => request('POST', url, body ?? {}, opts),
     delete: (url)        => request('DELETE', url),
 };

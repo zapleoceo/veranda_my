@@ -19,10 +19,8 @@ final class PosterCashShiftDetailAction
         $shiftId = (string)($args['shiftId'] ?? '');
         try {
             $rows = $this->service->detail($shiftId);
-        } catch (\InvalidArgumentException $e) {
-            return JsonResponder::error($response, $e->getMessage(), 400);
         } catch (\Throwable $e) {
-            return JsonResponder::error($response, $e->getMessage(), 500);
+            return JsonResponder::fromException($response, $e, 502);
         }
         return JsonResponder::ok($response, ['transactions' => $rows]);
     }

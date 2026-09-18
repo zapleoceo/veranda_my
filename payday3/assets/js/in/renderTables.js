@@ -6,43 +6,38 @@
 
 'use strict';
 
-// Cache-bust cross-module imports — see comment in out/bootstrap.js.
-const _v = new URL(import.meta.url).searchParams.get('v') || '';
-const _qs = _v ? '?v=' + encodeURIComponent(_v) : '';
-const { createTxButtonHtml, TX_TYPE } = await import(new URL('../ui/rowCreateTx.js' + _qs, import.meta.url).href);
-const { BANK_COLUMNS, SEPAY_TBODY } = await import(new URL('../ui/bankTable.js' + _qs, import.meta.url).href);
-const { classify: rowState } = await import(new URL('../ui/rowStates.js' + _qs, import.meta.url).href);
+const _i = (await import(new URL('../ui/cacheBust.js' + new URL(import.meta.url).search, import.meta.url).href)).importer(import.meta.url);
+const { createTxButtonHtml, TX_TYPE } = await _i('../ui/rowCreateTx.js');
+const { BANK_COLUMNS, SEPAY_TBODY }   = await _i('../ui/bankTable.js');
+const { classify: rowState }          = await _i('../ui/rowStates.js');
+const { esc, fmtVnd: fmt }            = await _i('../ui/format.js');
+const { isVietnam, isBybit, methodOfRow } = await _i('../ui/paymentMethods.js');
+const { topTotals, diffClass }        = await _i('./totals.js');
 
-const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({
-    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
-})[c]);
-
-const fmt = (n) => {
-    const v = Math.round(Number(n) || 0);
-    try { return new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(v).replace(/,/g, ' '); }
-    catch (_) { return String(v).replace(/\B(?=(\d{3})+(?!\d))/g, ' '); }
-};
+/** Cells per Poster check row — see posterRow() / poster_table.php. */
+export const POSTER_COLUMNS = 9;
 
 function sepayRow(s, cls) {
     const content = s.content ?? '';
     const time    = s.time ?? '';
     const amount  = Number(s.amount) || 0;
-    return `<tr id="pd3-sepay-${s.id}" class="pd3-row ${cls}"
-        data-sepay-id="${s.id}"
+    const id      = esc(s.id);
+    return `<tr id="pd3-sepay-${id}" class="pd3-row ${cls}"
+        data-sepay-id="${id}"
         data-ts="${esc(s.transaction_date)}"
         data-sum="${amount}"
         data-content="${esc(String(content).toLowerCase())}">
         <td class="pd3-col pd3-col--hide">
-            <button type="button" class="pd3-row-hide" data-sepay-id="${s.id}" title="Скрыть/восстановить">−</button>
+            <button type="button" class="pd3-row-hide" data-sepay-id="${id}" title="Скрыть/восстановить">−</button>
         </td>
         <td class="pd3-col pd3-col--content">${esc(content)}</td>
         <td class="pd3-col pd3-col--time nowrap">${esc(time)}</td>
         <td class="pd3-col pd3-col--sum nowrap right">${esc(s.amount_fmt ?? fmt(amount))}</td>
         <td class="pd3-col pd3-col--create">${createTxButtonHtml({ amount, date: s.transaction_date, type: TX_TYPE.INCOME })}</td>
         <td class="pd3-col pd3-col--cb">
-            <input type="checkbox" class="pd3-cb pd3-cb--sepay" data-sepay-id="${s.id}" data-sum="${amount}">
+            <input type="checkbox" class="pd3-cb pd3-cb--sepay" data-sepay-id="${id}" data-sum="${amount}">
         </td>
-        <td class="pd3-col pd3-col--anchor"><span class="pd3-anchor" id="pd3-sepay-anchor-${s.id}"></span></td>
+        <td class="pd3-col pd3-col--anchor"><span class="pd3-anchor" id="pd3-sepay-anchor-${id}"></span></td>
     </tr>`;
 }
 
@@ -51,20 +46,23 @@ function posterRow(p, cls) {
     const num    = p.receipt_number !== '' ? p.receipt_number : String(p.transaction_id);
     const method = p.payment_method ?? '—';
     const methodLite = p.payment_method_lite ?? method;
-    return `<tr id="pd3-poster-${p.transaction_id}" class="pd3-row ${cls}"
-        data-poster-id="${p.transaction_id}"
+    const methodId = p.payment_method_id ?? p.poster_payment_method_id ?? '';
+    const id     = esc(p.transaction_id);
+    return `<tr id="pd3-poster-${id}" class="pd3-row ${cls}"
+        data-poster-id="${id}"
         data-num="${esc(num)}"
         data-ts="${esc(p.date_close)}"
         data-card="${Number(p.payed_card) || 0}"
         data-tips="${Number(p.tip_sum) || 0}"
         data-total="${total}"
         data-method="${esc(method)}"
+        data-method-id="${esc(methodId)}"
         data-waiter="${esc(p.waiter_name ?? '')}"
-        data-table="${p.table_id ?? 0}">
+        data-table="${esc(p.table_id ?? 0)}">
         <td class="pd3-col pd3-col--lead">
             <div class="pd3-lead">
-                <span class="pd3-anchor" id="pd3-poster-anchor-${p.transaction_id}"></span>
-                <input type="checkbox" class="pd3-cb pd3-cb--poster" data-poster-id="${p.transaction_id}" data-sum="${total}">
+                <span class="pd3-anchor" id="pd3-poster-anchor-${id}"></span>
+                <input type="checkbox" class="pd3-cb pd3-cb--poster" data-poster-id="${id}" data-sum="${total}">
             </div>
         </td>
         <td class="pd3-col pd3-col--num    nowrap">${esc(num)}</td>
@@ -108,49 +106,34 @@ export function renderPoster(rows, links) {
         byPoster.get(l.poster_transaction_id).push(l);
     }
     if (rows.length === 0) {
-        tbody.innerHTML = '<tr class="pd3-empty"><td colspan="9">Нет чеков Poster за период.</td></tr>';
+        tbody.innerHTML = `<tr class="pd3-empty"><td colspan="${POSTER_COLUMNS}">Нет чеков Poster за период.</td></tr>`;
         return;
     }
     tbody.innerHTML = rows.map((p) => posterRow(p, rowState(byPoster.get(p.transaction_id)))).join('');
 }
 
+/**
+ * Sepay footer sum + the top totals card, from row data (see totals.js).
+ * The Poster pane footer depends on live row classes (linked / hidden),
+ * so the page repaint recomputes it once via recomputePosterFooter().
+ */
 export function updateInFooters(sepayOpen, sepayHidden, posterRows) {
-    const sepayTotal = sepayOpen.reduce((acc, s) => acc + (Number(s.amount) || 0), 0);
-    const allSepay = sepayTotal + sepayHidden.reduce((acc, s) => acc + (Number(s.amount) || 0), 0);
+    const t = topTotals({ sepayOpen, sepayHidden, poster: posterRows });
 
     const $st = document.getElementById('pd3SepayTotal');
-    if ($st) $st.textContent = fmt(sepayTotal);
+    if ($st) $st.textContent = fmt(sepayOpen.reduce((acc, s) => acc + (Number(s.amount) || 0), 0));
 
-    // Poster footer (Итого / Tips / связи / несвязи / BB / VC)
-    // is recomputed from the live DOM so it stays consistent with
-    // server-side render, JS-side re-render, and post-link-mutation
-    // state without us having to thread row data through every call site.
-    recomputePosterFooter();
-
-    // Top totals card (Sepay / Poster / VC / Δ).
-    //
-    // Poster value mirrors the pane-footer "Итого" — non-Vietnam checks
-    // including tips. VC is the Vietnam Company bucket (cash collected
-    // by the company, NOT routed through the bank). Sepay is all bank
-    // deposits, so the reconciliation identity is:
-    //     Sepay = Poster + VC  →  Δ = Sepay − Poster − VC
-    // Δ is zero when the day reconciles perfectly.
-    const posterTotal  = readPosterFooterValue('pd3PosterTotal');
-    const vietnamTotal = readPosterFooterValue('pd3PosterVietnam');
     const totals = document.querySelector('.pd3-totals');
-    if (totals) {
-        const cells = totals.querySelectorAll('strong');
-        if (cells.length >= 4) {
-            cells[0].textContent = fmt(allSepay);
-            cells[1].textContent = fmt(posterTotal);
-            cells[2].textContent = fmt(vietnamTotal);
-            const diff = allSepay - posterTotal - vietnamTotal;
-            cells[3].textContent = fmt(diff);
-            const diffWrap = cells[3].parentElement;
-            if (diffWrap) {
-                diffWrap.classList.remove('ok', 'warn', 'danger');
-                diffWrap.classList.add(diff === 0 ? 'ok' : (diff < 0 ? 'danger' : 'warn'));
-            }
+    const cells = totals ? totals.querySelectorAll('strong') : [];
+    if (cells.length >= 4) {
+        cells[0].textContent = fmt(t.sepay);
+        cells[1].textContent = fmt(t.poster);
+        cells[2].textContent = fmt(t.vietnam);
+        cells[3].textContent = fmt(t.diff);
+        const diffWrap = cells[3].parentElement;
+        if (diffWrap) {
+            diffWrap.classList.remove('ok', 'warn', 'danger');
+            diffWrap.classList.add(diffClass(t.diff));
         }
     }
 }
@@ -174,6 +157,9 @@ export function updateInFooters(sepayOpen, sepayHidden, posterRows) {
  * `data-total` already encodes card+third+tip (server- and JS-render
  * both mirror payday2's "Card+Tips" column convention), so we read it
  * directly instead of summing data-total+data-tips.
+ *
+ * VC / BB are bucketed by payment-method id (data-method-id), the
+ * server's rule — see paymentMethods.js.
  */
 export function recomputePosterFooter() {
     const rows = document.querySelectorAll('#pd3PosterTable tr.pd3-row');
@@ -181,14 +167,14 @@ export function recomputePosterFooter() {
     for (const tr of rows) {
         const sum  = Number(tr.dataset.total) || 0;
         const tip  = Number(tr.dataset.tips) || 0;
-        const pm   = String(tr.dataset.method || '').toLowerCase();
+        const method = methodOfRow(tr);
 
         // BB / VC are visibility-independent — they're "this is what
         // Poster reported for the period". Toggling the 👁 hides
         // Vietnam rows from the operator's view but doesn't change
         // the underlying number.
-        if (pm.startsWith('vietnam')) { vc += sum; continue; }   // VC excluded from Итого
-        if (pm.startsWith('bybit'))   { bb += sum; }
+        if (isVietnam(method)) { vc += sum; continue; }   // VC excluded from Итого
+        if (isBybit(method))   { bb += sum; }
 
         // Итого / Tips / связи / несвязи respect the visibility
         // toggles (hidden rows aren't part of the live total).
@@ -209,13 +195,4 @@ export function recomputePosterFooter() {
     set('pd3PosterUnlinked',    unlinked);
     set('pd3PosterBybit',       bb);
     set('pd3PosterVietnam',     vc);
-}
-
-// Read a numeric span from the Poster footer (used by the top totals
-// card so it doesn't have to duplicate the bucket logic).
-function readPosterFooterValue(id) {
-    const el = document.getElementById(id);
-    if (!el) return 0;
-    const cleaned = String(el.textContent || '').replace(/[^\d\-]/g, '');
-    return Number(cleaned) || 0;
 }

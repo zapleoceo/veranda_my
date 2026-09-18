@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace App\Payday3\Services;
 
-use App\Infrastructure\Config;
 use App\Infrastructure\Database;
 use App\Payday3\Contracts\SepaySyncServiceInterface;
 use App\Payday3\Domain\DateRange;
+use App\Payday3\Domain\Money;
 
 /**
  * Cleaned-up port of payday2/post/reload_sepay_api.php (145 → ~100 lines).
@@ -18,17 +18,21 @@ use App\Payday3\Domain\DateRange;
  * as payday2: 'bybit' → Bybit, 'vietnam company' → Vietnam Company,
  * otherwise Card.
  *
- * Requires .env keys SEPAY_API_TOKEN and (optionally)
- * SEPAY_ACCOUNT_NUMBER for filtering.
+ * Credentials (.env SEPAY_API_TOKEN and optional SEPAY_ACCOUNT_NUMBER
+ * filter) are injected by the container — no $_ENV reads here.
  */
 final class SepaySyncService implements SepaySyncServiceInterface
 {
-    public function __construct(private readonly Database $db) {}
+    public function __construct(
+        private readonly Database $db,
+        private readonly string   $apiToken,
+        private readonly string   $accountNumber = '',
+    ) {}
 
     public function sync(DateRange $range): array
     {
-        $token   = trim((string)($_ENV['SEPAY_API_TOKEN']      ?? Config::get('SEPAY_API_TOKEN')));
-        $account = trim((string)($_ENV['SEPAY_ACCOUNT_NUMBER'] ?? Config::get('SEPAY_ACCOUNT_NUMBER')));
+        $token   = trim($this->apiToken);
+        $account = trim($this->accountNumber);
         if ($token === '') {
             throw new \RuntimeException('SEPAY_API_TOKEN is not configured');
         }
@@ -54,43 +58,46 @@ final class SepaySyncService implements SepaySyncServiceInterface
         );
 
         $inserted = 0; $updated = 0; $skipped = 0;
-        foreach ($txs as $tx) {
-            if (!is_array($tx)) { $skipped++; continue; }
-            $sepayId = (int)($tx['id'] ?? 0);
-            if ($sepayId <= 0) { $skipped++; continue; }
+        // One transaction for the batch — one fsync instead of one per row.
+        $this->db->transaction(function () use ($txs, $upsert, &$inserted, &$updated, &$skipped): void {
+            foreach ($txs as $tx) {
+                if (!is_array($tx)) { $skipped++; continue; }
+                $sepayId = (int)($tx['id'] ?? 0);
+                if ($sepayId <= 0) { $skipped++; continue; }
 
-            $ts = strtotime((string)($tx['transaction_date'] ?? $tx['transactionDate'] ?? ''));
-            if ($ts === false || $ts <= 0) { $skipped++; continue; }
+                $ts = strtotime((string)($tx['transaction_date'] ?? $tx['transactionDate'] ?? ''));
+                if ($ts === false || $ts <= 0) { $skipped++; continue; }
 
-            // amount_in / amount_out → transfer_type + amount
-            $in  = (float)($tx['amount_in']  ?? 0);
-            $out = (float)($tx['amount_out'] ?? 0);
-            if ($out > 0.0001 && $in <= 0.0001) { $type = 'out'; $amount = (int)round($out); }
-            else                                 { $type = 'in';  $amount = (int)round($in);  }
+                // amount_in / amount_out → transfer_type + amount
+                $in  = (float)($tx['amount_in']  ?? 0);
+                $out = (float)($tx['amount_out'] ?? 0);
+                if ($out > 0.0001 && $in <= 0.0001) { $type = 'out'; $amount = (int)round($out); }
+                else                                 { $type = 'in';  $amount = (int)round($in);  }
 
-            $content   = trim((string)($tx['transaction_content'] ?? $tx['content'] ?? ''));
-            $sub       = self::nullableString($tx['sub_account'] ?? $tx['subAccount'] ?? null);
-            $code      = self::nullableString($tx['code'] ?? null);
-            $reference = trim((string)($tx['reference_number'] ?? $tx['referenceCode'] ?? $tx['reference_code'] ?? ''));
-            $gateway   = trim((string)($tx['bank_brand_name'] ?? $tx['gateway'] ?? '')) ?: 'Unknown';
-            $accNo     = trim((string)($tx['account_number'] ?? $tx['accountNumber'] ?? '')) ?: 'Unknown';
-            $accum     = self::moneyToInt($tx['accumulated'] ?? 0);
-            $method    = self::inferMethod($content . ' ' . (string)$sub);
-            $raw       = json_encode($tx, JSON_UNESCAPED_UNICODE) ?: null;
+                $content   = trim((string)($tx['transaction_content'] ?? $tx['content'] ?? ''));
+                $sub       = self::nullableString($tx['sub_account'] ?? $tx['subAccount'] ?? null);
+                $code      = self::nullableString($tx['code'] ?? null);
+                $reference = trim((string)($tx['reference_number'] ?? $tx['referenceCode'] ?? $tx['reference_code'] ?? ''));
+                $gateway   = trim((string)($tx['bank_brand_name'] ?? $tx['gateway'] ?? '')) ?: 'Unknown';
+                $accNo     = trim((string)($tx['account_number'] ?? $tx['accountNumber'] ?? '')) ?: 'Unknown';
+                $accum     = Money::toInt($tx['accumulated'] ?? 0);
+                $method    = self::inferMethod($content . ' ' . (string)$sub);
+                $raw       = json_encode($tx, JSON_UNESCAPED_UNICODE) ?: null;
 
-            $stmt = $upsert;
-            $stmt->execute([
-                $sepayId, $gateway, date('Y-m-d H:i:s', $ts), $accNo, $code,
-                $content !== '' ? $content : '-',
-                $type, $amount, $accum, $sub,
-                $reference !== '' ? $reference : '-',
-                $content !== '' ? $content : '-',
-                $method, $raw,
-            ]);
-            $affected = $stmt->rowCount();
-            if      ($affected === 1) $inserted++;
-            else if ($affected >= 2)  $updated++;
-        }
+                $stmt = $upsert;
+                $stmt->execute([
+                    $sepayId, $gateway, date('Y-m-d H:i:s', $ts), $accNo, $code,
+                    $content !== '' ? $content : '-',
+                    $type, $amount, $accum, $sub,
+                    $reference !== '' ? $reference : '-',
+                    $content !== '' ? $content : '-',
+                    $method, $raw,
+                ]);
+                $affected = $stmt->rowCount();
+                if      ($affected === 1) $inserted++;
+                else if ($affected >= 2)  $updated++;
+            }
+        });
         return [
             'inserted' => $inserted,
             'updated'  => $updated,
@@ -144,13 +151,5 @@ final class SepaySyncService implements SepaySyncServiceInterface
         if ($v === null) return null;
         $s = trim((string)$v);
         return $s === '' ? null : $s;
-    }
-
-    private static function moneyToInt(mixed $v): int
-    {
-        if (is_int($v))   return $v;
-        if (is_float($v)) return (int)round($v);
-        if (is_string($v) && is_numeric($v)) return (int)round((float)$v);
-        return 0;
     }
 }

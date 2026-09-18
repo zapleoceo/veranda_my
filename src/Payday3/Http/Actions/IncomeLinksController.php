@@ -8,6 +8,7 @@ use App\Payday3\Contracts\IncomeFinanceLinkRepositoryInterface;
 use App\Payday3\Contracts\IncomeFinanceReconciliationServiceInterface;
 use App\Payday3\Domain\DateRange;
 use App\Payday3\Http\JsonResponder;
+use App\Payday3\Services\ManualLinker;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
 
@@ -27,6 +28,7 @@ final class IncomeLinksController
     public function __construct(
         private readonly IncomeFinanceReconciliationServiceInterface $service,
         private readonly IncomeFinanceLinkRepositoryInterface        $links,
+        private readonly ManualLinker                                $linker,
     ) {}
 
     public function list(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
@@ -41,24 +43,16 @@ final class IncomeLinksController
 
     public function manual(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
     {
-        $body = (array)$request->getParsedBody();
-        $ids  = static fn(string $key) => array_values(array_filter(
-            array_map('intval', (array)($body[$key] ?? [])), static fn(int $i) => $i > 0));
-        $sepayIds   = $ids('sepayIds');
-        $financeIds = $ids('financeIds');
+        $body       = (array)$request->getParsedBody();
+        $sepayIds   = ManualLinker::ids($body['sepayIds']   ?? []);
+        $financeIds = ManualLinker::ids($body['financeIds'] ?? []);
         if ($sepayIds === [] || $financeIds === []) {
             return JsonResponder::error($response, 'Select at least one bank row and one Poster transaction.', 400);
         }
-        return $this->respond($request, $response, function (DateRange $r) use ($sepayIds, $financeIds) {
-            $added = 0;
-            foreach ($sepayIds as $sid) {
-                foreach ($financeIds as $fid) {
-                    $this->service->manualLink($sid, $fid, $r->to);
-                    $added++;
-                }
-            }
-            return ['added' => $added];
-        });
+        return $this->respond($request, $response, fn(DateRange $r) => $this->linker->link(
+            $sepayIds, $financeIds,
+            fn(int $sid, int $fid) => $this->service->manualLink($sid, $fid, $r->to),
+        ));
     }
 
     /** @param array{sepayId:string, financeId:string} $args */
@@ -72,7 +66,9 @@ final class IncomeLinksController
 
     public function clear(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
     {
-        return $this->respond($request, $response, fn(DateRange $r) => ['removed' => $this->service->clearLinks($r)]);
+        return $this->respond($request, $response,
+            fn(DateRange $r) => ['removed' => $this->service->clearLinks($r)],
+            DateRange::MAX_DESTRUCTIVE_DAYS);
     }
 
     /**
@@ -81,20 +77,14 @@ final class IncomeLinksController
      *
      * @param callable(DateRange): array<string,mixed> $op
      */
-    private function respond(ServerRequestInterface $request, ResponseInterface $response, callable $op): ResponseInterface
+    private function respond(ServerRequestInterface $request, ResponseInterface $response, callable $op, int $maxDays = DateRange::MAX_READ_DAYS): ResponseInterface
     {
         try {
-            $range = DateRange::fromQuery($request->getQueryParams());
-        } catch (\InvalidArgumentException $e) {
-            return JsonResponder::error($response, $e->getMessage(), 400);
-        }
-        try {
+            $range = DateRange::fromQuery($request->getQueryParams())->limitedTo($maxDays);
             $extra = $op($range);
-            $links = array_map(static fn($l) => $l->toJsonShape(), $this->links->listInRange($range));
-        } catch (\InvalidArgumentException $e) {
-            return JsonResponder::error($response, $e->getMessage(), 400);
+            $links = JsonResponder::shapes($this->links->listInRange($range));
         } catch (\Throwable $e) {
-            return JsonResponder::error($response, $e->getMessage(), 500);
+            return JsonResponder::fromException($response, $e);
         }
         return JsonResponder::ok($response, $extra + ['links' => $links]);
     }

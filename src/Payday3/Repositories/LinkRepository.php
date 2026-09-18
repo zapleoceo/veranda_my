@@ -53,12 +53,10 @@ final class LinkRepository implements LinkRepositoryInterface
 
     public function add(ReconciliationLink $link): void
     {
-        if ($this->exists($link->sepayId, $link->posterTransactionId)) {
-            return;
-        }
+        // uq_link_pair makes INSERT IGNORE idempotent — no exists() round-trip.
         $pl = $this->db->t('check_payment_links');
         $this->db->query(
-            "INSERT INTO {$pl} (sepay_id, poster_transaction_id, link_type) VALUES (?, ?, ?)",
+            "INSERT IGNORE INTO {$pl} (sepay_id, poster_transaction_id, link_type) VALUES (?, ?, ?)",
             [$link->sepayId, $link->posterTransactionId, $link->linkType]
         );
     }
@@ -70,6 +68,19 @@ final class LinkRepository implements LinkRepositoryInterface
             "DELETE FROM {$pl} WHERE sepay_id = ? AND poster_transaction_id = ?",
             [$sepayId, $posterTransactionId]
         );
+    }
+
+    public function linkedPosterIds(array $posterTransactionIds): array
+    {
+        $ids = array_values(array_unique(array_filter(array_map('intval', $posterTransactionIds), static fn(int $i) => $i > 0)));
+        if ($ids === []) return [];
+        $pl = $this->db->t('check_payment_links');
+        $in = implode(',', array_fill(0, count($ids), '?'));
+        $rows = $this->db->query(
+            "SELECT DISTINCT poster_transaction_id FROM {$pl} WHERE poster_transaction_id IN ({$in})",
+            $ids
+        )->fetchAll();
+        return array_values(array_map(static fn(array $r) => (int)$r['poster_transaction_id'], $rows));
     }
 
     public function clearInRange(DateRange $r): int

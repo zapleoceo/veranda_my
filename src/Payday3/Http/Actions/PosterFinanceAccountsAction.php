@@ -17,7 +17,7 @@ final class PosterFinanceAccountsAction
     public function __invoke(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
     {
         try { $rows = $this->lookup->financeAccounts(); }
-        catch (\Throwable $e) { return JsonResponder::error($response, $e->getMessage(), 500); }
+        catch (\Throwable $e) { return JsonResponder::fromException($response, $e, 502); }
         // JsonResponder already wraps as {ok:true, data: ...} — no
         // extra `accounts` envelope, the JS receives the map directly.
         return JsonResponder::ok($response, $rows);

@@ -27,17 +27,16 @@ final class AutoLinkAction
     public function __invoke(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
     {
         try {
-            $range = DateRange::fromQuery($request->getQueryParams());
+            $range  = DateRange::forRead($request->getQueryParams());
             $result = $this->service->autoLink($range);
-        } catch (\InvalidArgumentException $e) {
-            return JsonResponder::error($response, $e->getMessage(), 400);
+            $links  = JsonResponder::shapes($this->links->listInRange($range));
+        } catch (\Throwable $e) {
+            return JsonResponder::fromException($response, $e);
         }
-
-        $payload = [
+        return JsonResponder::ok($response, [
             'added' => $result['added'],
             'total' => $result['total'],
-            'links' => array_map(static fn($l) => $l->toJsonShape(), $this->links->listInRange($range)),
-        ];
-        return JsonResponder::ok($response, $payload);
+            'links' => $links,
+        ]);
     }
 }

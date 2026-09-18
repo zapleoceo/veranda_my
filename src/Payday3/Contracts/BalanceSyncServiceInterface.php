@@ -9,7 +9,9 @@ namespace App\Payday3\Contracts;
  * into Poster as a `finance.createTransactions` correction.
  *
  * Two-step protocol, exactly as payday2:
- *   plan(diffVnd)   → builds the payload, stashes a nonce in session,
+ *   plan(diffVnd)   → computes the difference on the server (saved
+ *                     Факт. − live Poster), rejects it when the client's
+ *                     diffVnd disagrees, stashes a nonce in session and
  *                     returns a human-readable preview the operator
  *                     confirms client-side.
  *   commit(nonce)   → validates nonce age (<5 min), checks today's
@@ -29,7 +31,7 @@ interface BalanceSyncServiceInterface
      *   }
      * }
      */
-    public function plan(int $diffVnd, string $byLabel = ''): array;
+    public function plan(int $diffVnd, string $byLabel = '', ?string $targetDate = null): array;
 
     /**
      * @return array{ok:bool, already?:bool, response?:mixed}

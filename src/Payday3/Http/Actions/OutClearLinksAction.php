@@ -18,11 +18,11 @@ final class OutClearLinksAction
     public function __invoke(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
     {
         try {
-            $range = DateRange::fromQuery($request->getQueryParams());
-        } catch (\InvalidArgumentException $e) {
-            return JsonResponder::error($response, $e->getMessage(), 400);
+            $range   = DateRange::forDestructive($request->getQueryParams());
+            $removed = $this->service->clearLinks($range);
+        } catch (\Throwable $e) {
+            return JsonResponder::fromException($response, $e);
         }
-        $removed = $this->service->clearLinks($range);
         return JsonResponder::ok($response, ['removed' => $removed, 'links' => []]);
     }
 }

@@ -8,6 +8,7 @@ use App\Payday3\Contracts\BalanceSyncServiceInterface;
 use App\Payday3\Http\JsonResponder;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
+use App\Payday3\Http\CurrentUser;
 
 /**
  * POST /payday3/api/balances/sync/plan
@@ -28,17 +29,15 @@ final class BalanceSyncPlanAction
         $payload = json_decode($body, true);
         if (!is_array($payload)) $payload = [];
 
-        $diffVnd = (int)($payload['diff_vnd'] ?? 0);
-        // Operator label for the audit trail comment — same shape as
-        // payday2 (" by <email>").
-        $by = trim((string)($_SESSION['user_email'] ?? $_SESSION['user_name'] ?? ''));
+        // diff_vnd from the browser is only a cross-check now — the
+        // service recomputes Факт. − Poster itself.
+        $diffVnd    = (int)($payload['diff_vnd'] ?? 0);
+        $targetDate = isset($payload['target_date']) ? (string)$payload['target_date'] : null;
 
         try {
-            $result = $this->service->plan($diffVnd, $by);
-        } catch (\InvalidArgumentException $e) {
-            return JsonResponder::error($response, $e->getMessage(), 400);
-        } catch (\RuntimeException $e) {
-            return JsonResponder::error($response, $e->getMessage(), 500);
+            $result = $this->service->plan($diffVnd, CurrentUser::email(), $targetDate);
+        } catch (\Throwable $e) {
+            return JsonResponder::fromException($response, $e);
         }
         return JsonResponder::ok($response, $result);
     }

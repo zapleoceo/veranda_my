@@ -10,20 +10,12 @@
 
 'use strict';
 
-// Cache-bust cross-module imports — see comment in out/bootstrap.js.
-const _v = new URL(import.meta.url).searchParams.get('v') || '';
-const _qs = _v ? '?v=' + encodeURIComponent(_v) : '';
-const { api }          = await import(new URL('../api.js'       + _qs, import.meta.url).href);
-const { LineRenderer } = await import(new URL('./lineRenderer.js' + _qs, import.meta.url).href);
-const { BANK_SCROLL, BANK_TABLE } = await import(new URL('./bankTable.js' + _qs, import.meta.url).href);
-
-function rangeQs(state) {
-    const r = state.get('range') || {};
-    const p = new URLSearchParams();
-    if (r.from) p.set('dateFrom', r.from);
-    if (r.to)   p.set('dateTo',   r.to);
-    return p.toString();
-}
+const _i = (await import(new URL('./cacheBust.js' + new URL(import.meta.url).search, import.meta.url).href)).importer(import.meta.url);
+const { api }          = await _i('../api.js');
+const { LineRenderer } = await _i('./lineRenderer.js');
+const { BANK_SCROLL, BANK_TABLE } = await _i('./bankTable.js');
+const { withRange }    = await _i('./format.js');
+const { notify }       = await _i('./notify.js');
 
 /**
  * @param {{state:object, onChanged?:()=>void}} deps
@@ -33,6 +25,7 @@ export function initIncomeLinks({ state, onChanged }) {
     const grid = document.querySelector('#pd3GraphRoot .pd3-graph__grid');
     if (!grid) return null;
     const base = '/payday3/api/income-links';
+    const url  = (path) => withRange(base + path, state.get('range'));
 
     const apply = (result) => {
         const links = Array.isArray(result?.links) ? result.links : [];
@@ -56,22 +49,25 @@ export function initIncomeLinks({ state, onChanged }) {
         linkKey:            (l) => 'income:' + l.sepay_id + ':' + l.finance_id,
         onUnlink: async (link) => {
             try {
-                apply(await api.delete(`${base}/${Number(link.sepay_id)}/${Number(link.finance_id)}?${rangeQs(state)}`));
+                apply(await api.delete(url(`/${Number(link.sepay_id)}/${Number(link.finance_id)}`)));
             } catch (e) { console.error('[payday3-income]', e); alert(e.message); }
         },
     });
 
     const load = async () => {
-        try { apply(await api.get(`${base}?${rangeQs(state)}`)); }
-        catch (e) { console.error('[payday3-income]', e); }
+        try { apply(await api.get(url(''))); }
+        catch (e) {
+            console.error('[payday3-income]', e);
+            notify('Связи «приход ↔ транзакция» не загрузились: ' + (e.message || 'ошибка'), 'warn');
+        }
     };
     load();
 
     return {
         reload:     load,
-        autoLink:   async () => apply(await api.post(`${base}/auto?${rangeQs(state)}`)),
+        autoLink:   async () => apply(await api.post(url('/auto'))),
         manualLink: async (sepayIds, financeIds) =>
-            apply(await api.post(`${base}/manual?${rangeQs(state)}`, { sepayIds, financeIds })),
-        clearLinks: async () => apply(await api.post(`${base}/clear?${rangeQs(state)}`)),
+            apply(await api.post(url('/manual'), { sepayIds, financeIds })),
+        clearLinks: async () => apply(await api.post(url('/clear'))),
     };
 }

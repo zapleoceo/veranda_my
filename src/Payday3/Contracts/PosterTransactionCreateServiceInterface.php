@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Payday3\Contracts;
 
+use App\Payday3\Domain\Actor;
+
 /**
  * "+" button on each OUT-mail row opens a popup that creates a Poster
  * finance transaction at the amount/date of the bank email. This
@@ -23,8 +25,10 @@ interface PosterTransactionCreateServiceInterface
      *   comment?:string
      * } $input
      * @return array{ok:true, response?:mixed}
-     * @throws \InvalidArgumentException on validation failure
+     * @param Actor|null $actor  who creates it (audit row + per-session idempotency)
+     * @throws \InvalidArgumentException on validation failure (bad account / amount / date)
+     * @throws \DomainException         on an identical request from the same session < 10 s ago
      * @throws \RuntimeException         on Poster API failure
      */
-    public function create(array $input): array;
+    public function create(array $input, ?Actor $actor = null): array;
 }

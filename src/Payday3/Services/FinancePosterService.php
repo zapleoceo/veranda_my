@@ -16,9 +16,16 @@ use App\Payday3\Domain\Money;
  * Fetches Poster finance.getTransactions for the Andrey and Tips
  * accounts, deduped by transaction_id. Both account IDs come from
  * the injected LocalSettings repository — no payday2 import.
+ *
+ * Per-request memo (range + account): /out/finance and the OUT/income
+ * auto-link paths running in the same request share one Poster call per
+ * account. Nothing outlives the request — numbers stay live.
  */
 final class FinancePosterService implements FinanceServiceInterface
 {
+    /** @var array<string, list<mixed>> "from..to|account" → raw rows */
+    private array $memo = [];
+
     public function __construct(
         private readonly PosterApiProviderInterface       $poster,
         private readonly LocalSettingsRepositoryInterface $settings,
@@ -48,6 +55,11 @@ final class FinancePosterService implements FinanceServiceInterface
         // затягивает чужие счета того же типа.
         foreach ([$cfg->accountAndreyId, $cfg->accountTipsId] as $accountId) {
             if ((int) $accountId <= 0) continue;
+            $key = $range->from . '..' . $range->to . '|' . (int) $accountId;
+            if (isset($this->memo[$key])) {
+                $rows = array_merge($rows, $this->memo[$key]);
+                continue;
+            }
             try {
                 $batch = $api->request('finance.getTransactions', [
                     'dateFrom'   => date('Ymd', strtotime($range->from)),
@@ -55,7 +67,8 @@ final class FinancePosterService implements FinanceServiceInterface
                     'account_id' => (int) $accountId,
                     'timezone'   => 'client',
                 ]);
-                if (is_array($batch)) $rows = array_merge($rows, $batch);
+                $this->memo[$key] = is_array($batch) ? array_values($batch) : [];
+                $rows = array_merge($rows, $this->memo[$key]);
             } catch (\Throwable $e) {
                 // Один счёт мог не ответить — второй всё ещё может дать данные.
                 Logger::get()->warning('payday3.finance_fetch_failed', [

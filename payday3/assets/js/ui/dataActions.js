@@ -2,45 +2,32 @@
 // a spinner on its button while the request is in flight, then asks
 // the IN-mode loader to re-fetch the snapshot so the freshly-synced
 // rows show up — no page reload, no flash, no scroll-reset.
+//
+// «Деньги» ↻ (#pd3SepaySyncBtn) is the ONE listener for that button: it
+// syncs SePay + refreshes the incoming side AND reloads the outgoing
+// (mail) block via `reloadOut`, under one busy spinner.
 
 'use strict';
 
-// Cache-bust cross-module imports — see comment in out/bootstrap.js.
-const _v = new URL(import.meta.url).searchParams.get('v') || '';
-const _qs = _v ? '?v=' + encodeURIComponent(_v) : '';
-const { api } = await import(new URL('../api.js' + _qs, import.meta.url).href);
+const _i = (await import(new URL('./cacheBust.js' + new URL(import.meta.url).search, import.meta.url).href)).importer(import.meta.url);
+const { api }       = await _i('../api.js');
+const { withRange } = await _i('./format.js');
+const { withBusy }  = await _i('./busy.js');
 
-function dateQuery(range) {
-    const p = new URLSearchParams();
-    if (range?.from) p.set('dateFrom', range.from);
-    if (range?.to)   p.set('dateTo',   range.to);
-    return p.toString();
-}
+const alertError = (e) => {
+    console.error('[payday3]', e);
+    alert(e?.message || 'Ошибка');
+};
 
-function withBusy(btn, label, fn) {
-    return async () => {
-        if (btn.disabled) return;
-        btn.disabled = true;
-        const prev = btn.getAttribute('aria-label');
-        btn.setAttribute('aria-label', label);
-        btn.classList.add('is-busy');
-        try {
-            await fn();
-        } catch (e) {
-            console.error('[payday3]', e);
-            alert(e?.message || 'Ошибка');
-        } finally {
-            btn.disabled = false;
-            if (prev) btn.setAttribute('aria-label', prev);
-            else btn.removeAttribute('aria-label');
-            btn.classList.remove('is-busy');
-        }
-    };
-}
-
-export function initDataActions({ state, refresh }) {
+/**
+ * @param {{state:object, refresh:()=>Promise<void>, reloadOut?:()=>Promise<void>}} deps
+ *   refresh   — re-fetch the incoming side (+ finance card) after a write;
+ *   reloadOut — re-fetch the outgoing side (only on the operator's ↻).
+ * @returns {{autoFill:()=>Promise<void>}}  first-paint SePay + Poster sync
+ *   of an empty day — without an extra outgoing reload (it already loads).
+ */
+export function initDataActions({ state, refresh, reloadOut = null }) {
     const range = () => state.get('range') || {};
-    const qs    = () => dateQuery(range());
     const refreshAll = async () => {
         if (typeof refresh === 'function') await refresh();
     };
@@ -49,36 +36,42 @@ export function initDataActions({ state, refresh }) {
     const $posterSync = document.getElementById('pd3PosterSyncBtn');
     const $clearDay   = document.getElementById('pd3ClearDayBtn');
 
-    // NB: #pd3SepaySyncBtn is the «Деньги» ↻ and has a SECOND, independent
-    // listener in out/bootstrap.js that reloads the outgoing (mail) block.
-    // Keep both: this one syncs SePay + refreshes the incoming side.
-    $sepaySync?.addEventListener('click', withBusy(
-        $sepaySync, 'Loading sepay...',
-        async () => {
-            await api.post('/payday3/api/sepay/sync?' + qs());
-            await refreshAll();
-        },
-    ));
+    const syncSepay = async () => {
+        await api.post(withRange('/payday3/api/sepay/sync', range()));
+        await refreshAll();
+    };
+    const syncPoster = async () => {
+        await api.post(withRange('/payday3/api/poster/sync', range()));
+        await refreshAll();
+    };
 
-    $posterSync?.addEventListener('click', withBusy(
-        $posterSync, 'Loading poster...',
-        async () => {
-            await api.post('/payday3/api/poster/sync?' + qs());
-            await refreshAll();
-        },
-    ));
+    const sepayBusy = (fn) => withBusy($sepaySync, fn, { label: 'Loading sepay...', onError: alertError });
+    const posterRun = withBusy($posterSync, syncPoster, { label: 'Loading poster...', onError: alertError });
 
-    $clearDay?.addEventListener('click', withBusy(
-        $clearDay, 'Resetting...',
-        async () => {
-            const r = range();
-            const sameDay = r?.from === r?.to;
-            const msg = sameDay
-                ? `Soft-reset за ${r.from}?\n\nВсе записи Sepay и Poster за этот день будут помечены was_deleted=1. Следующая синхронизация их восстановит.`
-                : `Soft-reset за период ${r?.from} — ${r?.to}?\n\nВсе записи Sepay и Poster в диапазоне будут помечены was_deleted=1. Следующая синхронизация их восстановит.`;
-            if (!confirm(msg)) return;
-            await api.post('/payday3/api/day/clear?' + qs());
-            await refreshAll();
+    $sepaySync?.addEventListener('click', sepayBusy(async () => {
+        // The outgoing reload runs alongside the sync (independent data);
+        // its own failures are reported by out/bootstrap.js.
+        const out = reloadOut ? Promise.resolve(reloadOut()).catch(() => {}) : null;
+        await syncSepay();
+        await out;
+    }));
+
+    $posterSync?.addEventListener('click', posterRun);
+
+    $clearDay?.addEventListener('click', withBusy($clearDay, async () => {
+        const r = range();
+        const sameDay = r?.from === r?.to;
+        const msg = sameDay
+            ? `Soft-reset за ${r.from}?\n\nВсе записи Sepay и Poster за этот день будут помечены was_deleted=1. Следующая синхронизация их восстановит.`
+            : `Soft-reset за период ${r?.from} — ${r?.to}?\n\nВсе записи Sepay и Poster в диапазоне будут помечены was_deleted=1. Следующая синхронизация их восстановит.`;
+        if (!confirm(msg)) return;
+        await api.post(withRange('/payday3/api/day/clear', range()));
+        await refreshAll();
+    }, { label: 'Resetting...', onError: alertError }));
+
+    return {
+        autoFill: async () => {
+            await Promise.all([sepayBusy(syncSepay)(), posterRun()]);
         },
-    ));
+    };
 }

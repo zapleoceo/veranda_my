@@ -26,10 +26,10 @@ final class PosterCheckListAction
         $q     = $request->getQueryParams();
         $limit = (int)($q['limit'] ?? 200);
         try {
-            $range = DateRange::fromQuery($q);
+            $range = DateRange::forRead($q);
             $rows  = $this->service->listRecent($range, $limit > 0 ? $limit : 200);
         } catch (\Throwable $e) {
-            return JsonResponder::error($response, $e->getMessage(), 500);
+            return JsonResponder::fromException($response, $e, 502);
         }
         return JsonResponder::ok($response, ['checks' => $rows]);
     }

@@ -24,14 +24,11 @@ final class LinksAction
     public function __invoke(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
     {
         try {
-            $range = DateRange::fromQuery($request->getQueryParams());
-        } catch (\InvalidArgumentException $e) {
-            return JsonResponder::error($response, $e->getMessage(), 400);
+            $range = DateRange::forRead($request->getQueryParams());
+            $links = JsonResponder::shapes($this->links->listInRange($range));
+        } catch (\Throwable $e) {
+            return JsonResponder::fromException($response, $e);
         }
-
-        $edges = $this->links->listInRange($range);
-        $payload = array_map(static fn($l) => $l->toJsonShape(), $edges);
-
-        return JsonResponder::ok($response, ['links' => $payload, 'range' => $range->asArray()]);
+        return JsonResponder::ok($response, ['links' => $links, 'range' => $range->asArray()]);
     }
 }

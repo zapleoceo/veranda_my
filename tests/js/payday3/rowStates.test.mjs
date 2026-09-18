@@ -72,3 +72,23 @@ test('перекраска из объединения связей всех т�
     assert.equal(finIncome.state(),   'row-yellow', 'транзакция с поступлением — тоже связана');
     assert.equal(finFree.state(),     'row-red');
 });
+
+test('перекраска трогает только строки, у которых цвет поменялся', () => {
+    // Каждая запись class будит MutationObserver трёх LineRenderer'ов.
+    const same    = new Row({ sepayId: '1' }, 'pd3-row row-green');
+    const changed = new Row({ sepayId: '2' }, 'pd3-row row-green');
+    let writes = 0;
+    for (const r of [same, changed]) {
+        const { add, remove } = r.classList;
+        r.classList.add    = (...c) => { writes++; add(...c); };
+        r.classList.remove = (...c) => { writes++; remove(...c); };
+    }
+    Object.assign(tables, {
+        '#pd3SepayTbody tr.pd3-row': [same, changed],
+        '#pd3PosterTable tr.pd3-row': [], '#pd3OutMailTbody tr.pd3-row': [], '#pd3OutFinanceTable tr.pd3-row': [],
+    });
+    paintRowStates({ checkLinks: [{ sepay_id: 1, poster_transaction_id: 5, link_type: 'auto_green' }] });
+    assert.equal(same.state(), 'row-green');
+    assert.equal(changed.state(), 'row-red');
+    assert.equal(writes, 2, 'одна remove + одна add — только у изменившейся строки');
+});

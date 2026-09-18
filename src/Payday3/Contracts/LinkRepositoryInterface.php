@@ -21,6 +21,14 @@ interface LinkRepositoryInterface
     /** Remove a single edge. */
     public function remove(int $sepayId, int $posterTransactionId): void;
 
+    /**
+     * Which of $posterTransactionIds have at least one bank link.
+     *
+     * @param list<int> $posterTransactionIds
+     * @return list<int>
+     */
+    public function linkedPosterIds(array $posterTransactionIds): array;
+
     /** Wipe every edge whose sepay or poster row falls in the range. */
     public function clearInRange(DateRange $range): int;
 }

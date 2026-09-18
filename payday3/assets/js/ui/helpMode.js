@@ -28,6 +28,7 @@ function positionTip(tip, target) {
     if (!text) return;
     tip.textContent = text;
     tip.hidden = false;
+    tip._target = target;   // the scroll handler re-positions against it
 
     // First reveal lets us measure the rendered box.
     const r  = target.getBoundingClientRect();
