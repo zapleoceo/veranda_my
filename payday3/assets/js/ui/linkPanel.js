@@ -1,13 +1,18 @@
 // Page-wide link panel — the one mid column.
 //
-// One set of buttons for both kinds of links:
-//   🧩 auto   — incoming↔checks AND outgoing↔finance matchers, one click
-//   🎯 manual — routed by what is ticked (selection.linkPlan)
-//   ⛓️‍💥 clear  — every link of the day, both kinds, one confirmation
-// Each side is an adapter with the same shape
-//   { autoLink(), manualLink(leftIds, rightIds), clearLinks() }:
-//   incoming — ui/linkActions.js, outgoing — out/bootstrap.js.
-// The two sides run independently: one failing never blocks the other.
+// One set of buttons for all three pairs of tables:
+//   incoming ↔ checks   (inLinks,     ui/linkActions.js)
+//   incoming ↔ finance  (incomeLinks, ui/incomeLinks.js)
+//   outgoing ↔ finance  (outLinks,    out/bootstrap.js)
+// each an adapter of the same shape
+//   { autoLink(), manualLink(leftIds, rightIds), clearLinks() }.
+//
+//   🧩 auto   — checks + expenses first (in parallel), THEN the incoming
+//               rows still without a pair look among Poster incomes —
+//               so a bank row never gets two counterparts;
+//   🎯 manual — routed by what is ticked (selection.linkPlan);
+//   ⛓️‍💥 clear  — every link of the day, all pairs, one confirmation.
+// Pairs run independently: one failing never blocks the others.
 
 'use strict';
 
@@ -50,26 +55,36 @@ function withBusy(btn, fn) {
  * @param {{state:object, inLinks:object, outLinks:object|null, selection:object,
  *          confirmFn?:(msg:string)=>boolean}} deps
  */
-export function initLinkPanel({ state, inLinks, outLinks, selection, confirmFn = (m) => confirm(m) }) {
+/**
+ * @param {{state:object, inLinks:object, incomeLinks:object|null, outLinks:object|null,
+ *          selection:object, confirmFn?:(msg:string)=>boolean}} deps
+ */
+export function initLinkPanel({ state, inLinks, incomeLinks = null, outLinks, selection, confirmFn = (m) => confirm(m) }) {
     const $auto  = document.getElementById('pd3LinkAutoBtn');
     const $make  = document.getElementById('pd3LinkMakeBtn');
     const $clear = document.getElementById('pd3LinkClearBtn');
 
-    $auto?.addEventListener('click', withBusy($auto, () => runSides([
-        ['Приходы', inLinks?.autoLink],
-        ['Расходы', outLinks?.autoLink],
-    ])));
+    $auto?.addEventListener('click', withBusy($auto, async () => [
+        ...await runSides([
+            ['Приходы ↔ чеки', inLinks?.autoLink],
+            ['Расходы',        outLinks?.autoLink],
+        ]),
+        // After both: only the incoming rows left without a check look
+        // among Poster incomes, and finance rows taken by expenses are gone.
+        ...await runSides([['Приходы ↔ транзакции', incomeLinks?.autoLink]]),
+    ]));
 
     $make?.addEventListener('click', withBusy($make, async () => {
         const plan = linkPlan(selection.counts());
         if (!plan.canLink) return [];
         const { sepay, poster, mail, finance } = selection.sets;
         const errors = await runSides([
-            ['Приходы', plan.in  ? () => inLinks.manualLink([...sepay], [...poster])   : null],
-            ['Расходы', plan.out ? () => outLinks.manualLink([...mail], [...finance]) : null],
+            ['Приходы ↔ чеки',       plan.in     ? () => inLinks.manualLink([...sepay], [...poster])       : null],
+            ['Приходы ↔ транзакции', plan.income ? () => incomeLinks.manualLink([...sepay], [...finance]) : null],
+            ['Расходы',              plan.out    ? () => outLinks.manualLink([...mail], [...finance])     : null],
         ]);
-        // Both adapters re-render on success; a failure leaves the ticks
-        // in place so the operator can retry without re-selecting.
+        // Adapters repaint on success; a failure leaves the ticks in place
+        // so the operator can retry without re-selecting.
         if (!errors.length) selection.reset();
         return errors;
     }));
@@ -80,8 +95,9 @@ export function initLinkPanel({ state, inLinks, outLinks, selection, confirmFn =
         if (!confirmFn(`Снять ВСЕ связи за ${period} — и приходов, и расходов?\n\n`
             + 'Удалятся и авто-, и ручные связи. Отмеченные чекбоксы не учитываются.')) return [];
         return runSides([
-            ['Приходы', inLinks?.clearLinks],
-            ['Расходы', outLinks?.clearLinks],
+            ['Приходы ↔ чеки',       inLinks?.clearLinks],
+            ['Приходы ↔ транзакции', incomeLinks?.clearLinks],
+            ['Расходы',              outLinks?.clearLinks],
         ]);
     }));
 }

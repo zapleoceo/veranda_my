@@ -18,6 +18,7 @@ use App\Payday3\Http\Actions\OutAutoLinkAction;
 use App\Payday3\Http\Actions\OutManualLinkAction;
 use App\Payday3\Http\Actions\OutUnlinkAction;
 use App\Payday3\Http\Actions\OutClearLinksAction;
+use App\Payday3\Http\Actions\IncomeLinksController;
 use App\Payday3\Http\Actions\MailHideAction;
 use App\Payday3\Http\Actions\ActualBalanceAction;
 use App\Payday3\Http\Actions\PosterCashShiftListAction;
@@ -265,6 +266,12 @@ $app->group('/payday3', function (RouteCollectorProxy $g) {
         $api->post(  '/out/links/manual',                            OutManualLinkAction::class);
         $api->post(  '/out/links/clear',                             OutClearLinksAction::class);
         $api->delete('/out/links/{mailUid:[0-9]+}/{financeId:[0-9]+}', OutUnlinkAction::class);
+        // Incoming bank row ↔ Poster finance income (money without a check).
+        $api->get(   '/income-links',                                [IncomeLinksController::class, 'list']);
+        $api->post(  '/income-links/auto',                           [IncomeLinksController::class, 'auto']);
+        $api->post(  '/income-links/manual',                         [IncomeLinksController::class, 'manual']);
+        $api->post(  '/income-links/clear',                          [IncomeLinksController::class, 'clear']);
+        $api->delete('/income-links/{sepayId:[0-9]+}/{financeId:[0-9]+}', [IncomeLinksController::class, 'unlink']);
         $api->post(  '/out/mail/hide',                               MailHideAction::class);
         // Actual balances — Phase 8 footer card.
         $api->get(   '/balances',                                    ActualBalanceAction::class);

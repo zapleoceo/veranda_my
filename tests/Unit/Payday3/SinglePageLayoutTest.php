@@ -80,6 +80,7 @@ final class SinglePageLayoutTest extends TestCase
 
         $this->assertStringContainsString('id="pd3LineLayer"', $html, 'линии поступления ↔ чеки');
         $this->assertStringContainsString('id="pd3OutLineLayer"', $html, 'линии расходы ↔ транзакции');
+        $this->assertStringContainsString('id="pd3IncomeLineLayer"', $html, 'линии поступления ↔ приходы Poster');
     }
 
     public function test_every_element_id_is_unique(): void

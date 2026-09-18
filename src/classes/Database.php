@@ -367,6 +367,21 @@ class Database {
             KEY idx_created_at (created_at)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
 
+        // Incoming bank row (SePay) ↔ Poster finance income — money that
+        // reached the bank without a sales check. Also self-created by
+        // App\Payday3\Repositories\IncomeFinanceLinkRepository on first use.
+        $sfl = $this->t('sepay_finance_links');
+        $this->pdo->exec("CREATE TABLE IF NOT EXISTS {$sfl} (
+            id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            sepay_id BIGINT UNSIGNED NOT NULL,
+            finance_id BIGINT UNSIGNED NOT NULL,
+            link_type VARCHAR(16) NOT NULL DEFAULT 'manual',
+            date_to DATE NOT NULL,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE KEY uq_sepay_finance (sepay_id, finance_id),
+            KEY idx_date_to (date_to)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
+
         // «Заначка» (Poster account 11) row added to Итоговый баланс.
         try {
             if (!$this->pdo->query("SHOW COLUMNS FROM {$ab} LIKE 'bal_stash'")->fetch()) {

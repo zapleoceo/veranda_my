@@ -30,11 +30,12 @@ declare(strict_types=1);
     <!-- One reconciliation graph for the whole day:
            left   «Деньги» — incoming (SePay) above, outgoing (BIDV mail)
                   below, one table;
-           middle one link panel for both kinds;
-           right  Poster checks (pair incoming) above Poster finance
-                  transactions (pair outgoing).
-         Two LineRenderer instances share the grid — incoming↔checks and
-         outgoing↔finance — each with its own SVG layer. The whole grid
+           middle one link panel for every pair;
+           right  Poster checks above Poster finance transactions.
+         Income with income, expense with expense — three pairs, three
+         LineRenderer instances on the same grid, each with its own SVG
+         layer: incoming↔checks, outgoing↔finance, incoming↔finance
+         income. The whole grid
          scrolls horizontally when the columns don't fit; the layers live
          inside it so the connectors scroll with the tables. -->
     <section class="pd3-card pd3-graph-card">
@@ -48,6 +49,7 @@ declare(strict_types=1);
                 </div>
                 <div class="pd3-graph__lines" id="pd3LineLayer" aria-hidden="true"></div>
                 <div class="pd3-graph__lines" id="pd3OutLineLayer" aria-hidden="true"></div>
+                <div class="pd3-graph__lines" id="pd3IncomeLineLayer" aria-hidden="true"></div>
             </div>
         </div>
     </section>

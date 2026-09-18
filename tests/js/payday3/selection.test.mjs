@@ -9,19 +9,27 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { linkPlan, matchState, initSelection, SIDE_KINDS } from '../../../payday3/assets/js/ui/selection.js';
 
-test('linkPlan: полные пары связываются, каждая своим запросом', () => {
-    assert.deepEqual(linkPlan({ sepay: 2, poster: 1 }), { in: true, out: false, canLink: true });
-    assert.deepEqual(linkPlan({ mail: 1, finance: 3 }), { in: false, out: true, canLink: true });
-    assert.deepEqual(linkPlan({ sepay: 1, poster: 1, mail: 1, finance: 1 }), { in: true, out: true, canLink: true });
+test('linkPlan: каждая пара таблиц — свой запрос', () => {
+    assert.deepEqual(linkPlan({ sepay: 2, poster: 1 }),  { in: true,  out: false, income: false, canLink: true });
+    assert.deepEqual(linkPlan({ mail: 1, finance: 3 }),  { in: false, out: true,  income: false, canLink: true });
+    // поступление без чека ↔ транзакция Poster (16.09: SHIRIAEVA ↔ «компенсация»)
+    assert.deepEqual(linkPlan({ sepay: 1, finance: 1 }), { in: false, out: false, income: true, canLink: true });
+    // две пары за один клик: транзакции достаются расходу, поступления — чекам
+    assert.deepEqual(linkPlan({ sepay: 1, poster: 1, mail: 1, finance: 1 }), { in: true, out: true, income: false, canLink: true });
 });
 
-test('linkPlan: строка без пары своего вида блокирует связывание', () => {
-    // приход с транзакцией / расход с чеком — не пары
-    assert.equal(linkPlan({ sepay: 1, finance: 1 }).canLink, false);
+test('linkPlan: неоднозначный выбор или строка без пары блокирует связывание', () => {
+    // расход с чеком — не пара
     assert.equal(linkPlan({ mail: 1, poster: 1 }).canLink, false);
+    // поступление + чек + транзакция: к чему поступление — к чеку или к транзакции?
+    assert.equal(linkPlan({ sepay: 1, poster: 1, finance: 1 }).canLink, false);
     // полная пара + «висящая» галочка — не молчим про лишнюю строку
     assert.equal(linkPlan({ sepay: 1, poster: 1, mail: 1 }).canLink, false);
     assert.equal(linkPlan({ mail: 1, finance: 1, poster: 2 }).canLink, false);
+    assert.equal(linkPlan({ mail: 1, finance: 1, sepay: 1 }).canLink, false);
+    // одна сторона без другой
+    assert.equal(linkPlan({ finance: 2 }).canLink, false);
+    assert.equal(linkPlan({ sepay: 1 }).canLink, false);
     assert.equal(linkPlan({}).canLink, false);
 });
 

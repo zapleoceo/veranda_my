@@ -166,7 +166,24 @@ return [
         $c->get(SepayRepositoryInterface::class),
         $c->get(PosterRepositoryInterface::class),
         $c->get(LinkRepositoryInterface::class),
+        $c->get(\App\Payday3\Contracts\IncomeFinanceLinkRepositoryInterface::class),
     ),
+    // Incoming bank row ↔ Poster finance income (money without a check).
+    \App\Payday3\Contracts\IncomeFinanceLinkRepositoryInterface::class =>
+        fn($c) => new \App\Payday3\Repositories\IncomeFinanceLinkRepository($c->get(Database::class)),
+    \App\Payday3\Contracts\IncomeFinanceReconciliationServiceInterface::class =>
+        fn($c) => new \App\Payday3\Services\IncomeFinanceReconciliationService(
+            $c->get(SepayRepositoryInterface::class),
+            $c->get(FinanceServiceInterface::class),
+            $c->get(\App\Payday3\Contracts\IncomeFinanceLinkRepositoryInterface::class),
+            $c->get(LinkRepositoryInterface::class),
+            $c->get(OutLinkRepositoryInterface::class),
+        ),
+    \App\Payday3\Http\Actions\IncomeLinksController::class =>
+        fn($c) => new \App\Payday3\Http\Actions\IncomeLinksController(
+            $c->get(\App\Payday3\Contracts\IncomeFinanceReconciliationServiceInterface::class),
+            $c->get(\App\Payday3\Contracts\IncomeFinanceLinkRepositoryInterface::class),
+        ),
     LinksAction::class      => fn($c) => new LinksAction($c->get(LinkRepositoryInterface::class)),
     AutoLinkAction::class   => fn($c) => new AutoLinkAction(
         $c->get(ReconciliationServiceInterface::class),
@@ -201,6 +218,7 @@ return [
         $c->get(MailServiceInterface::class),
         $c->get(FinanceServiceInterface::class),
         $c->get(OutLinkRepositoryInterface::class),
+        $c->get(\App\Payday3\Contracts\IncomeFinanceLinkRepositoryInterface::class),
     ),
     OutDataAction::class       => fn($c) => new OutDataAction(
         $c->get(MailServiceInterface::class),

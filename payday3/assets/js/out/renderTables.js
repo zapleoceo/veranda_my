@@ -9,6 +9,7 @@ const _v = new URL(import.meta.url).searchParams.get('v') || '';
 const _qs = _v ? '?v=' + encodeURIComponent(_v) : '';
 const { createTxButtonHtml, TX_TYPE } = await import(new URL('../ui/rowCreateTx.js' + _qs, import.meta.url).href);
 const { BANK_COLUMNS, MAIL_TBODY, byTimeAsc } = await import(new URL('../ui/bankTable.js' + _qs, import.meta.url).href);
+const { classify: rowState } = await import(new URL('../ui/rowStates.js' + _qs, import.meta.url).href);
 
 const fmt = (n) => {
     const v = Math.round(Number(n) || 0);
@@ -19,17 +20,6 @@ const fmt = (n) => {
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
 })[c]);
-
-function rowState(edges) {
-    if (!edges || edges.length === 0) return 'row-red';
-    let manual = false, yellow = false;
-    for (const e of edges) {
-        if (e.is_manual)                 manual = true;
-        if (e.link_type === 'auto_yellow') yellow = true;
-    }
-    if (manual) return 'row-gray';
-    return yellow ? 'row-yellow' : 'row-green';
-}
 
 export function renderOutMail(rows, links, { showHidden = false } = {}) {
     const byMail = new Map();

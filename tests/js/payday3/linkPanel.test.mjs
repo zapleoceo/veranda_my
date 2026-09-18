@@ -1,7 +1,8 @@
-// Единая панель связей: одна кнопка на обе пары таблиц.
+// Единая панель связей: одна кнопка на все три пары таблиц
 //   🧩 авто — оба алгоритма; 🎯 ручная — по тому, что отмечено;
-//   ⛓️‍💥 снять все — одно подтверждение, обе стороны.
-// Сбой одной стороны не должен мешать второй.
+//   ⛓️‍💥 снять все — одно подтверждение, все пары.
+// (приходы↔чеки, приходы↔транзакции, расходы↔транзакции). Сбой одной
+// пары не должен мешать остальным.
 //
 // Запуск: node --test "tests/js/**/*.test.mjs"
 
@@ -89,6 +90,7 @@ function mount({ counts, failOn = {}, confirmAnswer = true } = {}) {
     initLinkPanel({
         state: { get: () => ({ from: '2026-09-18', to: '2026-09-18' }) },
         inLinks: adapter('in', log, { failOn: failOn.in }),
+        incomeLinks: adapter('income', log, { failOn: failOn.income }),
         outLinks: adapter('out', log, { failOn: failOn.out }),
         selection,
         confirmFn: (m) => { confirms.push(m); return confirmAnswer; },
@@ -99,7 +101,9 @@ function mount({ counts, failOn = {}, confirmAnswer = true } = {}) {
 test('🧩 запускает авто-связи и приходов, и расходов', async () => {
     const p = mount();
     await p.click('pd3LinkAutoBtn');
-    assert.deepEqual(p.log.map((l) => l.slice(0, 2)).sort(), [['in', 'auto'], ['out', 'auto']]);
+    assert.deepEqual(p.log.map((l) => l.slice(0, 2)).sort(), [['in', 'auto'], ['income', 'auto'], ['out', 'auto']]);
+    assert.deepEqual(p.log[2].slice(0, 2), ['income', 'auto'],
+        'поступления ищут пару в транзакциях Poster ПОСЛЕ чеков и расходов — у поступления одна пара');
     assert.deepEqual(p.alerts, []);
 });
 
@@ -127,7 +131,7 @@ test('🎯 только пара расходов — приходы не тро
 });
 
 test('🎯 неполная пара ничего не отправляет', async () => {
-    const p = mount({ counts: { sepay: 1, finance: 1 } });
+    const p = mount({ counts: { sepay: 1, poster: 1, finance: 1 } });   // к чеку или к транзакции?
     await p.click('pd3LinkMakeBtn');
     assert.deepEqual(p.log, []);
     assert.deepEqual(p.resets, []);
@@ -145,11 +149,26 @@ test('⛓️‍💥 одно подтверждение — снимаются �
     await p.click('pd3LinkClearBtn');
     assert.equal(p.confirms.length, 1);
     assert.match(p.confirms[0], /2026-09-18/);
-    assert.deepEqual(p.log.map((l) => l.slice(0, 2)).sort(), [['in', 'clear'], ['out', 'clear']]);
+    assert.deepEqual(p.log.map((l) => l.slice(0, 2)).sort(), [['in', 'clear'], ['income', 'clear'], ['out', 'clear']]);
 });
 
 test('⛓️‍💥 отказ в подтверждении — ничего не снимается', async () => {
     const p = mount({ confirmAnswer: false });
     await p.click('pd3LinkClearBtn');
     assert.deepEqual(p.log, []);
+});
+
+test('🎯 поступление + транзакция Poster → пара «приход ↔ транзакция»', async () => {
+    // 16.09: SHIRIAEVA 1 331 200 ↔ «компенсация от игровой…» — вручную.
+    const p = mount({ counts: { sepay: 1, finance: 1 } });
+    await p.click('pd3LinkMakeBtn');
+    assert.deepEqual(p.log, [['income', 'manual', [11], [44]]]);
+    assert.deepEqual(p.resets, ['all']);
+});
+
+test('🧩 сбой приходов↔транзакций показывается, остальное связано', async () => {
+    const p = mount({ failOn: { income: 'auto' } });
+    await p.click('pd3LinkAutoBtn');
+    assert.deepEqual(p.log.map((l) => l.slice(0, 2)).sort(), [['in', 'auto'], ['income', 'auto'], ['out', 'auto']]);
+    assert.deepEqual(p.alerts, ['Приходы ↔ транзакции: income auto failed']);
 });

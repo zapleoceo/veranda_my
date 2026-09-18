@@ -28,6 +28,8 @@ const [
     { refreshStats },
     { LineRenderer },
     { createInLinks },
+    { initIncomeLinks },
+    { paintRowStates },
     { initLinkPanel },
     { initDataActions },
     { BANK_TABLE, BANK_SCROLL, SEPAY_TBODY },
@@ -50,6 +52,8 @@ const [
     _i('./ui/stats.js'),
     _i('./ui/lineRenderer.js'),
     _i('./ui/linkActions.js'),
+    _i('./ui/incomeLinks.js'),
+    _i('./ui/rowStates.js'),
     _i('./ui/linkPanel.js'),
     _i('./ui/dataActions.js'),
     _i('./ui/bankTable.js'),
@@ -87,12 +91,25 @@ initHelpMode();
 initDateForm();
 initModals({ state });
 
-// After a side re-renders its rows: its old ticks are gone, and the eye
-// toggles must be applied to the fresh rows. Each side resets only its
-// own selection buckets (SIDE_KINDS).
+// Row colours come from ALL link kinds at once (a SePay row is linked by
+// a check OR a Poster income; a finance row by an expense OR an income),
+// so after any change every table is repainted from the union, then the
+// footers and eye toggles follow.
+const repaint = () => {
+    paintRowStates({
+        checkLinks:  state.get('links')       || [],
+        mailLinks:   state.get('outLinks')    || [],
+        incomeLinks: state.get('incomeLinks') || [],
+    });
+    refreshStats();
+    eyes.reapply();
+};
+
+// After a side re-renders its rows its old ticks are gone. Each side
+// resets only its own selection buckets (SIDE_KINDS), then repaint.
 const afterSideRender = (side) => () => {
     selection.reset(SIDE_KINDS[side]);
-    eyes.reapply();
+    repaint();
 };
 
 // Incoming connectors — SePay rows ↔ Poster checks. Observes the WHOLE
@@ -122,6 +139,10 @@ if (renderer) {
 // (live IMAP + Poster), draws its own connectors on the same grid.
 const outMode = initOutMode({ state, onChanged: afterSideRender('out') });
 
+// Incoming rows ↔ Poster finance incomes (money without a check) — its
+// own connectors on #pd3IncomeLineLayer; loads its links right away.
+const incomeLinks = initIncomeLinks({ state, onChanged: repaint });
+
 // Balances BEFORE createTx: the «+» popups refresh the Poster column
 // after finance.createTransactions succeeds.
 const balances = initBalances({ state });
@@ -140,7 +161,7 @@ initCreateTx({
 });
 
 // One link panel for both sides (🧩 / 🎯 / ⛓️‍💥 in the mid column).
-initLinkPanel({ state, inLinks, outLinks: outMode, selection });
+initLinkPanel({ state, inLinks, incomeLinks, outLinks: outMode, selection });
 refreshStats();
 
 // Font-scale widget — single «Aa» button that cycles 1 / 1.2 / 1.5×.

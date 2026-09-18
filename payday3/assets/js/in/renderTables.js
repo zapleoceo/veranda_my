@@ -11,6 +11,7 @@ const _v = new URL(import.meta.url).searchParams.get('v') || '';
 const _qs = _v ? '?v=' + encodeURIComponent(_v) : '';
 const { createTxButtonHtml, TX_TYPE } = await import(new URL('../ui/rowCreateTx.js' + _qs, import.meta.url).href);
 const { BANK_COLUMNS, SEPAY_TBODY } = await import(new URL('../ui/bankTable.js' + _qs, import.meta.url).href);
+const { classify: rowState } = await import(new URL('../ui/rowStates.js' + _qs, import.meta.url).href);
 
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
@@ -21,17 +22,6 @@ const fmt = (n) => {
     try { return new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(v).replace(/,/g, ' '); }
     catch (_) { return String(v).replace(/\B(?=(\d{3})+(?!\d))/g, ' '); }
 };
-
-function rowState(edges) {
-    if (!edges || edges.length === 0) return 'row-red';
-    let manual = false, yellow = false;
-    for (const e of edges) {
-        if (e.is_manual)                 manual = true;
-        if (e.link_type === 'auto_yellow') yellow = true;
-    }
-    if (manual) return 'row-gray';
-    return yellow ? 'row-yellow' : 'row-green';
-}
 
 function sepayRow(s, cls) {
     const content = s.content ?? '';

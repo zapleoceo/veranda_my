@@ -6,9 +6,10 @@
 //   right:          Poster checks  (.pd3-cb--poster, data-poster-id)
 //                   Poster finance (.pd3-cb--out-finance, data-finance-id)
 //
-// Valid pairs are incoming ↔ checks and outgoing ↔ finance. linkPlan()
-// turns the current selection into the link calls to make; the mid
-// column shows the left/right sums and enables 🎯 only for a valid plan.
+// Valid pairs: incoming ↔ checks, incoming ↔ finance, outgoing ↔ finance.
+// linkPlan() turns the current selection into the link calls to make;
+// the mid column shows the left/right sums and enables 🎯 only for a
+// valid plan.
 
 'use strict';
 
@@ -36,20 +37,31 @@ export const SIDE_KINDS = Object.freeze({ in: ['sepay', 'poster'], out: ['mail',
 
 /**
  * Which manual links the selection asks for.
- *   in  — incoming SePay rows ↔ Poster checks
- *   out — outgoing mail rows  ↔ Poster finance transactions
- * A selection is linkable only if at least one pair is complete AND no
- * row is left without its counterpart kind (e.g. ticked mail with no
- * finance row) — otherwise a click would silently ignore some ticks.
+ *   in     — incoming SePay rows ↔ Poster checks
+ *   income — incoming SePay rows ↔ Poster finance transactions
+ *   out    — outgoing mail rows  ↔ Poster finance transactions
+ * Every ticked row must get exactly one kind of counterpart, otherwise
+ * the click would silently ignore — or double-link — some ticks:
+ *   - ticked mail: the finance ticks belong to the mail (out), and the
+ *     SePay ticks then need checks (in) — both pairs in one click;
+ *   - no mail, finance ticked: SePay ↔ finance (income); a check tick
+ *     too would make the SePay side ambiguous → blocked;
+ *   - neither: SePay ↔ checks (in).
  *
  * @param {{sepay:number, poster:number, mail:number, finance:number}} n  counts
- * @returns {{in:boolean, out:boolean, canLink:boolean}}
+ * @returns {{in:boolean, out:boolean, income:boolean, canLink:boolean}}
  */
 export function linkPlan({ sepay = 0, poster = 0, mail = 0, finance = 0 } = {}) {
-    const inPair  = sepay > 0 && poster > 0;
-    const outPair = mail > 0 && finance > 0;
-    const orphan  = (sepay > 0) !== (poster > 0) || (mail > 0) !== (finance > 0);
-    return { in: inPair, out: outPair, canLink: (inPair || outPair) && !orphan };
+    if (mail > 0) {
+        const ok = finance > 0 && (sepay > 0) === (poster > 0);
+        return { in: ok && sepay > 0, out: ok, income: false, canLink: ok };
+    }
+    if (finance > 0) {
+        const ok = sepay > 0 && poster === 0;
+        return { in: false, out: false, income: ok, canLink: ok };
+    }
+    const ok = sepay > 0 && poster > 0;
+    return { in: ok, out: false, income: false, canLink: ok };
 }
 
 /**

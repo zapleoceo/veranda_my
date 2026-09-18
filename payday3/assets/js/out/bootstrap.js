@@ -79,6 +79,9 @@ export function initOutMode({ state, onChanged }) {
         renderOutFinance(finRows, links);
         buildRenderer();
         renderer.setLinks(links);
+        // Finance rows can also be linked to incoming rows (ui/incomeLinks.js):
+        // publish our set so the page repaints from the union of both.
+        state.set('outLinks', links);
         onChanged?.();
     }
 
