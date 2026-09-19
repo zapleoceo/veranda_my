@@ -79,6 +79,7 @@ class HttpClient
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_TIMEOUT, $this->timeoutSeconds);
         curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
+        TelegramDns::applyIfTelegram($ch, $url);
         return $ch;
     }
 

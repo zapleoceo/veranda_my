@@ -1,5 +1,6 @@
 <?php
 declare(strict_types=1);
+require_once __DIR__ . '/../src/Infrastructure/TelegramDns.php';
 
 function tr3_api_submit_booking(array $ctx): void {
   api_json_headers(true);
@@ -331,6 +332,7 @@ function tr3_api_submit_booking(array $ctx): void {
     file_put_contents($tmpFile, $imgData);
 
     curl_setopt($ch, CURLOPT_URL, "https://api.telegram.org/bot{$tgToken}/sendPhoto");
+    \App\Infrastructure\TelegramDns::apply($ch);
     curl_setopt($ch, CURLOPT_POST, true);
     curl_setopt($ch, CURLOPT_POSTFIELDS, [
       'chat_id' => (string)$tgUid,
@@ -345,6 +347,7 @@ function tr3_api_submit_booking(array $ctx): void {
     @unlink($tmpFile);
   } else {
     curl_setopt($ch, CURLOPT_URL, "https://api.telegram.org/bot{$tgToken}/sendMessage");
+    \App\Infrastructure\TelegramDns::apply($ch);
     curl_setopt($ch, CURLOPT_POST, true);
     curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query([
       'chat_id' => (string)$tgUid,
@@ -361,6 +364,7 @@ function tr3_api_submit_booking(array $ctx): void {
   if ($qrUrl !== '' && (!is_array($data) || empty($data['ok']))) {
     $ch = curl_init();
     curl_setopt($ch, CURLOPT_URL, "https://api.telegram.org/bot{$tgToken}/sendMessage");
+    \App\Infrastructure\TelegramDns::apply($ch);
     curl_setopt($ch, CURLOPT_POST, true);
     curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query([
       'chat_id' => (string)$tgUid,

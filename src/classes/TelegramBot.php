@@ -1,6 +1,7 @@
 <?php
 
 namespace App\Classes;
+require_once __DIR__ . '/../Infrastructure/TelegramDns.php';
 
 class TelegramBot {
     private string $token;
@@ -40,6 +41,7 @@ class TelegramBot {
 
         $ch = curl_init();
         curl_setopt($ch, CURLOPT_URL, $url);
+        \App\Infrastructure\TelegramDns::apply($ch);
         curl_setopt($ch, CURLOPT_POST, true);
         curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($params));
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
@@ -71,6 +73,7 @@ class TelegramBot {
 
         $ch = curl_init();
         curl_setopt($ch, CURLOPT_URL, $url);
+        \App\Infrastructure\TelegramDns::apply($ch);
         curl_setopt($ch, CURLOPT_POST, true);
         curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($params));
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
@@ -106,6 +109,7 @@ class TelegramBot {
 
         $ch = curl_init();
         curl_setopt($ch, CURLOPT_URL, $url);
+        \App\Infrastructure\TelegramDns::apply($ch);
         curl_setopt($ch, CURLOPT_POST, true);
         curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($params));
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
@@ -137,6 +141,7 @@ class TelegramBot {
 
         $ch = curl_init();
         curl_setopt($ch, CURLOPT_URL, $url);
+        \App\Infrastructure\TelegramDns::apply($ch);
         curl_setopt($ch, CURLOPT_POST, true);
         curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($params));
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
@@ -168,6 +173,7 @@ class TelegramBot {
 
         $ch = curl_init();
         curl_setopt($ch, CURLOPT_URL, $url);
+        \App\Infrastructure\TelegramDns::apply($ch);
         curl_setopt($ch, CURLOPT_POST, true);
         curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($params));
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
@@ -201,6 +207,7 @@ class TelegramBot {
 
         $ch = curl_init();
         curl_setopt($ch, CURLOPT_URL, $url);
+        \App\Infrastructure\TelegramDns::apply($ch);
         curl_setopt($ch, CURLOPT_POST, true);
         curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($params));
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
@@ -222,6 +229,7 @@ class TelegramBot {
         $url = "https://api.telegram.org/bot{$this->token}/getWebhookInfo";
         $ch = curl_init();
         curl_setopt($ch, CURLOPT_URL, $url);
+        \App\Infrastructure\TelegramDns::apply($ch);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_TIMEOUT, 10);
         $response = curl_exec($ch);
@@ -241,6 +249,7 @@ class TelegramBot {
         ];
         $ch = curl_init();
         curl_setopt($ch, CURLOPT_URL, $url);
+        \App\Infrastructure\TelegramDns::apply($ch);
         curl_setopt($ch, CURLOPT_POST, true);
         curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($params));
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);

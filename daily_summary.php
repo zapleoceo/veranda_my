@@ -14,6 +14,7 @@ if (PHP_SAPI !== 'cli') {
 }
 
 require_once __DIR__ . '/src/classes/Database.php';
+require_once __DIR__ . '/src/Infrastructure/TelegramDns.php';
 
 $logPath = __DIR__ . '/daily_summary.log';
 $logLine = function (string $msg) use ($logPath): void {
@@ -129,6 +130,7 @@ $sendTelegram = function (string $token, string $chatId, string $text): bool {
     ];
     $ch = curl_init();
     curl_setopt($ch, CURLOPT_URL, $url);
+    \App\Infrastructure\TelegramDns::apply($ch);
     curl_setopt($ch, CURLOPT_POST, true);
     curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($params));
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
@@ -145,6 +147,7 @@ $sendTelegramFile = function (string $token, string $chatId, string $filePath, s
     $url = "https://api.telegram.org/bot{$token}/sendDocument";
     $ch = curl_init();
     curl_setopt($ch, CURLOPT_URL, $url);
+    \App\Infrastructure\TelegramDns::apply($ch);
     curl_setopt($ch, CURLOPT_POST, true);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
     curl_setopt($ch, CURLOPT_TIMEOUT, 30);

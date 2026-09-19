@@ -109,6 +109,7 @@ class ReservationMessagingService
                     $tmp = tempnam(sys_get_temp_dir(), 'qr_');
                     file_put_contents($tmp, $imgData);
                     $ch = curl_init("https://api.telegram.org/bot{$tgToken}/sendPhoto");
+                    \App\Infrastructure\TelegramDns::apply($ch);
                     curl_setopt_array($ch, [
                         CURLOPT_POST => true, CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 15,
                         CURLOPT_POSTFIELDS => [
@@ -124,6 +125,7 @@ class ReservationMessagingService
         }
 
         $ch = curl_init("https://api.telegram.org/bot{$tgToken}/sendMessage");
+        \App\Infrastructure\TelegramDns::apply($ch);
         curl_setopt_array($ch, [
             CURLOPT_POST => true, CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 10,
             CURLOPT_POSTFIELDS => http_build_query(['chat_id' => (string)$tgUid, 'text' => $html, 'parse_mode' => 'HTML']),

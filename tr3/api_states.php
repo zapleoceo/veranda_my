@@ -1,5 +1,6 @@
 <?php
 declare(strict_types=1);
+require_once __DIR__ . '/../src/Infrastructure/TelegramDns.php';
 
 function tr3_api_tg_state_create(array $ctx): void {
   api_json_headers(true);
@@ -32,6 +33,7 @@ function tr3_api_tg_state_create(array $ctx): void {
       try {
         $ch = curl_init();
         curl_setopt($ch, CURLOPT_URL, "https://api.telegram.org/bot{$token}/getMe");
+        \App\Infrastructure\TelegramDns::apply($ch);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_TIMEOUT, 10);
         $resp = curl_exec($ch);

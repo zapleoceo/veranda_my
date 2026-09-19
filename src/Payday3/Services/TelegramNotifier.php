@@ -129,6 +129,7 @@ final class TelegramNotifier implements TelegramNotifierInterface
         }
         $ch = curl_init();
         curl_setopt($ch, CURLOPT_URL,            "https://api.telegram.org/bot{$token}/{$method}");
+        \App\Infrastructure\TelegramDns::apply($ch);
         curl_setopt($ch, CURLOPT_POST,           true);
         curl_setopt($ch, CURLOPT_POSTFIELDS,     $fields);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
