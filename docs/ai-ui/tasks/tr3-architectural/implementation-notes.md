@@ -1,0 +1,32 @@
+# Implementation notes — TR3 architectural presentation
+
+## Changed files
+- `tr3/assets/plan-presentation.js`: isolated browser/CommonJS presentation helper; hall-scoped material and safe station classification; pure live-box scene derivation; inert DOM artwork.
+- `tr3/assets/plan-presentation.css`: local natural tile/grass/wood/glass/gazebo/cushion/curtain textures and fountain/koi, reservation overlay stacking, stationary hover and visible keyboard focus, reduced motion.
+- `tr3/assets/app.js`: collects existing computed button rectangles and invokes optional decorator after button insertion; existing fitting, minima, rotation, identity datasets, badge contents and event/availability calls remain unchanged.
+- `tr3/assets/tr3.boot.js`: attempts optional artwork module before app, tolerates artwork load failure.
+- `tr3/assets/tr3.css`, `tr3/index.php`: local import and changed asset cache versions.
+
+## API
+`TR3PlanPresentation` in browser, CommonJS exports in Node:
+- `classify(hallId,item)` returns gazebo/glass/wood/room/bar/cashier/stage or null. Item contract is existing renderer metadata (`schemeNum,label,bookable`). Station roles require nonbookable exact known labels; Poster IDs never determine art.
+- `deriveScene(hallId,items,width,height)` consumes final rendered `x,y,w,h` boxes without mutation. Terrace lower edge clears the complete terrace10–22/station bounds plus margin. An L-shaped lawn notch is derived from right edges10–16 and bottom edges17–22, gated by gazebo1 and overlap checks. Fountain is restricted to the notch above1/right10/below17 with clearance from all live boxes; no arbitrary distant-corner fallback. Extra shape fields are lawnNotch and terraceClip. No prototype coordinates.
+- `decorate({hallId,tablesEl,decorEl,items,width,height,translate})` also consumes `element` references. Builds off-DOM, replaces legacy scene only once ready, and rolls back committed table art on failure. The app catches optional errors so booking still binds. CSS is scoped to generated classes; hall7 untouched.
+
+## States and preservation
+Default furniture, inherited busy/occupied/disabled states, existing booking selection/status output, hover, keyboard focus and reduced-motion are supported. Booking badge nodes and dataset values are retained verbatim; translated station plaques are aria-hidden while original labels remain accessible. Reservation text and prohibited icon stay above artwork. All art descendants ignore pointers. No new network calls, form handlers, table IDs, station booking changes, backend changes or production fixtures.
+
+## Checks
+`node --check` passed for plan-presentation.js, app.js and tr3.boot.js. `git diff --check` passed. Regression and rendered checks are owned by the orchestrator/test agent; this note does not claim runtime/browser validation.
+
+## Deliberate adaptations
+Prototype coordinates and demo interaction shell are not copied. Tile/lawn boundary and fountain placement follow actual transformed Poster rectangles. Existing 34×28 minimum stays intact as directed. Room remains generic. Source has no selected table class/aria-pressed styling contract: its selection is reflected in the existing output/dialog, preserved here; keyboard focus is separately explicit. Natural textures are procedural local CSS; station art and number badges share existing footprints. No global overrides or !important added.
+
+## Terrain correction from rendered review
+Live Poster GET geometry verified: table10–13 bottoms420; tile lower edge431.84; right lawn notch x578.84/y309.84; fountain x597.76/y315.76/diameter49.32 at logical820×620. Geometry unchanged. Added a matching stone rim along notch top/left. Browser rerender remains the orchestrator gate.
+
+## Scoped material tokens
+Core repeated stone/frame/wood/glass/plaque/label/equipment colors and furniture/surface shadows are CSS custom properties scoped to `.plan-ground, .plan-tables`. Unique illustration geometry and unique material details stay local to their selectors. No global theme variables or shell styles changed. The L-shaped scene contract above supersedes the original horizontal midpoint/largest-circle approach.
+
+## Material refinement from visual review
+Added local deterministic `plan-grass.svg` with subtle fractal grain and sparse irregular blades, replacing regular diagonal lawn hatching. Table8 retains wood classification with a local live-edge art variant and irregular plank grain. Table4 parasol uses eight faceted fabric segments and a central hub. No button geometry changes; no edge foliage added because avoiding overlap with live furniture remains the priority.

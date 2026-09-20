@@ -1,0 +1,67 @@
+/* Architectural materials are local to the main hall; all boxes remain Poster-owned. */
+.plan-ground, .plan-tables {
+  --plan-stone: #d7c3a2;
+  --plan-frame: #343b34;
+  --plan-wood-edge: #c39565;
+  --plan-wood-dark: #965d39;
+  --plan-wood-light: #a97247;
+  --plan-wood-grain: #955c37;
+  --plan-glass-edge: #a1a990;
+  --plan-plaque-border: #d8be855c;
+  --plan-focus: #fff3c9;
+  --plan-label: #fff7e4;
+  --plan-equipment: #272d27;
+  --plan-furniture-shadow: 2px 4px 6px #30251a66;
+  --plan-surface-shadow: 1px 2px 4px #16201080;
+}
+.plan-ground, .plan-ground *, .plan-art, .plan-art * { pointer-events: none; box-sizing: border-box; }
+.plan-ground { position: absolute; inset: 0; overflow: hidden; border-radius: 12px; background: #c3bda9; }
+.plan-ground > span { position: absolute; }
+.plan-lawn { background-color: #677c42; background-image: url("/tr3/assets/plan-grass.svg?v=20260920_0001"), radial-gradient(ellipse at 23% 34%, #93a16444, transparent 58%), radial-gradient(ellipse at 78% 70%, #354e3033, transparent 65%); background-size: 160px 160px, 100% 100%, 100% 100%; box-shadow: inset 0 0 24px #35462b50; }
+.plan-terrace { background-color: #bd8a67; background-image: repeating-linear-gradient(0deg, transparent 0 30px, #806d575c 30px 32px, #ebc4a466 32px 33px), repeating-linear-gradient(90deg, transparent 0 42px, #886b536b 42px 44px, #e7c3a078 44px 45px), repeating-linear-gradient(117deg, #d2a98633 0 2px, #ab775822 2px 4px), linear-gradient(135deg, #d2a986, #ab7758); border-bottom: 8px ridge var(--plan-stone); box-shadow: 0 5px 7px #35432c70; }
+.plan-fountain { border: 7px ridge #aaa991; border-radius: 50%; background: radial-gradient(ellipse at 36% 28%, #8aafa0, #456f67 60%, #253f3c); box-shadow: 2px 5px 8px #233a2e80, inset 0 0 0 2px #d0cbb3; overflow: hidden; }
+.plan-ripple { position: absolute; inset: 13%; border: 1px solid #d7efdf; border-radius: 50%; animation: plan-ripple 4s ease-out infinite; }
+.plan-ripple.delay { animation-delay: -2s; }
+.plan-koi { position: absolute; inset: 14%; animation: plan-swim 17s linear infinite; }
+.plan-koi::before { content: ''; position: absolute; left: 12%; top: 8%; width: 21%; height: 9%; border-radius: 70% 35% 35% 70%; background: linear-gradient(90deg, #f4e5c8 35%, #dd713c 35% 68%, #f4e5c8 68%); box-shadow: -3px 1px 0 -1px #e8d4b1; }
+.plan-koi.two { inset: 25%; animation-duration: 23s; animation-direction: reverse; }
+.plan-jet { position: absolute; inset: 35%; border: 1px solid #c4ddd2aa; border-radius: 50%; background: radial-gradient(circle, #ecf7e7 0 8%, #9a9a79 10% 24%, transparent 27%); box-shadow: 0 0 0 7px #c4ddd233; }
+.plan-tables .table.plan-table { border: 1px solid #6d4e32; background: repeating-linear-gradient(0deg, #94653f 0 3px, #a9784b 3px 5px, #a47446 5px 8px); box-shadow: var(--plan-furniture-shadow); }
+.plan-tables .table.plan-table:hover { transform: none; filter: brightness(1.12); }
+.plan-tables .table.plan-table:focus-visible { transform: none; outline: 3px solid var(--plan-focus); outline-offset: 3px; }
+.plan-tables .plan-table .table-badge { z-index: 3; background: #302b23e8; border-color: var(--plan-plaque-border); border-radius: 3px; }
+.plan-tables .plan-table .res-time { z-index: 4; background: #28281de0; color: var(--plan-label); border-radius: 2px; }
+.plan-tables .plan-table.occupied-now::after { z-index: 5; }
+.plan-art { position: absolute; inset: 0; border-radius: inherit; }
+.plan-art > span { position: absolute; }
+.plan-tables .plan-gazebo { background: #62654c; border: 3px solid var(--plan-frame); border-radius: 2px; box-shadow: 3px 6px 9px #10200e70, inset 0 0 0 2px #b9baa266; }
+.plan-cushions { inset: 8% 7% 12%; border: calc(var(--tbl-min) * .16) solid #c9c3a4; border-bottom-width: calc(var(--tbl-min) * .09); border-radius: 3px; background: #565b44; box-shadow: inset 0 1px 5px #24291e88; }
+.plan-cushions::after { content: ''; position: absolute; inset: -8px; background: repeating-linear-gradient(90deg, transparent 0 17%, #807e6744 17% 18%); }
+.plan-surface { inset: 12% 14%; border: 1px solid var(--plan-wood-edge); border-radius: 3px; background: repeating-linear-gradient(0deg, var(--plan-wood-dark) 0 3px, var(--plan-wood-light) 3px 5px, var(--plan-wood-grain) 5px 7px); box-shadow: var(--plan-surface-shadow); }
+.plan-gazebo .plan-surface { inset: 29% 26% 23%; }
+.plan-curtain { top: 0; bottom: 0; width: 12%; background: repeating-linear-gradient(90deg, #eee8ccaa 0 2px, #d0c9b577 2px 4px); }
+.plan-curtain.left { left: 0; clip-path: polygon(0 0,100% 0,40% 46%,80% 100%,0 100%); }
+.plan-curtain.right { right: 0; clip-path: polygon(0 0,100% 0,100% 100%,20% 100%,60% 46%); }
+.plan-posts { inset: 0; border: 2px solid var(--plan-frame); }
+.plan-seat { top: 15%; bottom: 15%; width: 14%; border: 1px solid #554d36; border-radius: 3px; background: repeating-linear-gradient(90deg, #b9ab81 0 2px, #847557 2px 3px); box-shadow: 0 2px 3px #2228; }
+.plan-seat.left { left: -5%; } .plan-seat.right { right: -5%; }
+.plan-tables .plan-glass { background: #708c7680; border-color: var(--plan-glass-edge); }
+.plan-glass .plan-surface { background: linear-gradient(125deg, #b9d1bd99, #638e7a99 48%, #c5ded3aa 50%, #739c86aa); border-color: var(--plan-glass-edge); }
+.plan-parasol { width: 67%; aspect-ratio: 1; right: -16%; top: -22%; border: 0; border-radius: 0; clip-path: polygon(30% 0,70% 0,100% 30%,100% 70%,70% 100%,30% 100%,0 70%,0 30%); background: conic-gradient(from 22.5deg, #e8dfc7 0 45deg, #c6bea7 45deg 90deg, #e2d9be 90deg 135deg, #bcb39c 135deg 180deg, #e8dfc7 180deg 225deg, #c6bea7 225deg 270deg, #e2d9be 270deg 315deg, #d5ccb3 315deg); filter: drop-shadow(2px 4px 3px #29342155); }
+.plan-parasol::after { content: ""; position: absolute; inset: 46%; border-radius: 50%; background: #9a8d6f; box-shadow: 0 0 0 1px #e7dec9; }
+.plan-tables .plan-room { background: #9d967d; border: 3px double #615e4e; }
+.plan-tables .plan-bar, .plan-tables .plan-cashier, .plan-tables .plan-stage { filter: none; background: repeating-linear-gradient(0deg, #765d43 0 5px, #c29b6d 5px 6px); border: 2px solid #4d3d2a; border-radius: 3px; }
+.plan-tables .plan-bar .table-badge, .plan-tables .plan-cashier .table-badge, .plan-tables .plan-stage .table-badge { opacity: 0; }
+.plan-plaque { left: 50%; top: 50%; transform: translate(-50%,-50%); white-space: nowrap; padding: 3px 6px; background: linear-gradient(#302b23ee,#181e18ee); color: #f2dfb6; border: 1px solid var(--plan-plaque-border); border-radius: 2px; font: 500 10px/1.2 Georgia,serif; letter-spacing: 1px; }
+.plan-terminal { right: 8%; top: 12%; width: 20%; height: 30%; background: #718d7f; border: 3px solid #252e2a; transform: rotate(-8deg); }
+.plan-speaker { top: 15%; bottom: 15%; width: 13%; border-radius: 2px; background: radial-gradient(circle,#151b15 30%,#4c5246 35%,#30342e 40%); }
+.plan-speaker.left { left: 4%; } .plan-speaker.right { right: 4%; }
+.plan-keyboard { left: 28%; top: 12%; width: 44%; height: 20%; border: 2px solid var(--plan-equipment); background: repeating-linear-gradient(90deg,#e7e6d6 0 3px,var(--plan-equipment) 3px 4px); }
+.plan-tables .plan-table.busy, .plan-tables .plan-table.occupied-now, .plan-tables .plan-table.busy:hover, .plan-tables .plan-table.occupied-now:hover { filter: grayscale(.85) brightness(.82); }
+@keyframes plan-swim { to { transform: rotate(360deg); } }
+@keyframes plan-ripple { from { transform: scale(.3); opacity: .65; } to { transform: scale(1); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .plan-ground *, .plan-tables .plan-table { animation: none; transition: none; } }
+
+.plan-lawn-notch { border-top: 5px ridge var(--plan-stone); border-left: 5px ridge var(--plan-stone); }
+
+.plan-live-edge .plan-surface { inset: 8% 12%; border: 0; border-radius: 0; clip-path: polygon(4% 0,94% 2%,100% 17%,96% 36%,100% 54%,95% 72%,98% 96%,7% 100%,0 83%,5% 65%,1% 43%,6% 24%); background: radial-gradient(ellipse at 65% 30%, transparent 0 8%, #57371f70 9% 10%, transparent 11% 14%, #70482560 15% 16%, transparent 17%), repeating-linear-gradient(87deg, #9d693d 0 4px, #ad7e50 5px 8px, #89582f 9px 10px, #a87747 11px 16px); box-shadow: inset 3px 0 0 #d0a26e, inset -3px 0 0 #694221; }
