@@ -17,7 +17,7 @@
       return null;
     }
     if (gazebos.has(number)) return 'gazebo';
-    if (number === '4') return 'glass';
+    if (['4', '5', '7', '8'].includes(number)) return 'glass';
     if (/^1[0-3]$/.test(number)) return 'counter';
     if (/^(?:[1-9]|1\d|2[0-2])$/.test(number)) return 'wood';
     return 'room';
@@ -94,7 +94,6 @@
       const role = classify(hallId, item);
       if (!role || !item.element) return;
       const art = make('art');
-      if (role === 'wood' && String(item.schemeNum) === '8') art.classList.add('plan-live-edge');
       if (role === 'gazebo') ['cushions', 'curtain left', 'curtain right', 'posts', 'surface'].forEach(n => make(n, art));
       else if (role === 'counter') ['counter-chair first', 'counter-chair second', 'counter-slab'].forEach(n => make(n, art));
       else if (role === 'wood' || role === 'glass') {

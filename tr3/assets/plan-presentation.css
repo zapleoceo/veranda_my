@@ -64,7 +64,6 @@
 
 .plan-lawn-notch { border-top: 5px ridge var(--plan-stone); border-left: 5px ridge var(--plan-stone); }
 
-.plan-live-edge .plan-surface { inset: 8% 12%; border: 0; border-radius: 0; clip-path: polygon(4% 0,94% 2%,100% 17%,96% 36%,100% 54%,95% 72%,98% 96%,7% 100%,0 83%,5% 65%,1% 43%,6% 24%); background: radial-gradient(ellipse at 65% 30%, transparent 0 8%, #57371f70 9% 10%, transparent 11% 14%, #70482560 15% 16%, transparent 17%), repeating-linear-gradient(87deg, #9d693d 0 4px, #ad7e50 5px 8px, #89582f 9px 10px, #a87747 11px 16px); box-shadow: inset 3px 0 0 #d0a26e, inset -3px 0 0 #694221; }
 
 /* Places 10–13: terrace-edge timber counter, chairs on the terrace side only. */
 .plan-tables .table.plan-counter { background: transparent; border-color: transparent; box-shadow: none; }

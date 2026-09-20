@@ -33,3 +33,6 @@ Added local deterministic `plan-grass.svg` with subtle fractal grain and sparse 
 
 ## Photo clarification: places10–13
 User confirmed terrace-edge wooden counter photos apply to places10–13. Added hall2 counter illustration: horizontal live-edge timber slab and two wicker chairs on terrace side. Each existing Poster rectangle remains an independent button. No coordinate, capacity, availability or booking-handler changes. Focused16 tests and independent Sol review passed; rendered desktop confirms correct chair side and separate number/status overlays. Cache version0002.
+
+## Photo clarification: garden tables4,5,7,8
+User confirms all four share glass tabletops, wicker seating and pale parasols. Reuse existing glass illustration for all four; remove obsolete table8 wood variant. Poster geometry/capacity and booking behavior unchanged. Focused16 regressions and independent Sol diff review pass. Cache0003.
