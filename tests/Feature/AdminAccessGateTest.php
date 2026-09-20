@@ -89,4 +89,28 @@ final class AdminAccessGateTest extends TestCase
 
         $this->assertSame(403, $this->callIndex($db)->getStatusCode());
     }
+
+    public function test_admin_can_grant_and_revoke_manager_order_permission(): void
+    {
+        $_SESSION['user_permissions'] = ['admin' => true];
+        foreach ([true, false] as $grant) {
+            $statement = $this->createMock(\PDOStatement::class);
+            $statement->method('fetchAll')->willReturn([]);
+            $saved = null;
+            $db = $this->createMock(Database::class);
+            $db->method('t')->willReturn('users');
+            $db->method('query')->willReturnCallback(function ($sql, $params = []) use ($statement, &$saved) {
+                if (str_starts_with($sql, 'UPDATE')) $saved = $params;
+                return $statement;
+            });
+            $body = ['save_user_permissions' => '1', 'perm_email' => 'manager@example.com'];
+            if ($grant) $body['perm_neworder'] = '1';
+            $request = (new ServerRequestFactory())->createServerRequest('POST', '/admin/access')->withParsedBody($body);
+            $response = (new AccessController($db))->index($request, new Response());
+            self::assertSame(200, $response->getStatusCode());
+            self::assertSame((int) $grant, json_decode($saved[0], true)['neworder']);
+            self::assertSame('manager@example.com', $saved[2]);
+            self::assertStringContainsString('name="perm_neworder"', (string) $response->getBody());
+        }
+    }
 }

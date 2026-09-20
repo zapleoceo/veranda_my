@@ -60,9 +60,11 @@ final class I18n
         return [
             // ─── Russian (canonical / fallback) ──────────────────
             'ru' => [
-                'title'             => 'Новый заказ',
+                'title'             => 'Заказ Менеджера',
                 'locationDefault'   => 'Стол',
                 'searchPh'          => 'Поиск по меню',
+                'searchClear'       => 'Очистить поиск',
+                'searchResultsTpl'  => 'Найдено блюд: {n}',
                 'refreshMenu'       => 'Обновить меню',
                 'menuRefreshing'    => 'Меню обновляется…',
                 'menuEmpty'         => 'Меню пусто.',
@@ -81,7 +83,7 @@ final class I18n
                 'addModifTotal'     => 'К позиции:',
                 'modifNoOptions'    => 'Без опций',
                 'modifExtras'       => 'Дополнительно',
-                'pickTable'         => 'Выбрать стол',
+                'pickTable'         => 'Выбрать столик',
                 'selectTable'       => 'Выберите стол',
                 'spot'              => 'Заведение',
                 'hall'              => 'Зал',
@@ -103,9 +105,11 @@ final class I18n
 
             // ─── English ──────────────────────────────────────────
             'en' => [
-                'title'             => 'New order',
+                'title'             => 'Manager Order',
                 'locationDefault'   => 'Table',
                 'searchPh'          => 'Search the menu',
+                'searchClear'       => 'Clear search',
+                'searchResultsTpl'  => 'Dishes found: {n}',
                 'refreshMenu'       => 'Refresh menu',
                 'menuRefreshing'    => 'Refreshing menu…',
                 'menuEmpty'         => 'Menu is empty.',
@@ -146,9 +150,11 @@ final class I18n
 
             // ─── Vietnamese ───────────────────────────────────────
             'vi' => [
-                'title'             => 'Đơn mới',
+                'title'             => 'Đơn hàng quản lý',
                 'locationDefault'   => 'Bàn',
                 'searchPh'          => 'Tìm trong thực đơn',
+                'searchClear'       => 'Xóa tìm kiếm',
+                'searchResultsTpl'  => 'Số món tìm thấy: {n}',
                 'refreshMenu'       => 'Cập nhật thực đơn',
                 'menuRefreshing'    => 'Đang cập nhật thực đơn…',
                 'menuEmpty'         => 'Thực đơn trống.',

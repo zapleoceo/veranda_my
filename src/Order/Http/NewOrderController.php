@@ -21,8 +21,16 @@ final class NewOrderController
     public function index(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
     {
         $csrfToken   = Csrf::token();
-        $cssVersion  = self::fileMtime(__DIR__ . '/../../../neworder/assets/css/order.css');
-        $jsVersion   = self::fileMtime(__DIR__ . '/../../../neworder/assets/js/index.js');
+        $root = dirname(__DIR__, 3);
+        $cssVersion = self::assetVersion([
+            $root . '/assets/css/common.css',
+            $root . '/neworder/assets/css/order.css',
+        ]);
+        // The bootstrap forwards this version to every imported module.
+        $jsVersion = self::assetVersion(array_merge(
+            glob($root . '/neworder/assets/js/*.js') ?: [],
+            glob($root . '/neworder/assets/js/ui/*.js') ?: [],
+        ));
 
         $requested   = is_string($request->getQueryParams()['lang'] ?? null) ? $request->getQueryParams()['lang'] : null;
         $cookieLang  = $_COOKIE[I18n::COOKIE_NAME] ?? null;
@@ -51,13 +59,19 @@ final class NewOrderController
 
         $response->getBody()->write($html);
         return $response
+            ->withHeader('Cache-Control', 'no-store')
             ->withHeader('Content-Type', 'text/html; charset=utf-8')
             ->withHeader('X-Robots-Tag', 'noindex, nofollow');
     }
 
-    private static function fileMtime(string $abs): string
+    /** @param list<string> $files */
+    private static function assetVersion(array $files): string
     {
-        $t = @filemtime($abs);
-        return $t !== false ? (string)$t : '1';
+        sort($files);
+        $hash = hash_init('sha256');
+        foreach ($files as $file) {
+            hash_update_file($hash, $file);
+        }
+        return substr(hash_final($hash), 0, 16);
     }
 }

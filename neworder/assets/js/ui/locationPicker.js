@@ -48,13 +48,10 @@ function render(state) {
     const $btn   = document.getElementById('noLocationBtn');
     if ($label && $btn) {
         const tbl = state.findTable(state.s.tableId);
-        const sp  = state.findSpot(state.s.spotId);
-        const parts = [];
-        if (sp) parts.push(sp.name);
-        if (tbl) parts.push(t('locationDefault') + ' ' + tbl.name);
-        const label = parts.length ? parts.join(' · ') : t('locationDefault');
+        const label = tbl ? t('locationDefault') + ' ' + tbl.name : t('pickTable');
         $label.textContent = label;
-        $btn.classList.toggle('is-set', state.s.tableId > 0);
+        $btn.setAttribute('aria-label', tbl ? label + ' — ' + t('pickTable') : label);
+        $btn.classList.toggle('is-set', Boolean(tbl));
     }
 }
 

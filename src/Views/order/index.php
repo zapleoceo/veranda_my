@@ -32,7 +32,7 @@ $h = static fn($s) => htmlspecialchars((string)$s, ENT_QUOTES | ENT_SUBSTITUTE, 
             <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
                 <path fill="currentColor" d="M12 2a7 7 0 0 0-7 7c0 5.25 7 13 7 13s7-7.75 7-13a7 7 0 0 0-7-7Zm0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5Z"/>
             </svg>
-            <span class="no-location-label" id="noLocationLabel"><?= $h($t['locationDefault']) ?></span>
+            <span class="no-location-label" id="noLocationLabel"><?= $h($t['pickTable']) ?></span>
         </button>
         <!-- Language switcher (replaces the static "Новый заказ" title).
              Anchor reload — each click writes the cookie via the controller
@@ -58,9 +58,10 @@ $h = static fn($s) => htmlspecialchars((string)$s, ENT_QUOTES | ENT_SUBSTITUTE, 
             <path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M21 21l-4.35-4.35"/>
             <circle cx="10.5" cy="10.5" r="6.5" fill="none" stroke="currentColor" stroke-width="2"/>
         </svg>
-        <input type="search" id="noSearchInput" class="no-search-input" placeholder="<?= $h($t['searchPh']) ?>" autocomplete="off">
-        <button type="button" class="no-search-clear" id="noSearchClear" hidden aria-label="<?= $h($t['close']) ?>">×</button>
+        <input type="search" id="noSearchInput" class="no-search-input" placeholder="<?= $h($t['searchPh']) ?>" aria-label="<?= $h($t['searchPh']) ?>" autocomplete="off" enterkeyhint="search">
+        <button type="button" class="no-search-clear" id="noSearchClear" hidden aria-label="<?= $h($t['searchClear']) ?>">×</button>
     </div>
+    <p class="no-search-status" id="noSearchStatus" role="status" aria-live="polite" aria-atomic="true" hidden></p>
 </header>
 
 <!-- ─── Menu scroll area ─────────────────────────────────────────── -->

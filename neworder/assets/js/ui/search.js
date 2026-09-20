@@ -10,7 +10,7 @@ export function initSearch({ state }) {
 
     const update = () => {
         const v = $in.value.trim();
-        $clear.hidden = v === '';
+        if ($clear) $clear.hidden = $in.value === '';
         state.setSearch(v);
     };
     $in.addEventListener('input', update);
