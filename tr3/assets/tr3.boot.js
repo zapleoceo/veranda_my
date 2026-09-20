@@ -33,9 +33,9 @@
         latestWeekend: j.latestWeekend,
         apiBase: j.apiBase,
       };
-      return loadScript('/tr3/assets/plan-presentation.js?v=20260920_0003')
+      return loadScript('/tr3/assets/plan-presentation.js?v=20260920_0004')
         .catch(() => { /* Optional artwork: retain the legacy plan on failure. */ })
-        .then(() => loadScript('/tr3/assets/app.js?v=20260920_0003'));
+        .then(() => loadScript('/tr3/assets/app.js?v=20260920_0004'));
     })
     .catch((e) => {
       const msg = document.createElement('div');

@@ -36,3 +36,6 @@ User confirmed terrace-edge wooden counter photos apply to places10–13. Added 
 
 ## Photo clarification: garden tables4,5,7,8
 User confirms all four share glass tabletops, wicker seating and pale parasols. Reuse existing glass illustration for all four; remove obsolete table8 wood variant. Poster geometry/capacity and booking behavior unchanged. Focused16 regressions and independent Sol diff review pass. Cache0003.
+
+## Tree and scooter approach
+Owner clarified tree between10/18 with canopy across10 and half11. Ground-layer tree anchors use those live boxes; number/status/buttons stay above decoration. Gray driveway begins at Room right edge and ends at lawn notch; P/scooter sign upper-right. Missing anchors omit corresponding decoration.17 focused tests and Sol review pass; desktop rendering inspected. Cache0004.

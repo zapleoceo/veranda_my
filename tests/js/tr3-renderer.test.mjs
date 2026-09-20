@@ -249,3 +249,18 @@ test('adversarial display label stays escaped in native badge and literal in boo
     assert.ok(!button.innerHTML.includes('<img'));
     assert.ok(button.innerHTML.includes('&lt;img'));
 });
+
+test('tree and scooter approach follow room and table anchors without consuming the lawn', () => {
+    const api = presentation();
+    const scene = api.deriveScene(2, liveBounds, 820, 620);
+    assert.equal(scene.driveway.x, 690);
+    assert.equal(scene.driveway.w, 130);
+    assert.equal(scene.driveway.h, scene.lawnNotch.y);
+    assert.equal(scene.tree.x, 420);
+    assert.equal(scene.tree.x + scene.tree.w, 567);
+    assert.ok(scene.tree.y + scene.tree.trunkY > 273);
+    assert.ok(scene.tree.y + scene.tree.trunkY < 371);
+    const missing = api.deriveScene(2, liveBounds.filter(i => i.label !== 'Room' && i.schemeNum !== '18'), 820, 620);
+    assert.equal(missing.driveway, null);
+    assert.equal(missing.tree, null);
+});
