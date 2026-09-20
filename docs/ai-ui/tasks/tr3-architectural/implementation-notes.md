@@ -42,3 +42,6 @@ Owner clarified tree between10/18 with canopy across10 and half11. Ground-layer 
 
 ## Garden stairs
 Four treads cross the terrace border in the actual gap between11 and12. Missing/blocked gap suppresses illustration. Ground-layer decoration only; native tables unchanged.18 focused tests and Sol review pass. Cache0005.
+
+## Second garden stairs
+Same four treads left of13, shared width derived from11/12 gap and shared collision/bounds guard. Both stair groups reuse existing artwork; native tables untouched. Review fallback finding fixed: no guessed width with missing reference anchors.18 focused tests pass. Cache0006.
