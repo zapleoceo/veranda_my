@@ -288,3 +288,29 @@ test('four garden steps occupy only the gap between11 and12 and fail closed if b
     assert.equal(api.deriveScene(2, liveBounds.filter(i => i.schemeNum !== '13'), 820, 620).stepsAfter13, null);
     assert.equal(api.deriveScene(2, [...liveBounds, { ...scene.stepsAfter13, label:'Obstacle', bookable:false }], 820, 620).stepsAfter13, null);
 });
+
+test('landscaping stays on lawn and preserves all tables, fountain and stair openings', () => {
+    const api = presentation();
+    const scene = api.deriveScene(2, liveBounds, 820, 620);
+    const { shrubs, stones } = scene.landscape;
+    assert.ok(shrubs.length > 0 && stones.length > 0);
+    const obstacles = [...liveBounds, scene.fountain, scene.steps, scene.stepsAfter13].filter(Boolean);
+    const inside = (box, area) => area && box.x >= area.x && box.y >= area.y && box.x + box.w <= area.x + area.w && box.y + box.h <= area.y + area.h;
+    for (const box of [...shrubs, ...stones]) {
+        assert.ok(inside(box, scene.lawn) || inside(box, scene.lawnNotch));
+        assert.ok(obstacles.every(obstacle => !overlaps(box, obstacle)));
+    }
+    assert.ok(shrubs.every(shrub => stones.every(stone => !overlaps(shrub, stone))));
+    assert.equal(JSON.stringify(scene.landscape), JSON.stringify(api.deriveScene(2, liveBounds, 820, 620).landscape));
+});
+
+test('tree stone bed reaches tile edge and stays clear of furniture', () => {
+    const scene = presentation().deriveScene(2, liveBounds, 820, 620);
+    assert.ok(scene.stoneBed);
+    assert.equal(scene.stoneBed.x + scene.stoneBed.w, scene.lawnNotch.x);
+    assert.ok(liveBounds.every(i => !overlaps(scene.stoneBed,i)));
+    const trunkX = scene.tree.x + scene.tree.trunkX;
+    const trunkY = scene.tree.y + scene.tree.trunkY;
+    assert.ok(trunkX > scene.stoneBed.x && trunkX < scene.stoneBed.x + scene.stoneBed.w);
+    assert.ok(trunkY > scene.stoneBed.y && trunkY < scene.stoneBed.y + scene.stoneBed.h);
+});

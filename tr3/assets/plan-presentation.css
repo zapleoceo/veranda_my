@@ -87,3 +87,15 @@
 /* Four terrace-to-garden treads in the live gap between tables11 and12. */
 .plan-steps { display: grid; grid-template-rows: repeat(4,1fr); border-left: 2px solid #827d6b; border-right: 2px solid #827d6b; background: #a7a18b; box-shadow: 2px 4px 5px #29352155; }
 .plan-step { position: relative; display: block; background: linear-gradient(#d3cbb3,#b0a78e); border-top: 1px solid #eee5ce; border-bottom: 2px solid #78735f; }
+
+/* Inert low planting and separated natural paving on clear live lawn only. */
+.plan-shrub { background: url("/tr3/assets/plan-shrub.svg?v=20260920_0007") center / 100% 100% no-repeat; filter: drop-shadow(1px 2px 1px #1e362a55); }
+.plan-shrub-1 { transform: scaleX(-1); }
+.plan-shrub-2 { filter: brightness(.91) drop-shadow(1px 2px 1px #1e362a55); }
+.plan-shrub-3 { transform: scaleY(-1); filter: brightness(1.06) drop-shadow(1px 2px 1px #1e362a55); }
+.plan-stepping-stone { background: radial-gradient(ellipse at 24% 30%, #ede4cc77, transparent 52%), repeating-linear-gradient(13deg, #b5ac9655 0 1px, transparent 1px 4px), #c8bea5; clip-path: polygon(8% 11%,43% 0,86% 9%,100% 38%,91% 83%,55% 100%,10% 85%,0 43%); box-shadow: inset 1px 2px 0 #e0d7c0, inset -1px -2px 0 #8d8976; }
+.plan-stone-1 { clip-path: polygon(13% 0,74% 6%,100% 28%,91% 78%,61% 100%,8% 91%,0 34%); }
+.plan-stone-2 { clip-path: polygon(6% 18%,36% 0,87% 11%,100% 63%,75% 91%,24% 100%,0 70%); background-color: #bcb59f; }
+
+.plan-stone-bed { border: 3px solid #827f6e; background-color:#252925; background-image:radial-gradient(ellipse,#555951 0 28%,#161c18 40%,transparent 54%),radial-gradient(ellipse,#72766a 0 23%,#1b211c 40%,transparent 54%); background-size:9px 7px,11px 9px; background-position:0 0,4px 3px; box-shadow:inset 0 0 5px #101912aa; }
+.plan-ochre-rock { position:absolute; left:34%; top:22%; width:43%; height:71%; clip-path:polygon(8% 27%,28% 5%,65% 0,92% 31%,100% 72%,70% 95%,23% 100%,0 63%); background:linear-gradient(135deg,#c5a447 0 26%,#9e7e2e 28% 54%,#735e24 56% 76%,#ad8e3a 78%); box-shadow:inset 3px 4px 5px #e0bf6566; }
