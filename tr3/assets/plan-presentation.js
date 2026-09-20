@@ -59,7 +59,20 @@
         if (radius >= unit * 0.20) fountain = { x: x - radius, y: y - radius, w: radius * 2, h: radius * 2 };
       }
     }
-    return { terrace: { x: 0, y: 0, w: width, h: edge }, lawn, lawnNotch, terraceClip, fountain };
+    const room = valid.find(i => /^room$/i.test(String(i.label || '').trim()));
+    const driveX = room ? clamp(room.x + room.w, width) : width;
+    const driveway = driveX < width ? { x: driveX, y: 0, w: width - driveX, h: lawnNotch ? lawnNotch.y : edge } : null;
+    const ten = valid.find(i => String(i.schemeNum) === '10');
+    const eleven = valid.find(i => String(i.schemeNum) === '11');
+    const eighteen = valid.find(i => String(i.schemeNum) === '18');
+    let tree = null;
+    if (ten && eleven && eighteen && eighteen.y + eighteen.h < ten.y) {
+      const x = eleven.x + eleven.w / 2;
+      const top = eighteen.y + eighteen.h;
+      tree = { x, y: top, w: Math.max(0, ten.x + ten.w - x), h: ten.y + ten.h - top,
+        trunkX: ten.x + ten.w / 2 - x, trunkY: (ten.y - top) / 2 };
+    }
+    return { terrace: { x: 0, y: 0, w: width, h: edge }, lawn, lawnNotch, terraceClip, fountain, driveway, tree };
   }
 
   function decorate(options) {
@@ -87,6 +100,19 @@
     if (notch) notch.classList.add('plan-lawn-notch');
     const terrace = place('terrace', scene.terrace);
     if (scene.terraceClip) terrace.style.clipPath = scene.terraceClip;
+    const driveway = place('driveway', scene.driveway);
+    if (driveway) {
+      const parking = make('parking', driveway);
+      parking.textContent = 'P';
+      make('scooter', parking);
+    }
+    const tree = place('tree', scene.tree);
+    if (tree) {
+      make('canopy', tree);
+      const trunk = make('trunk', tree);
+      trunk.style.left = scene.tree.trunkX + 'px';
+      trunk.style.top = scene.tree.trunkY + 'px';
+    }
     const fountain = place('fountain', scene.fountain);
     if (fountain) ['ripple', 'ripple delay', 'koi one', 'koi two', 'jet'].forEach(n => make(n, fountain));
     const additions = [];

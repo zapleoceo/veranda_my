@@ -72,3 +72,14 @@
 .plan-counter-chair.first { left: 20%; }
 .plan-counter-chair.second { right: 12%; }
 .plan-counter-chair::before { content: ''; position: absolute; left: -2px; right: -2px; top: -2px; height: 30%; border: 1px solid #525848; border-radius: 4px; background: repeating-linear-gradient(90deg, #a0a48d 0 1px, #6b735f 1px 3px); }
+
+/* Existing room edge defines where terracotta becomes the scooter approach. */
+.plan-driveway { background: radial-gradient(ellipse at 20% 20%, #c2c1b744, transparent 65%), repeating-linear-gradient(125deg,#888b8580 0 1px,transparent 1px 5px), #969991; border-left: 2px solid #6c7168; box-shadow: inset 4px 0 8px #3c433322; }
+.plan-parking { position: absolute; right: 18%; top: 8%; width: 38px; height: 48px; border: 2px solid #d6dfd8; border-radius: 5px; background: #334e51; color: #f5f2e7; text-align: center; font: 600 24px/28px Arial,sans-serif; box-shadow: 1px 3px 5px #29373055; }
+.plan-scooter { position: absolute; width: 24px; height: 9px; bottom: 4px; left: 5px; border-bottom: 2px solid #eeeadd; transform: skewX(-12deg); }
+.plan-scooter::before { content: ''; position: absolute; width: 5px; height: 5px; border: 1px solid #eeeadd; border-radius: 50%; bottom: -5px; left: 1px; box-shadow: 16px 0 0 -1px #334e51,16px 0 0 0 #eeeadd; }
+.plan-scooter::after { content: ''; position: absolute; right: 1px; top: -5px; height: 12px; width: 6px; border-right: 2px solid #eeeadd; border-top: 2px solid #eeeadd; }
+.plan-tree { isolation: isolate; }
+.plan-canopy { position: absolute; inset: 5% -3% -7% -3%; border-radius: 43% 57% 48% 52% / 55% 41% 59% 45%; background: radial-gradient(ellipse at 22% 42%,#6a864cd9 0 19%,transparent 42%), radial-gradient(ellipse at 68% 25%,#436934da 0 23%,transparent 45%), radial-gradient(ellipse at 72% 70%,#638545d9 0 22%,transparent 44%), radial-gradient(ellipse at 35% 76%,#365e34c9 0 24%,transparent 46%), radial-gradient(ellipse,#4c7437b8 35%,transparent 72%); filter: drop-shadow(4px 7px 4px #24352233); opacity: .7; }
+.plan-trunk { position: absolute; width: 12px; height: 14px; transform: translate(-50%,-50%); border: 2px solid #6b5940; border-radius: 42%; background: radial-gradient(ellipse,#ad9265 0 18%,#796449 22% 35%,#a18b62 40% 55%,#5d513d 62%); box-shadow: 2px 3px 3px #27321f44; }
+.plan-canopy::after { content: ''; position: absolute; inset: 8%; border-radius: 43% 55% 48% 46%; background: radial-gradient(ellipse at 30% 35%,#afba715c 0 15%,transparent 24%) 0 0 / 19px 17px, radial-gradient(ellipse at 67% 60%,#254f3666 0 18%,transparent 28%) 5px 7px / 23px 21px, radial-gradient(ellipse at 45% 60%,#819e4d77 0 18%,transparent 30%) 2px 3px / 29px 19px; }
