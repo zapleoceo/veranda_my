@@ -322,10 +322,9 @@ $app->group('/payday3', function (RouteCollectorProxy $g) {
     ->add(RequirePermission::for('payday'))
     ->add(AuthMiddleware::class);
 
-// /neworder — operator-facing order page (live Poster menu, create
-// new order or append to an open check). Public (no auth yet) but
-// every mutation endpoint is CSRF-gated and Origin-locked. Will get
-// a proper login layer in a later iteration.
+// /neworder — Manager Order. Session authentication and the separately
+// assigned neworder permission cover the page and every API endpoint.
+// Mutations additionally retain CSRF and Origin protection.
 $app->group('/neworder', function (RouteCollectorProxy $g) {
     $g->get('[/]', [NewOrderController::class, 'index']);
     $g->group('/api', function (RouteCollectorProxy $api) {
@@ -337,7 +336,7 @@ $app->group('/neworder', function (RouteCollectorProxy $g) {
         $api->post('/orders',          NewOrderCreateAction::class)->add(NewOrderCsrfMiddleware::class);
         $api->post('/orders/append',   NewOrderAppendAction::class)->add(NewOrderCsrfMiddleware::class);
     });
-});
+})->add(RequirePermission::for('neworder'))->add(AuthMiddleware::class);
 $app->get('/neworder/assets/{file:.+}', [StaticController::class, 'neworderAssets']);
 
 // /onlineorder — PUBLIC customer-facing delivery checkout (no auth by

@@ -15,6 +15,7 @@ class AccessController
         'dashboard'      => 'Дашборд',
         'rawdata'        => 'Сырые данные',
         'kitchen_online' => 'КухняOnline',
+        'neworder'       => 'Заказ Менеджера',
         'errors'         => 'Cooked (errors)',
         'zapara'         => 'Zapara',
         'employees'      => 'ЗП сотрудников',

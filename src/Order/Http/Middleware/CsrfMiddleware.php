@@ -12,8 +12,8 @@ use Psr\Http\Server\MiddlewareInterface;
 use Psr\Http\Server\RequestHandlerInterface;
 
 /**
- * Three-layer guard for the /neworder POST endpoints. Until proper
- * auth ships, every mutation request must:
+ * CSRF guard shared by manager and public customer order endpoints.
+ * Every mutation request must:
  *
  *   1. carry a valid `X-Csrf-Token` header matching the session;
  *   2. originate from a same-origin browser context (Origin/Referer
@@ -29,7 +29,7 @@ final class CsrfMiddleware implements MiddlewareInterface
     public function process(ServerRequestInterface $request, RequestHandlerInterface $handler): ResponseInterface
     {
         // Shared implementation; /neworder additionally REQUIRES an
-        // Origin or Referer header (public page, no login layer yet).
+        // Origin or Referer header, including on the public customer page.
         return (new CsrfGuard(Csrf::SESSION_KEY, requireOriginHeader: true))
             ->process($request, $handler);
     }

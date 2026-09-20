@@ -46,8 +46,8 @@ window.__no = state;   // dev-tools peek hook; remove later
 
 // Modules wire themselves to DOM nodes by id — they receive `state` and
 // each other's public hooks (open/close/refresh) as needed.
-const refreshMenu       = await initMenu({ state });
 initSearch({ state });
+const refreshMenu       = await initMenu({ state });
 const openCart          = initCart({ state, onSubmit: () => submit() });
 const openModif         = initModifiers({ state });
 // refreshOpenChecks must be defined BEFORE locationPicker (which captures it)

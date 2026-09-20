@@ -177,6 +177,7 @@ $navSections = [
             '/admin'          => ['label' => 'Дашборд',        'perm' => 'dashboard'],
             '/rawdata'        => ['label' => 'Таблица',         'perm' => 'rawdata'],
             '/kitchen_online' => ['label' => 'Онлайн',          'perm' => 'kitchen_online'],
+            '/neworder/'      => ['label' => 'Заказ Менеджера', 'perm' => 'neworder'],
         ],
     ],
     [

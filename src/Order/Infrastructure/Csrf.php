@@ -9,7 +9,7 @@ use App\Infrastructure\SessionCsrf;
 /**
  * Per-session CSRF token for /neworder.
  *
- * Until proper auth lands, this is the primary defence that stops
+ * In addition to manager authorization, this token stops
  * arbitrary cross-origin code from creating Poster orders on our
  * behalf: the token is server-rendered into the HTML page, stored
  * in $_SESSION, and the middleware below requires every mutation

@@ -72,6 +72,7 @@ if (!function_exists('veranda_get_user_permissions')) {
             'exclude_toggle' => true,
             'telegram_ack' => false,
             'payday' => false,
+            'neworder' => false,
         ];
         if ($email === '') return $defaults;
         
@@ -106,6 +107,7 @@ if (!function_exists('veranda_get_user_permissions')) {
             $out['errors'] = true;
             $out['zapara'] = true;
             $out['reservations'] = true;
+            $out['neworder'] = true;
         }
         return $out;
     }

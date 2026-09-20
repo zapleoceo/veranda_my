@@ -26,18 +26,19 @@ class UserPermissionsService
         'payday'         => false,
         'bloggers'       => false,
         'cashflow'       => false,
+        'neworder'       => false,
     ];
 
     private const TTL = 30;
 
     public function __construct(private readonly Database $db) {}
 
-    public function loadIntoSession(string $email): void
+    public function loadIntoSession(string $email, bool $forceRefresh = false): void
     {
         $now       = time();
         $loadedAt  = (int) ($_SESSION['user_permissions_loaded_at'] ?? 0);
 
-        if ($loadedAt > 0 && ($now - $loadedAt) < self::TTL) {
+        if (!$forceRefresh && $loadedAt > 0 && ($now - $loadedAt) < self::TTL) {
             return;
         }
 
@@ -88,6 +89,7 @@ class UserPermissionsService
             $out['kitchen_online'] = true;
             $out['bloggers']     = true;
             $out['cashflow']     = true;
+            $out['neworder']     = true;
         }
 
         return $out;

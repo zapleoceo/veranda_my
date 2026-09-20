@@ -31,6 +31,9 @@ class AuthMiddleware implements MiddlewareInterface
             $uri  = $request->getUri();
             $path = $uri->getPath();
             $next = $path . (($q = $uri->getQuery()) !== '' ? '?' . $q : '');
+            if (str_starts_with($path, '/neworder/api/')) {
+                $next = '/neworder/';
+            }
             if (ReturnPath::isSafe($path)) {
                 $_SESSION['auth_next'] = $next;
             }
@@ -54,7 +57,11 @@ class AuthMiddleware implements MiddlewareInterface
                 ->withHeader('Location', '/login');
         }
 
-        $this->permissions->loadIntoSession((string) $_SESSION['user_email']);
+        $managerOrder = $request->getUri()->getPath() === '/neworder'
+            || str_starts_with($request->getUri()->getPath(), '/neworder/');
+        // Manager-order access must reflect revocations immediately and must
+        // not reuse legacy permission snapshots cached in the shared session.
+        $this->permissions->loadIntoSession((string) $_SESSION['user_email'], $managerOrder);
 
         // Release the session file lock so concurrent AJAX from the
         // same operator can run in parallel — PHP's default file
@@ -76,8 +83,12 @@ class AuthMiddleware implements MiddlewareInterface
         // still hold the lock for their entire request to avoid
         // silently dropping their own session writes.
         $path = $request->getUri()->getPath();
+        // Menu/locations load concurrently and only read session permissions.
+        // Keep mutation sessions locked for CSRF and order serialization.
+        $managerRead = str_starts_with($path, '/neworder/api/')
+            && in_array(strtoupper($request->getMethod()), ['GET', 'HEAD'], true);
         if (str_starts_with($path, '/payday3')
-         || str_starts_with($path, '/zapara')) {
+         || str_starts_with($path, '/zapara') || $managerRead) {
             Session::close();
         }
 
@@ -87,6 +98,7 @@ class AuthMiddleware implements MiddlewareInterface
     /** True for fetch()/XHR/JSON clients (they get a 401 JSON, not a 302). */
     private static function wantsJson(ServerRequestInterface $r): bool
     {
+        if (str_starts_with($r->getUri()->getPath(), '/neworder/api/')) return true;
         $accept = strtolower($r->getHeaderLine('Accept'));
         if ($accept !== '' && str_contains($accept, 'application/json')) return true;
         if (strcasecmp($r->getHeaderLine('X-Requested-With'), 'XMLHttpRequest') === 0) return true;
