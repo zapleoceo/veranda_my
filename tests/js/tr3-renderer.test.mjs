@@ -184,6 +184,8 @@ test('actual rotated hall keeps all tables 10–22 tiled and raises the lawn in 
     }
     const f = scene.fountain;
     assert.ok(f, 'required fountain remains visible in the live pocket');
+    assert.equal(f.x, scene.lawnNotch.x);
+    assert.equal(f.y, scene.lawnNotch.y);
     assert.ok(f.x > numbered(10).x + numbered(10).w);
     assert.ok(f.y > numbered(17).y + numbered(17).h);
     assert.ok(f.y + f.h < numbered(1).y);
