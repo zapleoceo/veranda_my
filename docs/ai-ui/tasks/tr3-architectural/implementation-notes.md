@@ -45,3 +45,6 @@ Four treads cross the terrace border in the actual gap between11 and12. Missing/
 
 ## Second garden stairs
 Same four treads left of13, shared width derived from11/12 gap and shared collision/bounds guard. Both stair groups reuse existing artwork; native tables untouched. Review fallback finding fixed: no guessed width with missing reference anchors.18 focused tests pass. Cache0006.
+
+## Garden landscaping and tree stone bed
+Added deterministic shrubs and stepping stones from live scene bounds, excluding furniture, stairs and fountain. Rectangular black pebble bed surrounds the tree trunk and reaches the adjacent tile edge, with an ochre rock. Owner wording interpreted as tree trunk (clarification pending); all artwork remains inert ground decoration. No booking, capacity or Poster geometry changes. Desktop and 390px mobile inspected; Sol review PASS and 97 JavaScript tests pass (20 focused). Cache0007.
