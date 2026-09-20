@@ -2986,6 +2986,7 @@
         });
       }
 
+      const presentationItems = [];
       visible.forEach((it) => {
         const b = document.createElement('button');
         b.type = 'button';
@@ -3007,7 +3008,14 @@
           ? `<span class="table-badge"><span class="num">${esc(it.label)}</span><span class="cap"></span></span>`
           : `<span class="table-badge is-center"><span class="num">${esc(it.label)}</span></span>`;
         tablesEl.appendChild(b);
+        presentationItems.push({ ...it, x: left, y: top, w, h, element: b });
       });
+
+      try {
+        if (window.TR3PlanPresentation) {
+          window.TR3PlanPresentation.decorate({ hallId, tablesEl, decorEl, items: presentationItems, width: MAP_W, height: MAP_H, translate: t });
+        }
+      } catch (_) { /* Decoration must never prevent the booking UI from binding. */ }
 
       applyCapsToActiveTables();
       if (requestBindTables) requestBindTables();
