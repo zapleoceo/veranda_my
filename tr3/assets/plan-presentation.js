@@ -114,7 +114,11 @@
           const dy = Math.max(i.y - y, 0, y - i.y - i.h);
           radius = Math.min(radius, Math.hypot(dx, dy) - margin);
         });
-        if (radius >= unit * 0.20) fountain = { x: x - radius, y: y - radius, w: radius * 2, h: radius * 2 };
+        if (radius >= unit * 0.20) {
+          const candidate = { x: notchX, y: notchY, w: radius * 2, h: radius * 2 };
+          const blocked = valid.some(i => candidate.x < i.x + i.w && candidate.x + candidate.w > i.x && candidate.y < i.y + i.h && candidate.y + candidate.h > i.y);
+          if (!blocked) fountain = candidate;
+        }
       }
     }
     const room = valid.find(i => /^room$/i.test(String(i.label || '').trim()));
