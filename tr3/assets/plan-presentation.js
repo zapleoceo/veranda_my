@@ -72,7 +72,19 @@
       tree = { x, y: top, w: Math.max(0, ten.x + ten.w - x), h: ten.y + ten.h - top,
         trunkX: ten.x + ten.w / 2 - x, trunkY: (ten.y - top) / 2 };
     }
-    return { terrace: { x: 0, y: 0, w: width, h: edge }, lawn, lawnNotch, terraceClip, fountain, driveway, tree };
+    const twelve = valid.find(i => String(i.schemeNum) === '12');
+    let steps = null;
+    if (eleven && twelve) {
+      const left = Math.min(eleven.x + eleven.w, twelve.x + twelve.w);
+      const right = Math.max(eleven.x, twelve.x);
+      const gap = right - left;
+      if (gap > margin) {
+        const candidate = { x: left + margin / 4, y: edge - 8, w: gap - margin / 2, h: Math.min(unit * 0.65, height - edge + 8) };
+        const overlaps = valid.some(i => candidate.x < i.x + i.w && candidate.x + candidate.w > i.x && candidate.y < i.y + i.h && candidate.y + candidate.h > i.y);
+        if (candidate.h > 8 && !overlaps) steps = candidate;
+      }
+    }
+    return { terrace: { x: 0, y: 0, w: width, h: edge }, lawn, lawnNotch, terraceClip, fountain, driveway, tree, steps };
   }
 
   function decorate(options) {
@@ -100,6 +112,8 @@
     if (notch) notch.classList.add('plan-lawn-notch');
     const terrace = place('terrace', scene.terrace);
     if (scene.terraceClip) terrace.style.clipPath = scene.terraceClip;
+    const steps = place('steps', scene.steps);
+    if (steps) for (let n = 0; n < 4; n += 1) make('step', steps);
     const driveway = place('driveway', scene.driveway);
     if (driveway) {
       const parking = make('parking', driveway);

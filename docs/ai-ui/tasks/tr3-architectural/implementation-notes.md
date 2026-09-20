@@ -39,3 +39,6 @@ User confirms all four share glass tabletops, wicker seating and pale parasols. 
 
 ## Tree and scooter approach
 Owner clarified tree between10/18 with canopy across10 and half11. Ground-layer tree anchors use those live boxes; number/status/buttons stay above decoration. Gray driveway begins at Room right edge and ends at lawn notch; P/scooter sign upper-right. Missing anchors omit corresponding decoration.17 focused tests and Sol review pass; desktop rendering inspected. Cache0004.
+
+## Garden stairs
+Four treads cross the terrace border in the actual gap between11 and12. Missing/blocked gap suppresses illustration. Ground-layer decoration only; native tables unchanged.18 focused tests and Sol review pass. Cache0005.

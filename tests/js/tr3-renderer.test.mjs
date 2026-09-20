@@ -264,3 +264,18 @@ test('tree and scooter approach follow room and table anchors without consuming 
     assert.equal(missing.driveway, null);
     assert.equal(missing.tree, null);
 });
+
+test('four garden steps occupy only the gap between11 and12 and fail closed if blocked', () => {
+    const api = presentation();
+    const scene = api.deriveScene(2, liveBounds, 820, 620);
+    assert.ok(scene.steps.x > 322 && scene.steps.x + scene.steps.w < 371);
+    assert.ok(scene.steps.y < scene.lawn.y && scene.steps.y + scene.steps.h > scene.lawn.y);
+    assert.ok(liveBounds.every(i => !overlaps(scene.steps, i)));
+    assert.equal(api.deriveScene(2, [...liveBounds, { ...scene.steps, label: 'Obstacle', bookable: false }], 820, 620).steps, null);
+    assert.equal(api.deriveScene(2, liveBounds.filter(i => i.schemeNum !== '12'), 820, 620).steps, null);
+    const items = liveBounds.map(i => ({ ...i, element: new Element('button') }));
+    const tablesEl = new Element();
+    const decorEl = new Element();
+    api.decorate({ hallId:2, items, tablesEl, decorEl, width:820, height:620 });
+    assert.equal(decorEl.querySelectorAll('.plan-step').length,4);
+});
