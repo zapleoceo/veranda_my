@@ -30,3 +30,6 @@ Core repeated stone/frame/wood/glass/plaque/label/equipment colors and furniture
 
 ## Material refinement from visual review
 Added local deterministic `plan-grass.svg` with subtle fractal grain and sparse irregular blades, replacing regular diagonal lawn hatching. Table8 retains wood classification with a local live-edge art variant and irregular plank grain. Table4 parasol uses eight faceted fabric segments and a central hub. No button geometry changes; no edge foliage added because avoiding overlap with live furniture remains the priority.
+
+## Photo clarification: places10–13
+User confirmed terrace-edge wooden counter photos apply to places10–13. Added hall2 counter illustration: horizontal live-edge timber slab and two wicker chairs on terrace side. Each existing Poster rectangle remains an independent button. No coordinate, capacity, availability or booking-handler changes. Focused16 tests and independent Sol review passed; rendered desktop confirms correct chair side and separate number/status overlays. Cache version0002.

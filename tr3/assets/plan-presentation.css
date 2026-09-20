@@ -65,3 +65,11 @@
 .plan-lawn-notch { border-top: 5px ridge var(--plan-stone); border-left: 5px ridge var(--plan-stone); }
 
 .plan-live-edge .plan-surface { inset: 8% 12%; border: 0; border-radius: 0; clip-path: polygon(4% 0,94% 2%,100% 17%,96% 36%,100% 54%,95% 72%,98% 96%,7% 100%,0 83%,5% 65%,1% 43%,6% 24%); background: radial-gradient(ellipse at 65% 30%, transparent 0 8%, #57371f70 9% 10%, transparent 11% 14%, #70482560 15% 16%, transparent 17%), repeating-linear-gradient(87deg, #9d693d 0 4px, #ad7e50 5px 8px, #89582f 9px 10px, #a87747 11px 16px); box-shadow: inset 3px 0 0 #d0a26e, inset -3px 0 0 #694221; }
+
+/* Places 10–13: terrace-edge timber counter, chairs on the terrace side only. */
+.plan-tables .table.plan-counter { background: transparent; border-color: transparent; box-shadow: none; }
+.plan-counter-slab { left: 0; right: 0; top: 39%; bottom: 6%; clip-path: polygon(0 4%,26% 0,52% 5%,77% 1%,100% 3%,100% 92%,79% 98%,57% 93%,33% 100%,12% 94%,0 97%); background: radial-gradient(ellipse at 71% 48%, #58371e55 0 3%, transparent 4% 9%, #6e452a55 10% 11%, transparent 12%), repeating-linear-gradient(2deg, #9a632f 0 2px, #b17a42 3px 5px, #754728 6px 7px, #a26b36 8px 12px); box-shadow: inset 0 2px 0 #d4a266, inset 0 -3px 0 #553823; filter: drop-shadow(0 3px 2px #30251a66); }
+.plan-counter-chair { top: 3%; width: 23%; height: 43%; border: 2px solid #51564a; border-radius: 4px 4px 2px 2px; background: repeating-linear-gradient(0deg, #8b927a 0 1px, #616955 1px 3px); box-shadow: 1px 2px 3px #30251a55; }
+.plan-counter-chair.first { left: 20%; }
+.plan-counter-chair.second { right: 12%; }
+.plan-counter-chair::before { content: ''; position: absolute; left: -2px; right: -2px; top: -2px; height: 30%; border: 1px solid #525848; border-radius: 4px; background: repeating-linear-gradient(90deg, #a0a48d 0 1px, #6b735f 1px 3px); }
