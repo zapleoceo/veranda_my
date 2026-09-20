@@ -4,6 +4,22 @@ namespace App\Classes;
 require_once __DIR__ . '/PosterAPI.php';
 
 class PosterReservationHelper {
+    /** Keep short initials out of separate Poster name fields; never change the local guest name. */
+    public static function posterNameFields(string $name): array {
+        $name = trim(preg_replace('/\s+/u', ' ', $name) ?? $name);
+        if ($name === '') return ['first_name' => 'Guest'];
+        $parts = explode(' ', $name, 2);
+        $first = $parts[0];
+        $last = $parts[1] ?? '';
+        if (mb_strlen($first, 'UTF-8') < 2 || ($last !== '' && mb_strlen($last, 'UTF-8') < 2)) {
+            // Poster rejects one-character names. Preserve the full name in one field.
+            return ['first_name' => mb_strlen($name, 'UTF-8') < 2 ? $name . '.' : $name];
+        }
+        $fields = ['first_name' => $first];
+        if ($last !== '') $fields['last_name'] = $last;
+        return $fields;
+    }
+
     /**
      * Accept either legacy App\Classes\Database (tr3/api_booking.php) or
      * App\Infrastructure\Database (Slim Vposter / VposterFix actions). Same
@@ -159,9 +175,8 @@ class PosterReservationHelper {
             }
 
             $fullName = trim((string)$row['name']);
-            $nameParts = explode(' ', $fullName, 2);
-            $firstName = trim($nameParts[0] ?? 'Guest');
-            $lastName = trim($nameParts[1] ?? '');
+            $firstName = trim(explode(' ', $fullName, 2)[0]);
+            $nameFields = self::posterNameFields($fullName);
 
             if ($spotId === '0' || $spotId === '') $spotId = '1';
 
@@ -212,11 +227,9 @@ class PosterReservationHelper {
                 'guests_count'     => (string)$row['guests'],
                 'date_reservation' => $dateReservation,
                 'duration'         => (string)$durationSeconds,
-                'first_name'       => $firstName,
-                'last_name'        => $lastName,
                 'comment'          => $commentFinal,
                 'skip_phone_validation' => 'true'
-            ];
+            ] + $nameFields;
 
             $dateFrom = date('Y-m-d 00:00:00');
             $dateTo = date('Y-m-d 23:59:59', strtotime('+60 days'));
