@@ -130,7 +130,7 @@ test('furniture roles follow hall and scheme number, never Poster identity or di
     const api = presentation();
     for (const schemeNum of ['1', '2', '3', '6', '9']) assert.equal(api.classify(2, { schemeNum, posterId: 999, label: 'renamed', bookable: true }), 'gazebo');
     assert.equal(api.classify(2, { schemeNum: '4', posterId: 1, bookable: true }), 'glass');
-    assert.equal(api.classify(2, { schemeNum: '8', posterId: 4, bookable: true }), 'wood');
+    for (const schemeNum of ['5', '7', '8']) assert.equal(api.classify(2, { schemeNum, posterId: 4, bookable: true }), 'glass');
     for (const schemeNum of ['10', '11', '12', '13']) assert.equal(api.classify(2, { schemeNum, posterId: 999, label: 'renamed', bookable: true }), 'counter');
     assert.equal(api.classify(2, { schemeNum: '', posterId: 1, label: 'Room', bookable: true }), 'room');
     assert.equal(api.classify(7, { schemeNum: '1', bookable: true }), null);
