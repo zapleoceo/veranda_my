@@ -70,3 +70,6 @@ Latest owner correction supersedes earlier all-garden parasols: only7 has a gard
 - Regression coverage includes dictionary parity, live-label hooks and source identity preservation.
 
 - Follow-up: translate duration, until prefix, form placeholders and accessibility labels; preserve selected date during language animation. Cache0006.
+
+### Furniture previews (2026-09-21)
+Built-in imagegen generated seven catalog illustrations (preview-*-v1.png): wood17-21, square dark chairs14-15, square gray chairs16, glass garden4/5/8, glass parasol7, counter10/11, counter parasol12/13. Existing gazebo1/2/3/6/9 remains. Room and22 excluded pending reference photos. Prompt set: realistic architectural furniture illustrations, three-quarter view, full furniture on tile/lawn island and ivory background; no people or text. Materials/chair arrangement follow user photo descriptions; illustrations are approximate, not photographs. Static mapping uses scheme number, independent of Poster identity. 34tests and independent Sol review pass. PNGs are lazy-loaded; optimization remains a performance follow-up.

@@ -90,9 +90,9 @@ for (const hallId of [2, 7]) for (const rotate of [0, 1]) {
         });
         assert.deepEqual(tables.children.map(element => ['left', 'top', 'width', 'height'].map(key => element.style[key])), expected);
         assert.deepEqual(tables.children.map(element => ({ ...element.dataset })), [
-            { bookable: '1', cap: '8', posterTableId: '101', tableLabel: '1' },
-            { bookable: '1', cap: '4', posterTableId: '202', tableLabel: 'Custom table' },
-            { bookable: '0', cap: '', posterTableId: '303', tableLabel: 'Bar' },
+            { bookable: '1', schemeNum: '1', cap: '8', posterTableId: '101', tableLabel: '1' },
+            { bookable: '1', schemeNum: '10', cap: '4', posterTableId: '202', tableLabel: 'Custom table' },
+            { bookable: '0', schemeNum: '', cap: '', posterTableId: '303', tableLabel: 'Bar' },
         ]);
         assert.ok(tables.children.every(element => element.tagName === 'BUTTON' && element.classList.contains('table') && element.innerHTML.includes('table-badge')));
         assert.ok(tables.children[2].classList.contains('disabled'));

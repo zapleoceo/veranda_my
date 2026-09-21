@@ -3010,6 +3010,7 @@
         b.type = 'button';
         b.className = 'table is-dyn' + (String(it.shape) === 'circle' ? ' is-circle' : '') + (it.bookable ? '' : ' disabled');
         b.dataset.bookable = it.bookable ? '1' : '0';
+        b.dataset.schemeNum = String(it.schemeNum || '');
         b.dataset.cap = it.bookable ? String(it.cap || 0) : '';
         b.dataset.posterTableId = String(it.posterId);
         b.dataset.tableLabel = String(it.label || it.schemeNum || '').trim();
