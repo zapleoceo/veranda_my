@@ -316,3 +316,17 @@ test('tree stone bed reaches tile edge and stays clear of furniture', () => {
     assert.ok(trunkX > scene.stoneBed.x && trunkX < scene.stoneBed.x + scene.stoneBed.w);
     assert.ok(trunkY > scene.stoneBed.y && trunkY < scene.stoneBed.y + scene.stoneBed.h);
 });
+
+
+test('garden path follows terrace then rises beside pool without downward spurs', () => {
+    const scene = presentation().deriveScene('2', liveBounds, 820, 620);
+    const stones = scene.landscape.stones;
+    assert.ok(stones.length > 10);
+    assert.ok(stones.every(s => s.y + s.h < scene.lawn.y + 40));
+    const raised = stones.filter(s => s.y < scene.lawn.y);
+    assert.ok(raised.length >= 3);
+    assert.ok(raised.every(s => s.x >= scene.lawnNotch.x));
+    const end = stones.at(-1);
+    assert.ok(end.x > scene.fountain.x + scene.fountain.w);
+    assert.ok(end.y < scene.fountain.y + scene.fountain.h);
+});
