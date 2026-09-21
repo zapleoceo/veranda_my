@@ -229,7 +229,10 @@
       if (role === 'gazebo') ['cushions', 'curtain left', 'curtain right', 'posts', 'surface'].forEach(n => make(n, art));
       else if (role === 'counter') ['counter-chair first', 'counter-chair second', 'counter-slab'].forEach(n => make(n, art));
       else if (role === 'wood' || role === 'glass') {
-        ['seat left', 'seat right', 'surface'].forEach(n => make(n, art));
+        const seats = role === 'wood' && /^(1[7-9]|2[0-2])$/.test(String(item.schemeNum))
+          ? ['chair left first', 'chair left second', 'chair right first', 'chair right second', 'surface']
+          : ['seat left', 'seat right', 'surface'];
+        seats.forEach(n => make(n, art));
         if (role === 'glass') make('parasol', art);
       } else if (role === 'cashier') make('terminal', art);
       else if (role === 'stage') ['speaker left', 'speaker right', 'keyboard'].forEach(n => make(n, art));
