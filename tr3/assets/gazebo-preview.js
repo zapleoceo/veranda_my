@@ -5,6 +5,15 @@
   else root.TR3GazeboPreview = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this, function () {
   'use strict';
+  function previewSource(number) {
+    const n = Number(number);
+    if ([1, 2, 3, 6, 9].includes(n)) return '/tr3/assets/gazebo-preview-v1.png';
+    const type = [4, 5, 8].includes(n) ? 'garden' : n === 7 ? 'garden-parasol'
+      : [10, 11].includes(n) ? 'counter' : [12, 13].includes(n) ? 'counter-parasol'
+      : [14, 15].includes(n) ? 'small-dark' : n === 16 ? 'small-gray'
+      : n >= 17 && n <= 21 && Number.isInteger(n) ? 'wood' : null;
+    return type ? '/tr3/assets/preview-' + type + '-v1.png' : null;
+  }
   function positionPreview(anchor, viewport, preferred = { width: 320, height: 240 }) {
     const gap = 12;
     const width = Math.max(0, Math.min(preferred.width, viewport.width - gap * 2));
@@ -36,7 +45,6 @@
     let active = null;
     let pending = null;
     let touch = false;
-    let failed = false;
     const listeners = [];
     const on = (target, type, handler, options) => {
       target.addEventListener(type, handler, options);
@@ -48,13 +56,15 @@
       active = null;
       portal.hidden = true;
     };
-    const targetTable = target => target && typeof target.closest === 'function' ? target.closest('#mapTablesMain .table.plan-gazebo') : null;
+    const targetTable = target => target && typeof target.closest === 'function' ? target.closest('#mapTablesMain .table[data-bookable="1"]') : null;
     const modalOpen = () => !!doc.querySelector('.modal.on, .modal[aria-hidden="false"], .dtp.on, .dtp[aria-hidden="false"], dialog[open]');
     const show = table => {
       hide();
-      if (!table || failed || modalOpen() || table.closest('[hidden]')) return;
+      if (!table || modalOpen() || table.closest('[hidden]')) return;
+      const source = previewSource(table.dataset.schemeNum);
+      if (!source) return;
       refreshCaption();
-      if (!image.getAttribute('src')) image.src = '/tr3/assets/gazebo-preview-v1.png';
+      if (image.getAttribute('src') !== source) image.src = source;
       active = table;
       pending = win.setTimeout(() => {
         pending = null;
@@ -80,7 +90,7 @@
     on(doc, 'scroll', hide, true);
     on(win, 'resize', hide);
     on(win, 'blur', hide);
-    on(image, 'error', () => { failed = true; hide(); });
+    on(image, 'error', hide);
     const observer = new win.MutationObserver(records => {
       if (!active) return;
       if (!active.isConnected || modalOpen() || active.closest('[hidden]') || records.some(record => record.type === 'childList' && record.target.id === 'mapTablesMain')) hide();
@@ -88,5 +98,5 @@
     observer.observe(doc.body, { subtree: true, childList: true, attributes: true, attributeFilter: ['class', 'hidden', 'aria-hidden'] });
     return { hide, destroy() { hide(); observer.disconnect(); listeners.forEach(remove => remove()); portal.remove(); } };
   }
-  return { positionPreview, init };
+  return { positionPreview, previewSource, init };
 });
