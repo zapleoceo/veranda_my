@@ -227,13 +227,19 @@
       if (!role || !item.element) return;
       const art = make('art');
       if (role === 'gazebo') ['cushions', 'curtain left', 'curtain right', 'posts', 'surface'].forEach(n => make(n, art));
-      else if (role === 'counter') ['counter-chair first', 'counter-chair second', 'counter-slab'].forEach(n => make(n, art));
+      else if (role === 'counter') {
+        ['counter-chair first', 'counter-chair second', 'counter-slab'].forEach(n => make(n, art));
+        if (['12', '13'].includes(String(item.schemeNum))) {
+          make('parasol-mount', art);
+          make('parasol counter-parasol', art);
+        }
+      }
       else if (role === 'wood' || role === 'glass') {
         const seats = role === 'wood' && /^(1[7-9]|2[0-2])$/.test(String(item.schemeNum))
           ? ['chair left first', 'chair left second', 'chair right first', 'chair right second', 'surface']
           : ['seat left', 'seat right', 'surface'];
         seats.forEach(n => make(n, art));
-        if (role === 'glass') make('parasol', art);
+        if (role === 'glass' && String(item.schemeNum) === '7') make('parasol', art);
       } else if (role === 'cashier') make('terminal', art);
       else if (role === 'stage') ['speaker left', 'speaker right', 'keyboard'].forEach(n => make(n, art));
       if (['bar', 'cashier', 'stage'].includes(role)) {

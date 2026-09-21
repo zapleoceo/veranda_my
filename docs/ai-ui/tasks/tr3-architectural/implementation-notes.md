@@ -60,3 +60,6 @@ Built-in imagegen generated gazebo-preview-v1.png from owner gazebo photo. Promp
 
 ## Individual chairs17-22
 Owner requested two opposite two. Replace long side seats with four wicker chair drawings with outer backrests for17-22 only. Preserve all native geometry/capacity/handlers.25 tests pass including each affected number; Sol review PASS, browser inspected. Cache20260921_0003.
+
+## Correct parasol locations
+Latest owner correction supersedes earlier all-garden parasols: only7 has a garden parasol;12/13 have mounts at center lower tabletop edge.26 tests pass, Sol review PASS and browser inspected. Booking untouched. Cache20260921_0004.

@@ -344,3 +344,12 @@ test('tables 17 through 22 have two separate chairs on each side', () => {
         }
     }
 });
+
+
+test('parasols belong only to garden table7 and counters12/13', () => {
+    for (const number of [4,5,7,8,10,11,12,13]) {
+        const tableSettings = { ...settings, 101: { ...settings[101], scheme_num: String(number) }, 202: { ...settings[202], scheme_num: '1' } };
+        const { tables } = render({ tableSettings });
+        assert.equal(tables.querySelectorAll('.plan-parasol').length, [7,12,13].includes(number) ? 1 : 0);
+    }
+});
