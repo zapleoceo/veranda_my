@@ -1,13 +1,23 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
+import { readFileSync } from 'node:fs';
 const { positionPreview, previewSource, init } = createRequire(import.meta.url)('../../tr3/assets/gazebo-preview.js');
+
+test('every mapped preview is an existing WebP below the 100 KB transfer budget', () => {
+  const sources = new Set(Array.from({length:21}, (_, i) => previewSource(i + 1)));
+  for (const source of sources) {
+    const bytes = readFileSync(new URL('../..' + source, import.meta.url));
+    assert.equal(bytes.toString('ascii', 8, 12), 'WEBP');
+    assert.ok(bytes.length < 100000, source + ' exceeds preview budget');
+  }
+});
 
 test('all photographed tables map to their own furniture and umbrella variants', () => {
   const groups = {garden:[4,5,8], 'garden-parasol':[7],counter:[10,11], 'counter-parasol':[12,13], 'small-dark':[14,15], 'small-gray':[16], wood:[17,18,19,20,21]};
   for (const [type, numbers] of Object.entries(groups)) for (const n of numbers)
-    assert.equal(previewSource(String(n)), '/tr3/assets/preview-'+type+'-v1.png');
-  for (const n of [1,2,3,6,9]) assert.equal(previewSource(n), '/tr3/assets/gazebo-preview-v1.png');
+    assert.equal(previewSource(String(n)), '/tr3/assets/preview-'+type+'-v2.webp');
+  for (const n of [1,2,3,6,9]) assert.equal(previewSource(n), '/tr3/assets/gazebo-preview-v2.webp');
   for (const n of ['Room',22,0,'',null,'../../x',17.5]) assert.equal(previewSource(n),null);
 });
 
@@ -61,7 +71,7 @@ test('preview lazy loads on mouse intent, keeps clicks untouched and dismisses o
   h.fire('pointerover',{pointerType:'touch',target:h.table});h.flush();
   assert.equal(image.src,undefined);
   h.fire('pointerover',{pointerType:'mouse',target:h.table});h.flush();
-  assert.equal(image.src,'/tr3/assets/gazebo-preview-v1.png');
+  assert.equal(image.src,'/tr3/assets/gazebo-preview-v2.webp');
   assert.equal(h.portal.hidden,false);
   assert.equal(h.portal.children[1].textContent,'Иллюстрация');
   h.fire('keydown',{key:'Escape'});assert.equal(h.portal.hidden,true);

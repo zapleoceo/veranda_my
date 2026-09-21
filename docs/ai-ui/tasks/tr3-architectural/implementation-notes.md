@@ -73,3 +73,6 @@ Latest owner correction supersedes earlier all-garden parasols: only7 has a gard
 
 ### Furniture previews (2026-09-21)
 Built-in imagegen generated seven catalog illustrations (preview-*-v1.png): wood17-21, square dark chairs14-15, square gray chairs16, glass garden4/5/8, glass parasol7, counter10/11, counter parasol12/13. Existing gazebo1/2/3/6/9 remains. Room and22 excluded pending reference photos. Prompt set: realistic architectural furniture illustrations, three-quarter view, full furniture on tile/lawn island and ivory background; no people or text. Materials/chair arrangement follow user photo descriptions; illustrations are approximate, not photographs. Static mapping uses scheme number, independent of Poster identity. 34tests and independent Sol review pass. PNGs are lazy-loaded; optimization remains a performance follow-up.
+
+### Preview transfer optimization
+Converted all eight originals to 640x480 maximum WebP quality80 (2x320x240 card). Original PNGs retained as sources; runtime only requests versioned WebP. Transfer reduced from20,145,715bytes to418,120bytes (~97.9%). Added real-asset WebP/100KB budget regression. Cache0008.
