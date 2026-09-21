@@ -51,3 +51,6 @@ Added deterministic shrubs and stepping stones from live scene bounds, excluding
 
 ## Fountain corner alignment
 Owner requested flush left/top placement. Anchor existing diameter to lawn notch origin with native-footprint collision guard.20 focused tests and Sol review pass. Cache0008.
+
+## Owner path reference
+Replace straight spurs with one terrace-parallel route and a cubic rise beside the pool, following owner screenshot. Preserve lawn containment and collisions.21 tests including topology pass; Sol review and desktop verification pass. Cache20260921_0001.

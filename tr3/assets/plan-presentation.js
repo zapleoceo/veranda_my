@@ -38,27 +38,27 @@
     const stairs = [scene.steps, scene.stepsAfter13].filter(Boolean);
     const obstacles = valid.concat([scene.fountain, ...stairs].filter(Boolean));
     const clear = box => inLawn(box) && !obstacles.some(i => overlaps(box, i));
-    // Short, continuous stepping routes start at each actual stair landing.
-    // Local detours are bounded; stop rather than invent a route through furniture.
-    stairs.forEach(stair => {
-      let center = stair.x + stair.w / 2;
-      const stoneW = Math.min(stair.w * 0.52, unit * 0.24);
-      const stoneH = unit * 0.17;
-      const stride = unit * 0.29;
-      for (let n = 0; n < 8; n += 1) {
-        const y = stair.y + stair.h + clearance * 2 + n * stride;
-        const candidate = [0, -unit * 0.10, unit * 0.10].map(dx => ({ x: center + dx - stoneW / 2, y, w: stoneW, h: stoneH })).find(box => clear(box) && !result.stones.some(i => overlaps(box, i)));
-        if (!candidate) break;
-        result.stones.push(candidate);
-        center = candidate.x + candidate.w / 2;
-      }
-    });
-    // Separate paving across the clear lawn strip below the terrace. Stair
-    // openings and furniture interrupt the strip rather than being painted over.
-    const stoneStride = Math.max(unit * 0.42, width / 70);
-    for (let x = unit * 0.25; x + unit * 0.29 < width; x += stoneStride) {
-      const box = { x, y: scene.lawn.y + unit * 0.36, w: unit * 0.29, h: unit * 0.15 };
+    // One route follows the terrace, then bends up beside the koi pool.
+    const stoneSize = unit * 0.16;
+    const pathY = scene.lawn.y + unit * 0.36;
+    const bendX = scene.lawnNotch ? scene.lawnNotch.x - unit * 0.65 : width - unit;
+    const addStone = (x, y) => {
+      const box = { x: x - stoneSize / 2, y: y - stoneSize / 2, w: stoneSize, h: stoneSize };
       if (clear(box) && !result.stones.some(i => overlaps(box, i))) result.stones.push(box);
+    };
+    const stoneStride = unit * 0.25;
+    for (let x = unit * 0.25; x < bendX; x += stoneStride) addStone(x, pathY + Math.sin(x / unit * 1.5) * unit * 0.045);
+    if (scene.lawnNotch && scene.fountain) {
+      const endX = scene.fountain.x + scene.fountain.w + unit * 0.40;
+      const endY = scene.fountain.y + unit * 0.22;
+      // Sample the cubic by distance so the stepping stones stay evenly spaced.
+      let last = { x: bendX - stoneStride, y: pathY };
+      for (let n = 0; n <= 100; n += 1) {
+        const t = n / 100, u = 1 - t;
+        const x = u*u*u*bendX + 3*u*u*t*(bendX + unit) + 3*u*t*t*endX + t*t*t*endX;
+        const y = u*u*u*pathY + 3*u*u*t*pathY + 3*u*t*t*(endY + unit * 0.6) + t*t*t*endY;
+        if (Math.hypot(x-last.x, y-last.y) >= stoneStride) { addStone(x, y); last = { x, y }; }
+      }
     }
     const addShrub = (x, y, variant) => {
       const box = { x, y, w: size * (variant % 2 ? 1.12 : 1), h: shrubHeight * (variant % 3 ? 0.94 : 1), variant: variant % 4 };
