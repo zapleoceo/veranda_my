@@ -27,7 +27,7 @@ function harness() {
   const fire=(type,event={})=>events.get('doc:'+type)?.(event);
   const controller=init(doc,win);
   const portal=body.children[0];
-  return {controller,portal,table,fire,events,flush(){scheduled?.();},mutate(records=[]){observe(records);},setModal(){modal=true;}};
+  return {controller,portal,table,fire,events,doc,win,flush(){scheduled?.();},mutate(records=[]){observe(records);},setModal(){modal=true;}};
 }
 
 test('preview lazy loads on mouse intent, keeps clicks untouched and dismisses on Escape',()=>{
@@ -56,4 +56,19 @@ test('touch focus stays quiet and rerender, scroll or modal dismiss pending/visi
   h.fire('scroll');assert.equal(h.portal.hidden,true);
   h.fire('focusin',{target:h.table});h.flush();h.table.isConnected=false;h.mutate();assert.equal(h.portal.hidden,true);
   h.table.isConnected=true;h.fire('focusin',{target:h.table});h.flush();h.setModal();h.mutate();assert.equal(h.portal.hidden,true);
+});
+
+
+test('preview caption follows the current language on subsequent intent', () => {
+  const h=harness();
+  const caption=h.portal.children[1];
+  assert.equal(caption.getAttribute('data-i18n'),'preview_illustration');
+  h.doc.documentElement.lang='vi';
+  h.win.STR={preview_illustration:'Hình minh họa'};
+  h.fire('focusin',{target:h.table});h.flush();
+  assert.equal(caption.textContent,'Hình minh họa');
+  h.doc.documentElement.lang='en';
+  h.win.STR={preview_illustration:'Illustration'};
+  h.fire('focusin',{target:h.table});h.flush();
+  assert.equal(caption.textContent,'Illustration');
 });

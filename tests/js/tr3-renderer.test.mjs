@@ -56,7 +56,7 @@ const settings = {
     303: { display_name: 'Bar', capacity: 99, bookable: 0, show_on_canvas: 1 },
     404: { scheme_num: '22', capacity: 20, bookable: 1, show_on_canvas: 0 },
 };
-export function render({ hallId = 2, rotate = 0, source = app.slice(start, end), helper = presentation(), tableRows = rows, tableSettings = settings } = {}) {
+export function render({ hallId = 2, rotate = 0, source = app.slice(start, end), helper = presentation(), tableRows = rows, tableSettings = settings, translate = value => value } = {}) {
     const tables = new Element();
     tables.canvas = new Element();
     tables.canvas.clientWidth = 820;
@@ -66,7 +66,7 @@ export function render({ hallId = 2, rotate = 0, source = app.slice(start, end),
     const sandbox = {
         document: { createElement: tag => new Element(tag) },
         tableSettingsByHall: { [hallId]: tableSettings }, decorByHall: {}, hallSettingsByHall: { [hallId]: { rotate_180: rotate } },
-        t: value => value, esc: value => String(value).replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;'),
+        t: translate, esc: value => String(value).replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;'),
         showSystemModal: value => calls.push(value),
         applyCapsToActiveTables: () => calls.push('caps'), requestBindTables: () => calls.push('bind'), applyAvailabilityStyles: () => calls.push('availability'),
         TR3PlanPresentation: helper, console,
@@ -351,5 +351,51 @@ test('parasols belong only to garden table7 and counters12/13', () => {
         const tableSettings = { ...settings, 101: { ...settings[101], scheme_num: String(number) }, 202: { ...settings[202], scheme_num: '1' } };
         const { tables } = render({ tableSettings });
         assert.equal(tables.querySelectorAll('.plan-parasol').length, [7,12,13].includes(number) ? 1 : 0);
+    }
+});
+
+
+test('room display translates while Poster booking label and bounds remain unchanged', () => {
+    const tableRows = [row(49, 30, 40, 100, 50)];
+    const tableSettings = {49: {display_name: 'Room', capacity: 12, bookable: 1, show_on_canvas: 1}};
+    for (const translated of ['Комната', 'Room', 'Phòng']) {
+        const result = render({tableRows, tableSettings, translate: key => key === 'room' ? translated : key});
+        const button = result.tables.children[0];
+        assert.equal(button.dataset.tableLabel, 'Room');
+        assert.equal(button.dataset.posterTableId, '49');
+        assert.match(button.innerHTML, /data-i18n="room"/);
+        assert.ok(button.innerHTML.includes(translated));
+        assert.equal(button.style.left, '28px');
+        assert.equal(button.style.top, '28px');
+    }
+});
+
+test('display-only room translation keeps custom labels literal', () => {
+    const start = app.indexOf('  const displayTableLabel =');
+    const end = app.indexOf('  const fmtVars =', start);
+    const context = {t: key => key === 'room' ? 'Phòng' : key};
+    runInNewContext(app.slice(start, end) + '\nglobalThis.display = displayTableLabel;', context);
+    assert.equal(context.display('Room'), 'Phòng');
+    assert.equal(context.display(' ROOM '), 'Phòng');
+    assert.equal(context.display('Custom Room 49'), 'Custom Room 49');
+    assert.equal(context.display('12'), '12');
+});
+
+
+test('station plaques register for live language switching without changing source labels', () => {
+    const tablesEl = new Element(), decorEl = new Element();
+    const items = liveBounds.map(item => ({...item, element: new Element('button')}));
+    const stations = [{label:'BAR',role:'bar'},{label:'Kashier',role:'cashier'},{label:'🎸🎹🎤',role:'stage'}];
+    for (const station of stations) {
+        if (!items.some(i => i.label === station.label)) items.push({...station,bookable:false,x:0,y:0,w:20,h:20,element:new Element('button')});
+    }
+    const translations = {bar:'Quầy bar',cashier:'Thu ngân',stage:'Sân khấu'};
+    presentation().decorate({hallId:2,tablesEl,decorEl,items,width:820,height:620,translate:key=>translations[key]||key});
+    for (const station of stations) {
+        const item = items.find(i => i.label === station.label);
+        const plaque = item.element.querySelector('.plan-plaque');
+        assert.equal(plaque.getAttribute('data-i18n'),station.role);
+        assert.equal(plaque.textContent,translations[station.role]);
+        assert.equal(item.label,station.label);
     }
 });

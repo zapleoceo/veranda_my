@@ -63,3 +63,8 @@ Owner requested two opposite two. Replace long side seats with four wicker chair
 
 ## Correct parasol locations
 Latest owner correction supersedes earlier all-garden parasols: only7 has a garden parasol;12/13 have mounts at center lower tabletop edge.26 tests pass, Sol review PASS and browser inspected. Booking untouched. Cache20260921_0004.
+
+### Localized scheme labels (2026-09-21)
+- Translate bar, stage, cashier, room and illustration caption for ru/en/vi, including live language changes.
+- Keep raw Poster labels and booking payloads intact; translate visible booking headings only.
+- Regression coverage includes dictionary parity, live-label hooks and source identity preservation.

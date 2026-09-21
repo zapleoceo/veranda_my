@@ -27,7 +27,9 @@
     const caption = doc.createElement('span');
     caption.className = 'gazebo-preview-caption';
     const captions = { ru: 'Иллюстрация', en: 'Illustration', vi: 'Hình minh họa' };
-    caption.textContent = captions[doc.documentElement.lang] || captions.en;
+    caption.setAttribute('data-i18n', 'preview_illustration');
+    const refreshCaption = () => { caption.textContent = (win.STR && win.STR.preview_illustration) || captions[doc.documentElement.lang] || captions.en; };
+    refreshCaption();
     portal.appendChild(image);
     portal.appendChild(caption);
     doc.body.appendChild(portal);
@@ -51,6 +53,7 @@
     const show = table => {
       hide();
       if (!table || failed || modalOpen() || table.closest('[hidden]')) return;
+      refreshCaption();
       if (!image.getAttribute('src')) image.src = '/tr3/assets/gazebo-preview-v1.png';
       active = table;
       pending = win.setTimeout(() => {
