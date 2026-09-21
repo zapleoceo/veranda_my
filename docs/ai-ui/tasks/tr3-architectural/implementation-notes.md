@@ -68,3 +68,5 @@ Latest owner correction supersedes earlier all-garden parasols: only7 has a gard
 - Translate bar, stage, cashier, room and illustration caption for ru/en/vi, including live language changes.
 - Keep raw Poster labels and booking payloads intact; translate visible booking headings only.
 - Regression coverage includes dictionary parity, live-label hooks and source identity preservation.
+
+- Follow-up: translate duration, until prefix, form placeholders and accessibility labels; preserve selected date during language animation. Cache0006.

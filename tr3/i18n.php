@@ -4,6 +4,12 @@ return [
   'supported' => ['ru', 'en', 'vi'],
   'i18n' => [
     'ru' => [
+      'back' => 'Назад',
+      'language' => 'Язык',
+      'zoom_in' => 'Увеличить масштаб',
+      'zoom_out' => 'Уменьшить масштаб',
+      'telegram_verified' => 'Telegram подтверждён',
+      'whatsapp_verified' => 'WhatsApp подтверждён',
       'page_title' => 'Бронирование стола',
       'data_on' => 'Данные на',
       'pick_date' => 'Выбрать дату',
@@ -142,6 +148,12 @@ return [
       'next_month' => 'Следующий месяц',
     ],
     'en' => [
+      'back' => 'Back',
+      'language' => 'Language',
+      'zoom_in' => 'Zoom in',
+      'zoom_out' => 'Zoom out',
+      'telegram_verified' => 'Telegram verified',
+      'whatsapp_verified' => 'WhatsApp verified',
       'page_title' => 'Table reservation',
       'data_on' => 'Data for',
       'pick_date' => 'Pick date',
@@ -280,6 +292,12 @@ return [
       'next_month' => 'Next month',
     ],
     'vi' => [
+      'back' => 'Quay lại',
+      'language' => 'Ngôn ngữ',
+      'zoom_in' => 'Phóng to',
+      'zoom_out' => 'Thu nhỏ',
+      'telegram_verified' => 'Telegram đã xác minh',
+      'whatsapp_verified' => 'WhatsApp đã xác minh',
       'page_title' => 'Đặt bàn',
       'data_on' => 'Dữ liệu ngày',
       'pick_date' => 'Chọn ngày',

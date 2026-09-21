@@ -88,7 +88,7 @@ $mk = function (string $l) use ($self, $baseQs) {
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Montserrat:wght@300;400;500&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/tr3/assets/tr3.css?v=20260921_0005">
+  <link rel="stylesheet" href="/tr3/assets/tr3.css?v=20260921_0006">
   <noscript>
     <style>
       .modal:target { display: flex !important; }
@@ -104,10 +104,10 @@ $mk = function (string $l) use ($self, $baseQs) {
       <div class="topbar">
         <div class="title-wrap">
           <div class="title-line">
-            <a class="menu-back tr3-back" href="/links/?lang=<?= urlencode($lang) ?>" aria-label="Back">←</a>
+            <a class="menu-back tr3-back" href="/links/?lang=<?= urlencode($lang) ?>" data-i18n-aria-label="back" aria-label="<?= htmlspecialchars(tr('back')) ?>">←</a>
             <div class="title-stack">
               <h1 data-i18n="page_title"><?= htmlspecialchars(tr('page_title')) ?></h1>
-              <input type="date" id="resDate" aria-label="<?= htmlspecialchars(tr('select_date_time')) ?>">
+              <input type="date" id="resDate" data-i18n-aria-label="select_date_time" aria-label="<?= htmlspecialchars(tr('select_date_time')) ?>">
             </div>
           </div>
         </div>
@@ -123,16 +123,16 @@ $mk = function (string $l) use ($self, $baseQs) {
         <div class="map-invite" data-i18n="tap_table_to_book"><?= htmlspecialchars(tr('tap_table_to_book')) ?></div>
         <div class="busy-progress" id="busyProgress" hidden></div>
         <div class="controls">
-          <label class="zoom" aria-label="<?= htmlspecialchars(tr('zoom')) ?>">
+          <label class="zoom" data-i18n-aria-label="zoom" aria-label="<?= htmlspecialchars(tr('zoom')) ?>">
             <span data-i18n="zoom"><?= htmlspecialchars(tr('zoom')) ?></span>
-            <button class="zbtn" type="button" id="mapZoomMinus" aria-label="−">−</button>
+            <button class="zbtn" type="button" id="mapZoomMinus" data-i18n-aria-label="zoom_out" aria-label="<?= htmlspecialchars(tr('zoom_out')) ?>">−</button>
             <span class="zv" id="mapZoomVal">100%</span>
-            <button class="zbtn" type="button" id="mapZoomPlus" aria-label="+">+</button>
-            <input id="mapZoomRange" type="range" min="10" max="100" step="1" value="100" aria-label="<?= htmlspecialchars(tr('zoom')) ?>">
+            <button class="zbtn" type="button" id="mapZoomPlus" data-i18n-aria-label="zoom_in" aria-label="<?= htmlspecialchars(tr('zoom_in')) ?>">+</button>
+            <input id="mapZoomRange" type="range" min="10" max="100" step="1" value="100" data-i18n-aria-label="zoom" aria-label="<?= htmlspecialchars(tr('zoom')) ?>">
           </label>
         </div>
         <details class="lang-menu lang-menu--fixed">
-          <summary aria-label="Language">
+          <summary data-i18n-aria-label="language" aria-label="<?= htmlspecialchars(tr('language')) ?>">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2Zm7.93 9h-3.2a15.7 15.7 0 0 0-1.47-5 8.05 8.05 0 0 1 4.67 5ZM12 4c1.1 0 2.7 2.2 3.4 7H8.6C9.3 6.2 10.9 4 12 4ZM4.07 11a8.05 8.05 0 0 1 4.67-5 15.7 15.7 0 0 0-1.47 5Zm0 2h3.2a15.7 15.7 0 0 0 1.47 5 8.05 8.05 0 0 1-4.67-5ZM12 20c-1.1 0-2.7-2.2-3.4-7h6.8c-.7 4.8-2.3 7-3.4 7Zm3.26-2a15.7 15.7 0 0 0 1.47-5h3.2a8.05 8.05 0 0 1-4.67 5Z"/></svg>
           </summary>
           <div class="lang-panel">
@@ -157,7 +157,7 @@ $mk = function (string $l) use ($self, $baseQs) {
             <div class="tile-layer" aria-hidden="true"></div>
             <div class="map-zoom-box" id="mapZoomBox">
               <div class="map-zoom-inner" id="mapZoomInner">
-                <div class="map" aria-label="<?= htmlspecialchars(tr('map_aria')) ?>">
+                <div class="map" data-i18n-aria-label="map_aria" aria-label="<?= htmlspecialchars(tr('map_aria')) ?>">
                   <div class="map-canvas" id="mapCanvasMain" data-hall="2">
                     <div class="decor-layer" id="mapDecorMain" aria-hidden="true"></div>
                     <div class="tables-layer" id="mapTablesMain"></div>
@@ -182,9 +182,9 @@ $mk = function (string $l) use ($self, $baseQs) {
       <div class="dtp-title" id="dtpTitle" data-i18n="dtp_title"><?= htmlspecialchars(tr('dtp_title')) ?></div>
       <div class="cal">
         <div class="cal-head">
-          <button type="button" class="cal-nav" id="dtpPrev" aria-label="<?= htmlspecialchars(tr('prev_month')) ?>">‹</button>
+          <button type="button" class="cal-nav" id="dtpPrev" data-i18n-aria-label="prev_month" aria-label="<?= htmlspecialchars(tr('prev_month')) ?>">‹</button>
           <div class="cal-month" id="dtpMonthLabel"></div>
-          <button type="button" class="cal-nav" id="dtpNext" aria-label="<?= htmlspecialchars(tr('next_month')) ?>">›</button>
+          <button type="button" class="cal-nav" id="dtpNext" data-i18n-aria-label="next_month" aria-label="<?= htmlspecialchars(tr('next_month')) ?>">›</button>
         </div>
         <div class="cal-week" id="dtpWeek"></div>
         <div class="cal-grid" id="dtpCalGrid"></div>
@@ -231,7 +231,7 @@ $mk = function (string $l) use ($self, $baseQs) {
           <span class="framed-box" id="reqModalDate"></span>
           <span class="framed-box busy-tag" id="reqModalBusy" hidden></span>
         </div>
-        <button class="btn-close-modal" type="button" data-modal-close="reqModal" aria-label="Close">×</button>
+        <button class="btn-close-modal" type="button" data-modal-close="reqModal" data-i18n-aria-label="close" aria-label="<?= htmlspecialchars(tr('close')) ?>">×</button>
       </div>
       <form id="reqForm" method="post" action="/tr3/api.php?ajax=submit_booking" accept-charset="utf-8" novalidate>
         <input type="hidden" id="reqTableNum" name="table_num" value="">
@@ -257,9 +257,9 @@ $mk = function (string $l) use ($self, $baseQs) {
                 <div class="modal-label">
                   <span data-i18n="guests_count"><?= htmlspecialchars(tr('guests_count')) ?></span>
                   <div class="num-step">
-                    <button class="num-btn" type="button" id="reqGuestsMinus" aria-label="<?= htmlspecialchars(tr('decrease_guests')) ?>">−</button>
+                    <button class="num-btn" type="button" id="reqGuestsMinus" data-i18n-aria-label="decrease_guests" aria-label="<?= htmlspecialchars(tr('decrease_guests')) ?>">−</button>
                     <input type="number" id="reqGuests" name="guests" min="1" max="99" value="2" inputmode="numeric">
-                    <button class="num-btn" type="button" id="reqGuestsPlus" aria-label="<?= htmlspecialchars(tr('increase_guests')) ?>">+</button>
+                    <button class="num-btn" type="button" id="reqGuestsPlus" data-i18n-aria-label="increase_guests" aria-label="<?= htmlspecialchars(tr('increase_guests')) ?>">+</button>
                   </div>
                 </div>
                 <label class="modal-label">
@@ -290,17 +290,17 @@ $mk = function (string $l) use ($self, $baseQs) {
                       ?>
                     </select>
                     <div class="end-time-label" aria-live="polite">
-                      <div class="end-time-value" id="reqEndTime">до —</div>
+                      <div class="end-time-value" id="reqEndTime"><?= htmlspecialchars(tr('booking_until_prefix')) ?> —</div>
                     </div>
                   </div>
                 </div>
               </div>
               <label class="modal-label" id="reqNameLabel">
-                <input type="text" id="reqName" name="name" autocomplete="name" required maxlength="80" placeholder="<?= htmlspecialchars(tr('your_name')) ?>">
+                <input type="text" id="reqName" name="name" autocomplete="name" required maxlength="80" data-i18n-placeholder="your_name" placeholder="<?= htmlspecialchars(tr('your_name')) ?>">
               </label>
               <label class="modal-label" id="reqPhoneLabel">
                 <div class="phone-field">
-                  <input type="tel" id="reqPhone" name="phone" autocomplete="tel" inputmode="numeric" pattern="\+[1-9][0-9]{8,14}" required placeholder="<?= htmlspecialchars(tr('your_phone')) ?>">
+                  <input type="tel" id="reqPhone" name="phone" autocomplete="tel" inputmode="numeric" pattern="\+[1-9][0-9]{8,14}" required data-i18n-placeholder="your_phone" placeholder="<?= htmlspecialchars(tr('your_phone')) ?>">
                   <div class="msgr-stack" id="msgrStack">
                     <div class="msgr-actions" id="msgrActions">
                       <button type="button" class="msgr-btn msgr-btn-inline" id="msgrTgBtn" aria-label="Telegram" title="Telegram">
@@ -320,13 +320,13 @@ $mk = function (string $l) use ($self, $baseQs) {
                     <div class="msgr-hint" id="msgrHint" hidden></div>
                     <div class="msgr-toast" id="msgrToast" hidden></div>
                   </div>
-                  <button type="button" class="msgr-field-icon" id="msgrTgIcon" aria-label="Telegram verified" title="Telegram" hidden>
+                  <button type="button" class="msgr-field-icon" id="msgrTgIcon" data-i18n-aria-label="telegram_verified" aria-label="<?= htmlspecialchars(tr('telegram_verified')) ?>" title="Telegram" hidden>
                     <svg class="ico-tg" viewBox="0 0 24 24" fill="none" aria-hidden="true">
                       <path d="M20.6 5.3 4.2 11.7c-1.1.4-1.1 1-.2 1.3l4.2 1.3 1.6 4.8c.2.6.4.6.8.2l2.3-2.2 4.7 3.4c.9.5 1.5.2 1.7-.8l2.8-13.1c.3-1.2-.4-1.7-1.5-1.3Z" fill="currentColor" opacity=".9"/>
                       <path d="M9.1 14.9 18.3 8.9c.5-.3.9-.1.5.2l-7.6 6.9-.3 2.9c0 .4-.2.5-.4.1l-1.5-4.8Z" fill="currentColor"/>
                     </svg>
                   </button>
-                  <button type="button" class="msgr-field-icon" id="msgrWaIcon" aria-label="WhatsApp verified" title="WhatsApp" hidden>
+                  <button type="button" class="msgr-field-icon" id="msgrWaIcon" data-i18n-aria-label="whatsapp_verified" aria-label="<?= htmlspecialchars(tr('whatsapp_verified')) ?>" title="WhatsApp" hidden>
                     <svg class="ico-wa" viewBox="0 0 24 24" fill="none" aria-hidden="true">
                       <path d="M12.04 2c-5.46 0-9.91 4.45-9.91 9.91 0 1.75.46 3.45 1.32 4.95L2.05 22l5.25-1.38c1.45.79 3.08 1.21 4.74 1.21 5.46 0 9.91-4.45 9.91-9.91 0-2.65-1.03-5.14-2.9-7.01A9.816 9.816 0 0 0 12.04 2zM12.04 20.13c-1.55 0-3.07-.42-4.39-1.21l-.31-.19-3.11.82.83-3.04-.21-.33a8.103 8.103 0 0 1-1.24-4.27c0-4.47 3.64-8.11 8.11-8.11 2.17 0 4.2 0.84 5.73 2.38 1.53 1.53 2.38 3.56 2.38 5.73 0 4.47-3.64 8.12-8.11 8.12zM16.48 13.84c-.24-.12-1.44-.71-1.66-.79-.22-.08-.38-.12-.54.12-.16.24-.61.76-.75.91-.14.15-.28.17-.52.05-.24-.12-1.01-.37-1.92-1.18-.71-.63-1.19-1.41-1.33-1.65-.14-.24-.01-.37.11-.49.11-.11.24-.28.36-.42.12-.14.16-.24.24-.4.08-.16.04-.3-.02-.42s-.54-1.31-.74-1.79c-.2-.47-.4-.41-.54-.41-.14 0-.3 0-.46 0s-.42.06-.64.3c-.22.24-.84.82-.84 2s.86 2.33.98 2.49c.12.16 1.7 2.59 4.11 3.64.57.25 1.02.4 1.37.51.58.18 1.1.16 1.51.1.46-.07 1.44-.59 1.64-1.16.2-.57.2-1.06.14-1.16-.06-.1-.22-.16-.46-.28z" fill="currentColor"/>
                     </svg>
@@ -334,7 +334,7 @@ $mk = function (string $l) use ($self, $baseQs) {
                 </div>
               </label>
               <label class="modal-label full" id="reqCommentLabel">
-                <textarea id="reqComment" name="comment" class="preorder-box" rows="4" placeholder="<?= htmlspecialchars(tr('comment_placeholder')) ?>"></textarea>
+                <textarea id="reqComment" name="comment" class="preorder-box" rows="4" data-i18n-placeholder="comment_placeholder" placeholder="<?= htmlspecialchars(tr('comment_placeholder')) ?>"></textarea>
               </label>
               <label class="modal-label full" id="reqPreorderLabel" hidden>
                 <div id="reqPreorderBox" class="preorder-box" aria-readonly="true"></div>
@@ -372,7 +372,7 @@ $mk = function (string $l) use ($self, $baseQs) {
           <div class="modal-title" id="mobilePreorderTitle" data-i18n="preorder_title"><?= htmlspecialchars(tr('preorder_title')) ?></div>
           <div class="modal-total" id="mobilePreorderTotal"></div>
         </div>
-        <button class="btn-close-modal" type="button" data-modal-close="mobilePreorderModal" aria-label="Close">×</button>
+        <button class="btn-close-modal" type="button" data-modal-close="mobilePreorderModal" data-i18n-aria-label="close" aria-label="<?= htmlspecialchars(tr('close')) ?>">×</button>
       </div>
       <div class="mobile-preorder-layout">
         <div class="preorder-top">
@@ -398,7 +398,7 @@ $mk = function (string $l) use ($self, $baseQs) {
       ],
     ],
   ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?></script>
-  <script src="/tr3/assets/tr3.boot.js?v=20260921_0005" defer></script>
+  <script src="/tr3/assets/tr3.boot.js?v=20260921_0006" defer></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/libphonenumber-js/1.10.49/libphonenumber-js.min.js" defer></script>
 </body>
 </html>
