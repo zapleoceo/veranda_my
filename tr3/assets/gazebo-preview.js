@@ -7,12 +7,12 @@
   'use strict';
   function previewSource(number) {
     const n = Number(number);
-    if ([1, 2, 3, 6, 9].includes(n)) return '/tr3/assets/gazebo-preview-v1.png';
+    if ([1, 2, 3, 6, 9].includes(n)) return '/tr3/assets/gazebo-preview-v2.webp';
     const type = [4, 5, 8].includes(n) ? 'garden' : n === 7 ? 'garden-parasol'
       : [10, 11].includes(n) ? 'counter' : [12, 13].includes(n) ? 'counter-parasol'
       : [14, 15].includes(n) ? 'small-dark' : n === 16 ? 'small-gray'
       : n >= 17 && n <= 21 && Number.isInteger(n) ? 'wood' : null;
-    return type ? '/tr3/assets/preview-' + type + '-v1.png' : null;
+    return type ? '/tr3/assets/preview-' + type + '-v2.webp' : null;
   }
   function positionPreview(anchor, viewport, preferred = { width: 320, height: 240 }) {
     const gap = 12;
