@@ -70,11 +70,22 @@
     document.querySelectorAll('[data-i18n]').forEach((el) => {
       if (!(el instanceof HTMLElement)) return;
       const key = String(el.getAttribute('data-i18n') || '').trim();
-      if (!key) return;
+      if (!key || el.id === 'resDateBtn') return;
       swapText(el, t(key));
     });
-    const reqComment = document.getElementById('reqComment');
-    if (reqComment) reqComment.setAttribute('placeholder', t('comment_placeholder'));
+    ['aria-label', 'placeholder'].forEach(attribute => {
+      document.querySelectorAll('[data-i18n-' + attribute + ']').forEach(el => {
+        const key = el.getAttribute('data-i18n-' + attribute);
+        if (key) el.setAttribute(attribute, t(key));
+      });
+    });
+    const duration = document.getElementById('reqDuration');
+    if (duration) Array.from(duration.options).forEach(option => {
+      const hours = Number(option.value) / 60;
+      if (Number.isFinite(hours)) option.textContent = new Intl.NumberFormat(UI_LOCALE).format(hours) + ' ' + t('h_short');
+    });
+    const startIso = document.getElementById('reqStartIso');
+    if (typeof setEndTimeLabel === 'function') setEndTimeLabel(startIso ? startIso.value : '', duration ? duration.value : 0);
     const resDateBtn = document.getElementById('resDateBtn');
     const resDate = document.getElementById('resDate');
     if (resDateBtn) {
@@ -1460,13 +1471,13 @@
       const d0 = parseIsoLocal(startIso);
       const dur = Number(durationMin || 0) || 0;
       if (!d0 || !isFinite(d0.getTime()) || dur <= 0) {
-        reqEndTime.textContent = 'до —';
+        reqEndTime.textContent = t('booking_until_prefix') + ' —';
         return;
       }
       const end = new Date(d0.getTime() + dur * 60 * 1000);
       const hh = String(end.getHours()).padStart(2, '0');
       const mm = String(end.getMinutes()).padStart(2, '0');
-      reqEndTime.textContent = 'до ' + hh + ':' + mm;
+      reqEndTime.textContent = t('booking_until_prefix') + ' ' + hh + ':' + mm;
     };
     const syncStartIsoAndEnd = () => {
       if (!pendingBooking || !pendingBooking.start || !reqStart || !reqStart.value) {
