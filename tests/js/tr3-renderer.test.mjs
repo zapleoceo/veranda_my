@@ -330,3 +330,17 @@ test('garden path follows terrace then rises beside pool without downward spurs'
     assert.ok(end.x > scene.fountain.x + scene.fountain.w);
     assert.ok(end.y < scene.fountain.y + scene.fountain.h);
 });
+
+
+test('tables 17 through 22 have two separate chairs on each side', () => {
+    for (let number = 16; number <= 22; number += 1) {
+        const tableSettings = { ...settings, 101: { ...settings[101], scheme_num: String(number) }, 202: { ...settings[202], scheme_num: '1' } };
+        const { tables } = render({ tableSettings });
+        const chairs = tables.querySelectorAll('.plan-chair');
+        assert.equal(chairs.length, number === 16 ? 0 : 4);
+        if (number !== 16) {
+            assert.equal(chairs.filter(c => c.classList.contains('left')).length, 2);
+            assert.equal(chairs.filter(c => c.classList.contains('right')).length, 2);
+        }
+    }
+});

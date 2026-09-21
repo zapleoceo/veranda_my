@@ -57,3 +57,6 @@ Replace straight spurs with one terrace-parallel route and a cubic rise beside t
 
 ## Gazebo illustration preview
 Built-in imagegen generated gazebo-preview-v1.png from owner gazebo photo. Prompt: professional architectural drawing of complete black steel gazebo, transparent corrugated roof with bamboo crossbeams, pale sheer curtains, olive cushions and low timber table, grass base, no people/text. Lazy viewport-clamped hover/focus portal only for gazebos1/2/3/6/9; touch and booking clicks unchanged.24 focused tests pass, Sol review PASS, browser preview and booking modal transition verified. Cache20260921_0002.
+
+## Individual chairs17-22
+Owner requested two opposite two. Replace long side seats with four wicker chair drawings with outer backrests for17-22 only. Preserve all native geometry/capacity/handlers.25 tests pass including each affected number; Sol review PASS, browser inspected. Cache20260921_0003.
