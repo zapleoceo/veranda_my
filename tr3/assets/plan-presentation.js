@@ -244,7 +244,8 @@
       else if (role === 'stage') ['speaker left', 'speaker right', 'keyboard'].forEach(n => make(n, art));
       if (['bar', 'cashier', 'stage'].includes(role)) {
         const label = make('plaque', art);
-        label.textContent = typeof translate === 'function' ? translate(role === 'stage' ? 'musicians' : role) : item.label;
+        label.setAttribute('data-i18n', role);
+        label.textContent = typeof translate === 'function' ? translate(role) : item.label;
       }
       additions.push({ element: item.element, art, role });
     });

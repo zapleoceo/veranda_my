@@ -10,6 +10,8 @@
   window.UI_LOCALE = UI_LOCALE;
   window.STR = STR;
   const t = (key) => (STR && Object.prototype.hasOwnProperty.call(STR, key)) ? STR[key] : String(key);
+  // Display translation never replaces Poster labels used in booking payloads.
+  const displayTableLabel = (label) => /^room$/i.test(String(label || '').trim()) ? t('room') : String(label || '');
   const fmtVars = (str, vars) => String(str || '').replace(/\{(\w+)\}/g, (_, k) => (vars && vars[k] != null) ? String(vars[k]) : '');
   const SOON_BOOK_HOURS = Number(cfg.soonBookingHours != null ? cfg.soonBookingHours : 2) || 2;
   const SOON_BOOK_MIN = Math.max(0, Math.round(SOON_BOOK_HOURS * 60));
@@ -369,6 +371,7 @@
     };
     const getTableLabelText = (tEl) => {
       if (!tEl || !tEl.querySelector) return '';
+      if (tEl.dataset && tEl.dataset.tableLabel) return String(tEl.dataset.tableLabel).trim();
       const el = tEl.querySelector('.num');
       return el ? String(el.textContent || '').trim() : '';
     };
@@ -1597,7 +1600,11 @@
 
 
       pendingBooking = { tableLabel: String(tableLabel || ''), posterTableId: String(posterTableId || ''), spotId: Number(spotId || 1) || 1, hallId: Number(hallId || activeHallId || 0) || (activeHallId || 0), guests: Number(guests || 0), start: String(start || '') };
-      if (reqModalTable) reqModalTable.textContent = String(tableLabel || '');
+      if (reqModalTable) {
+        reqModalTable.textContent = displayTableLabel(tableLabel);
+        if (/^room$/i.test(String(tableLabel || '').trim())) reqModalTable.setAttribute('data-i18n', 'room');
+        else reqModalTable.removeAttribute('data-i18n');
+      }
       if (reqTableNumInput) reqTableNumInput.value = String(tableLabel || '');
       if (reqPosterTableIdInput) reqPosterTableIdInput.value = String(posterTableId || '');
       if (reqGuests) {
@@ -2226,7 +2233,7 @@
           // Final review popup before anything is booked. The time is highlighted
           // because guests frequently pick the wrong slot. Nothing is sent until
           // they confirm here; "Изменить" just closes back to the open form.
-          const bookingConfirmed = await confirmBookingSummary({ table: tableLabel, start, guests, name, phone });
+          const bookingConfirmed = await confirmBookingSummary({ table: displayTableLabel(tableLabel), start, guests, name, phone });
           if (!bookingConfirmed) return;
 
           submitBusy = true;
@@ -2268,7 +2275,7 @@
           // clear card (was preorder-only) so the guest gets explicit on-site
           // feedback that the booking went through; full details also arrive in
           // their messenger. Preorder note is appended when relevant.
-          setOutput(fmtVars(t('submit_success'), { start: (fmtStartHuman(start) || start), table: tableLabel, guests: String(guests), name, phone }));
+          setOutput(fmtVars(t('submit_success'), { start: (fmtStartHuman(start) || start), table: displayTableLabel(tableLabel), guests: String(guests), name, phone }));
           const okModal = document.getElementById('preorderOkModal');
           const okBtn   = document.getElementById('preorderOkBtn');
           const okTitle = document.getElementById('preorderOkTitle');
@@ -2463,7 +2470,7 @@
     };
 
     const setStatus = (tableId, label) => {
-      if (selectedTableEl) selectedTableEl.textContent = label ? String(label) : '—';
+      if (selectedTableEl) selectedTableEl.textContent = label ? displayTableLabel(label) : '—';
       if (!tableId) {
         if (statusLine) statusLine.textContent = '—';
         return;
@@ -2912,9 +2919,9 @@
           const el = document.createElement('div');
           el.className = 'bar-row';
           el.innerHTML = `
-            <div class="station-wrap"><div class="side-station">${esc(t('musicians'))}</div></div>
-            <div class="bar">${esc(t('bar'))}</div>
-            <div class="station-wrap cash"><div class="side-station">${esc(t('cashier'))}</div></div>
+            <div class="station-wrap"><div class="side-station" data-i18n="stage">${esc(t('stage'))}</div></div>
+            <div class="bar" data-i18n="bar">${esc(t('bar'))}</div>
+            <div class="station-wrap cash"><div class="side-station" data-i18n="cashier">${esc(t('cashier'))}</div></div>
           `;
           return el;
         }
@@ -3004,9 +3011,12 @@
         b.style.width = w + 'px';
         b.style.height = h + 'px';
       b.style.setProperty('--tbl-min', String(Math.max(1, Math.round(Math.min(w, h)))) + 'px');
+        const labelKey = /^room$/i.test(String(it.label || '').trim()) ? 'room' : '';
+        const visibleLabel = labelKey ? t(labelKey) : it.label;
+        const labelI18n = labelKey ? ' data-i18n="' + labelKey + '"' : '';
         b.innerHTML = it.bookable
-          ? `<span class="table-badge"><span class="num">${esc(it.label)}</span><span class="cap"></span></span>`
-          : `<span class="table-badge is-center"><span class="num">${esc(it.label)}</span></span>`;
+          ? `<span class="table-badge"><span class="num"${labelI18n}>${esc(visibleLabel)}</span><span class="cap"></span></span>`
+          : `<span class="table-badge is-center"><span class="num"${labelI18n}>${esc(visibleLabel)}</span></span>`;
         tablesEl.appendChild(b);
         presentationItems.push({ ...it, x: left, y: top, w, h, element: b });
       });
