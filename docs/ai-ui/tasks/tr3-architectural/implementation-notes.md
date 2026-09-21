@@ -54,3 +54,6 @@ Owner requested flush left/top placement. Anchor existing diameter to lawn notch
 
 ## Owner path reference
 Replace straight spurs with one terrace-parallel route and a cubic rise beside the pool, following owner screenshot. Preserve lawn containment and collisions.21 tests including topology pass; Sol review and desktop verification pass. Cache20260921_0001.
+
+## Gazebo illustration preview
+Built-in imagegen generated gazebo-preview-v1.png from owner gazebo photo. Prompt: professional architectural drawing of complete black steel gazebo, transparent corrugated roof with bamboo crossbeams, pale sheer curtains, olive cushions and low timber table, grass base, no people/text. Lazy viewport-clamped hover/focus portal only for gazebos1/2/3/6/9; touch and booking clicks unchanged.24 focused tests pass, Sol review PASS, browser preview and booking modal transition verified. Cache20260921_0002.
