@@ -33,10 +33,10 @@
         latestWeekend: j.latestWeekend,
         apiBase: j.apiBase,
       };
-      return loadScript('/tr3/assets/plan-presentation.js?v=20260921_0003')
+      return loadScript('/tr3/assets/plan-presentation.js?v=20260921_0004')
         .catch(() => { /* Optional artwork: retain the legacy plan on failure. */ })
-        .then(() => loadScript('/tr3/assets/app.js?v=20260921_0003'))
-        .then(() => loadScript('/tr3/assets/gazebo-preview.js?v=20260921_0003')
+        .then(() => loadScript('/tr3/assets/app.js?v=20260921_0004'))
+        .then(() => loadScript('/tr3/assets/gazebo-preview.js?v=20260921_0004')
           .then(() => window.TR3GazeboPreview.init(document, window))
           .catch(() => { /* Optional preview must never block booking. */ }));
     })

@@ -89,7 +89,7 @@
 .plan-step { position: relative; display: block; background: linear-gradient(#d3cbb3,#b0a78e); border-top: 1px solid #eee5ce; border-bottom: 2px solid #78735f; }
 
 /* Inert low planting and separated natural paving on clear live lawn only. */
-.plan-shrub { background: url("/tr3/assets/plan-shrub.svg?v=20260921_0003") center / 100% 100% no-repeat; filter: drop-shadow(1px 2px 1px #1e362a55); }
+.plan-shrub { background: url("/tr3/assets/plan-shrub.svg?v=20260921_0004") center / 100% 100% no-repeat; filter: drop-shadow(1px 2px 1px #1e362a55); }
 .plan-shrub-1 { transform: scaleX(-1); }
 .plan-shrub-2 { filter: brightness(.91) drop-shadow(1px 2px 1px #1e362a55); }
 .plan-shrub-3 { transform: scaleY(-1); filter: brightness(1.06) drop-shadow(1px 2px 1px #1e362a55); }
@@ -109,3 +109,7 @@
 .plan-chair::before { content: ''; position: absolute; top: -2px; bottom: -2px; width: 30%; border: 1px solid #494a38; border-radius: 3px; background: repeating-linear-gradient(0deg,#cbc3a2 0 2px,#8b8469 2px 3px); }
 .plan-chair.left::before { left: -3px; }
 .plan-chair.right::before { right: -3px; }
+
+/* Counter parasols attach at the middle of the lower tabletop edge. */
+.plan-counter .plan-parasol-mount { left: calc(50% - 3px); top: 82%; width: 6px; height: 15%; border: 1px solid #403e30; border-radius: 2px; background: #b6aa83; }
+.plan-counter .counter-parasol { width: 42%; left: 50%; right: auto; top: 94%; transform: translate(-50%, -50%); }
