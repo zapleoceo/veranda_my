@@ -13,8 +13,7 @@
 
 'use strict';
 
-const _i = (await import(new URL('./cacheBust.js' + new URL(import.meta.url).search, import.meta.url).href)).importer(import.meta.url);
-const { fmtVnd: fmt } = await _i('./format.js');
+import { fmtVnd as fmt } from './format.js';
 
 /** Checkbox dataset key → selection bucket. */
 const KINDS = { sepayId: 'sepay', posterId: 'poster', mailUid: 'mail', financeId: 'finance' };

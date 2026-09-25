@@ -4,11 +4,10 @@
 
 'use strict';
 
-const _i = (await import(new URL('../ui/cacheBust.js' + new URL(import.meta.url).search, import.meta.url).href)).importer(import.meta.url);
-const { createTxButtonHtml, TX_TYPE } = await _i('../ui/rowCreateTx.js');
-const { BANK_COLUMNS, MAIL_TBODY, byTimeAsc } = await _i('../ui/bankTable.js');
-const { classify: rowState }  = await _i('../ui/rowStates.js');
-const { esc, fmtVnd: fmt }    = await _i('../ui/format.js');
+import { createTxButtonHtml, TX_TYPE } from '../ui/rowCreateTx.js';
+import { BANK_COLUMNS, MAIL_TBODY, byTimeAsc } from '../ui/bankTable.js';
+import { classify as rowState }  from '../ui/rowStates.js';
+import { esc, fmtVnd as fmt }    from '../ui/format.js';
 
 /** Cells per finance row — see renderOutFinance(). */
 export const FINANCE_COLUMNS = 7;

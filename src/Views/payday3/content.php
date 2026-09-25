@@ -83,4 +83,7 @@ declare(strict_types=1);
     $jsMtime = @filemtime(__DIR__ . '/../../../payday3/assets/js/index.js');
     $jsVer = $jsMtime !== false ? (string)$jsMtime : '1';
 ?>
+<?php /* Must precede every module script: versions each module's URL
+         (static imports carry no ?v=) — see ModuleImportMap. */ ?>
+<script type="importmap"><?= \App\Payday3\Http\ModuleImportMap::json() ?></script>
 <script type="module" src="/payday3/assets/js/index.js?v=<?= htmlspecialchars($jsVer) ?>"></script>

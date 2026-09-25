@@ -7,14 +7,13 @@
 
 'use strict';
 
-const _i = (await import(new URL('../ui/cacheBust.js' + new URL(import.meta.url).search, import.meta.url).href)).importer(import.meta.url);
-const { api }              = await _i('../api.js');
-const { renderSepay,
+import { api }              from '../api.js';
+import { renderSepay,
         renderPoster,
-        updateInFooters }  = await _i('./renderTables.js');
-const { SEPAY_TBODY }      = await _i('../ui/bankTable.js');
-const { withRange }        = await _i('../ui/format.js');
-const { coalesce }         = await _i('../ui/coalesce.js');
+        updateInFooters }  from './renderTables.js';
+import { SEPAY_TBODY }      from '../ui/bankTable.js';
+import { withRange }        from '../ui/format.js';
+import { coalesce }         from '../ui/coalesce.js';
 
 /**
  * @param {{state:object, renderer:object|null, onRendered?:()=>void}} deps

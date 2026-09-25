@@ -10,12 +10,11 @@
 
 'use strict';
 
-const _i = (await import(new URL('./cacheBust.js' + new URL(import.meta.url).search, import.meta.url).href)).importer(import.meta.url);
-const { api }          = await _i('../api.js');
-const { LineRenderer } = await _i('./lineRenderer.js');
-const { BANK_SCROLL, BANK_TABLE } = await _i('./bankTable.js');
-const { withRange }    = await _i('./format.js');
-const { notify }       = await _i('./notify.js');
+import { api }          from '../api.js';
+import { LineRenderer } from './lineRenderer.js';
+import { BANK_SCROLL, BANK_TABLE } from './bankTable.js';
+import { withRange }    from './format.js';
+import { notify }       from './notify.js';
 
 /**
  * @param {{state:object, onChanged?:()=>void}} deps

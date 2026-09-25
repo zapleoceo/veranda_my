@@ -6,13 +6,12 @@
 
 'use strict';
 
-const _i = (await import(new URL('../ui/cacheBust.js' + new URL(import.meta.url).search, import.meta.url).href)).importer(import.meta.url);
-const { createTxButtonHtml, TX_TYPE } = await _i('../ui/rowCreateTx.js');
-const { BANK_COLUMNS, SEPAY_TBODY }   = await _i('../ui/bankTable.js');
-const { classify: rowState }          = await _i('../ui/rowStates.js');
-const { esc, fmtVnd: fmt }            = await _i('../ui/format.js');
-const { isVietnam, isBybit, methodOfRow } = await _i('../ui/paymentMethods.js');
-const { topTotals, diffClass }        = await _i('./totals.js');
+import { createTxButtonHtml, TX_TYPE } from '../ui/rowCreateTx.js';
+import { BANK_COLUMNS, SEPAY_TBODY }   from '../ui/bankTable.js';
+import { classify as rowState }          from '../ui/rowStates.js';
+import { esc, fmtVnd as fmt }            from '../ui/format.js';
+import { isVietnam, isBybit, methodOfRow } from '../ui/paymentMethods.js';
+import { topTotals, diffClass }        from './totals.js';
 
 /** Cells per Poster check row — see posterRow() / poster_table.php. */
 export const POSTER_COLUMNS = 9;

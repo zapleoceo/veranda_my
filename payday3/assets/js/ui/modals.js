@@ -10,20 +10,11 @@
 
 'use strict';
 
-const _i = (await import(new URL('./cacheBust.js' + new URL(import.meta.url).search, import.meta.url).href)).importer(import.meta.url);
-const [
-    { modalHost },
-    { initKashShift },
-    { initSupplies },
-    { initCheckFinder },
-    { initSettings },
-] = await Promise.all([
-    _i('./modal/host.js'),
-    _i('./modal/kashShift.js'),
-    _i('./modal/supplies.js'),
-    _i('./modal/checkFinder.js'),
-    _i('./modal/settings.js'),
-]);
+import { modalHost } from './modal/host.js';
+import { initKashShift } from './modal/kashShift.js';
+import { initSupplies } from './modal/supplies.js';
+import { initCheckFinder } from './modal/checkFinder.js';
+import { initSettings } from './modal/settings.js';
 
 export { modalHost };
 

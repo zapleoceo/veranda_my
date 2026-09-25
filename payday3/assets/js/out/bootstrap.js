@@ -17,22 +17,20 @@
 'use strict';
 
 // nginx serves /payday3/assets/js/* with a 4-hour cache and ignores
-// our Cache-Control headers, so bare static imports land on a stale URL
-// after every deploy. ui/cacheBust.js cascades index.js's ?v= through
-// dynamic imports so every cross-module URL changes on each commit.
-const _i = (await import(new URL('../ui/cacheBust.js' + new URL(import.meta.url).search, import.meta.url).href)).importer(import.meta.url);
-const { api }                 = await _i('../api.js');
-const { LineRenderer }        = await _i('../ui/lineRenderer.js');
-const { renderOutMail,
+// our Cache-Control headers; the import map emitted by content.php
+// (src/Payday3/Http/ModuleImportMap.php) versions every module URL.
+import { api }                 from '../api.js';
+import { LineRenderer }        from '../ui/lineRenderer.js';
+import { renderOutMail,
         renderOutFinance,
-        updateOutFooter }     = await _i('./renderTables.js');
-const { BANK_COLUMNS, BANK_SCROLL,
-        BANK_TABLE, MAIL_TBODY } = await _i('../ui/bankTable.js');
-const { esc, withRange }      = await _i('../ui/format.js');
-const { coalesce }            = await _i('../ui/coalesce.js');
-const { withBusy }            = await _i('../ui/busy.js');
-const { notify }              = await _i('../ui/notify.js');
-const { showHiddenFrom }      = await _i('../ui/eyeToggles.js');
+        updateOutFooter }     from './renderTables.js';
+import { BANK_COLUMNS, BANK_SCROLL,
+        BANK_TABLE, MAIL_TBODY } from '../ui/bankTable.js';
+import { esc, withRange }      from '../ui/format.js';
+import { coalesce }            from '../ui/coalesce.js';
+import { withBusy }            from '../ui/busy.js';
+import { notify }              from '../ui/notify.js';
+import { showHiddenFrom }      from '../ui/eyeToggles.js';
 
 /**
  * Merge an allSettled fan-out into the current rows: a rejected part

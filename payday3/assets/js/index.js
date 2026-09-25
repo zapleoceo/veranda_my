@@ -2,67 +2,40 @@
 // then wires up each small UI module. No business logic lives here —
 // every behaviour is one focused file in ./ui/.
 //
-// Cache-busting strategy: the <script> tag in content.php is loaded as
-//   index.js?v=<filemtime>
-// We forward that `v=` query string to every submodule import via
-// dynamic `import()` (ui/cacheBust.js; every module does the same for
-// its own imports). That way a single mtime bump on index.js
-// invalidates every cached module in one shot.
+// Cache-busting strategy: plain static imports, no query strings in the
+// specifiers. content.php emits an import map right before this module's
+// <script> that maps every /payday3/assets/js/**.js URL to the same URL
+// with ?v=<filemtime> (src/Payday3/Http/ModuleImportMap.php), so each
+// module is re-fetched exactly when its own file changes. (The previous
+// top-level-await dynamic-import cascade hung iOS WebKit — do not revive.)
 
 'use strict';
 
-const _v = new URL(import.meta.url).searchParams.get('v') || '';
-const _i = (await import(new URL('./ui/cacheBust.js' + new URL(import.meta.url).search, import.meta.url).href)).importer(import.meta.url);
+import { State } from './state.js';
+import { setCsrf } from './api.js';
+import { initModeToggle } from './ui/modeToggle.js';
+import { initSelection, SIDE_KINDS } from './ui/selection.js';
+import { initSort } from './ui/sort.js';
+import { initEyeToggles } from './ui/eyeToggles.js';
+import { initHelpMode } from './ui/helpMode.js';
+import { initDateForm } from './ui/dateForm.js';
+import { refreshStats } from './ui/stats.js';
+import { LineRenderer } from './ui/lineRenderer.js';
+import { createInLinks } from './ui/linkActions.js';
+import { initIncomeLinks } from './ui/incomeLinks.js';
+import { paintRowStates } from './ui/rowStates.js';
+import { initLinkPanel } from './ui/linkPanel.js';
+import { initDataActions } from './ui/dataActions.js';
+import { BANK_TABLE, BANK_SCROLL, SEPAY_TBODY } from './ui/bankTable.js';
+import { initModals, modalHost } from './ui/modals.js';
+import { initOutMode } from './out/bootstrap.js';
+import { initBalances } from './ui/balances.js';
+import { makeInLoader, initSepayHide } from './in/bootstrap.js';
+import { initFinanceTransfers } from './ui/financeTransfers.js';
+import { initCreateTx } from './ui/createTx.js';
+import { initFontScale } from './ui/fontScale.js';
 
-const [
-    { State },
-    { setCsrf },
-    { initModeToggle },
-    { initSelection, SIDE_KINDS },
-    { initSort },
-    { initEyeToggles },
-    { initHelpMode },
-    { initDateForm },
-    { refreshStats },
-    { LineRenderer },
-    { createInLinks },
-    { initIncomeLinks },
-    { paintRowStates },
-    { initLinkPanel },
-    { initDataActions },
-    { BANK_TABLE, BANK_SCROLL, SEPAY_TBODY },
-    { initModals, modalHost },
-    { initOutMode },
-    { initBalances },
-    { makeInLoader, initSepayHide },
-    { initFinanceTransfers },
-    { initCreateTx },
-    { initFontScale },
-] = await Promise.all([
-    _i('./state.js'),
-    _i('./api.js'),
-    _i('./ui/modeToggle.js'),
-    _i('./ui/selection.js'),
-    _i('./ui/sort.js'),
-    _i('./ui/eyeToggles.js'),
-    _i('./ui/helpMode.js'),
-    _i('./ui/dateForm.js'),
-    _i('./ui/stats.js'),
-    _i('./ui/lineRenderer.js'),
-    _i('./ui/linkActions.js'),
-    _i('./ui/incomeLinks.js'),
-    _i('./ui/rowStates.js'),
-    _i('./ui/linkPanel.js'),
-    _i('./ui/dataActions.js'),
-    _i('./ui/bankTable.js'),
-    _i('./ui/modals.js'),
-    _i('./out/bootstrap.js'),
-    _i('./ui/balances.js'),
-    _i('./in/bootstrap.js'),
-    _i('./ui/financeTransfers.js'),
-    _i('./ui/createTx.js'),
-    _i('./ui/fontScale.js'),
-]);
+const _v = new URL(import.meta.url).searchParams.get('v') || '';
 
 const bootstrapEl = document.getElementById('pd3-bootstrap');
 let raw = {};

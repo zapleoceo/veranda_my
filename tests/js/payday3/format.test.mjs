@@ -7,7 +7,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { fmtVnd, parseVnd, esc, rangeQuery, withRange } from '../../../payday3/assets/js/ui/format.js';
-import { versionQuery, versionedUrl } from '../../../payday3/assets/js/ui/cacheBust.js';
 import { withBusy, setStatus } from '../../../payday3/assets/js/ui/busy.js';
 
 test('fmtVnd: пробелы-разделители, округление, пустое значение', () => {
@@ -41,12 +40,6 @@ test('withRange: период в query, с учётом уже имеющего�
     assert.equal(withRange('/api/out/mail?include_hidden=1', r),
         '/api/out/mail?include_hidden=1&dateFrom=2026-09-18&dateTo=2026-09-18');
     assert.equal(withRange('/api/data', null), '/api/data', 'без периода URL не портится');
-});
-
-test('cacheBust: v= из URL модуля переносится на импорт', () => {
-    assert.equal(versionQuery('https://x/payday3/assets/js/index.js?v=123'), '?v=123');
-    assert.equal(versionQuery('file:///a/b.js'), '');
-    assert.equal(versionedUrl('../api.js', 'https://x/js/ui/a.js?v=9'), 'https://x/js/api.js?v=9');
 });
 
 function fakeBtn() {

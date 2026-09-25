@@ -14,8 +14,7 @@
 
 'use strict';
 
-const _i = (await import(new URL('./cacheBust.js' + new URL(import.meta.url).search, import.meta.url).href)).importer(import.meta.url);
-const { SEPAY_TBODY, MAIL_TBODY } = await _i('./bankTable.js');
+import { SEPAY_TBODY, MAIL_TBODY } from './bankTable.js';
 
 const STATES = ['row-red', 'row-green', 'row-yellow', 'row-gray'];
 

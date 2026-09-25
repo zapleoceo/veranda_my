@@ -25,8 +25,7 @@ const TITLES = {
     [TX_TYPE.EXPENSE]: 'Создать расход в Poster на эту сумму',
 };
 
-const _i = (await import(new URL('./cacheBust.js' + new URL(import.meta.url).search, import.meta.url).href)).importer(import.meta.url);
-const { esc } = await _i('./format.js');
+import { esc } from './format.js';
 
 /**
  * @param {{amount:number|string, date:string, type:number}} p

@@ -13,13 +13,12 @@
 
 'use strict';
 
-const _i = (await import(new URL('./cacheBust.js' + new URL(import.meta.url).search, import.meta.url).href)).importer(import.meta.url);
-const { api }                  = await _i('../api.js');
-const { esc, fmtVnd, parseVnd: parse } = await _i('./format.js');
-const { coalesce }             = await _i('./coalesce.js');
-const { withBusy, setStatus: setStatusOf } = await _i('./busy.js');
-const { splitDateTime }        = await _i('./rowCreateTx.js');
-const { loadHtml2Canvas }      = await _i('./html2canvasLoader.js');
+import { api }                  from '../api.js';
+import { esc, fmtVnd, parseVnd as parse } from './format.js';
+import { coalesce }             from './coalesce.js';
+import { withBusy, setStatus as setStatusOf } from './busy.js';
+import { splitDateTime }        from './rowCreateTx.js';
+import { loadHtml2Canvas }      from './html2canvasLoader.js';
 
 // Rows of the card. Факт. Total = sum of ROW_KEYS; Poster Total = every
 // Poster account — so a Poster account without a row skews Δ Total

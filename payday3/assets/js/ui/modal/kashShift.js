@@ -3,9 +3,8 @@
 
 'use strict';
 
-const _i = (await import(new URL('../cacheBust.js' + new URL(import.meta.url).search, import.meta.url).href)).importer(import.meta.url);
-const { api }            = await _i('../../api.js');
-const { esc, fmtVnd, withRange } = await _i('../format.js');
+import { api }            from '../../api.js';
+import { esc, fmtVnd, withRange } from '../format.js';
 
 const fmt = (n) => fmtVnd(n, { empty: '' });
 

@@ -10,9 +10,8 @@
 
 'use strict';
 
-const _i = (await import(new URL('./cacheBust.js' + new URL(import.meta.url).search, import.meta.url).href)).importer(import.meta.url);
-const { api }       = await _i('../api.js');
-const { withRange } = await _i('./format.js');
+import { api }       from '../api.js';
+import { withRange } from './format.js';
 
 /**
  * @param {{state:object, renderer:object|null, onChanged?:(links:array)=>void}} deps

@@ -3,9 +3,8 @@
 
 'use strict';
 
-const _i = (await import(new URL('./cacheBust.js' + new URL(import.meta.url).search, import.meta.url).href)).importer(import.meta.url);
-const { recomputePosterFooter } = await _i('../in/renderTables.js');
-const { SEPAY_TBODY }           = await _i('./bankTable.js');
+import { recomputePosterFooter } from '../in/renderTables.js';
+import { SEPAY_TBODY }           from './bankTable.js';
 
 export function refreshStats() {
     // Sepay footer — linked / unlinked counts. Sum is server-rendered

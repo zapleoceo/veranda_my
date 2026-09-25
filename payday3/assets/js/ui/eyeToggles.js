@@ -14,10 +14,9 @@
 
 'use strict';
 
-const _i = (await import(new URL('./cacheBust.js' + new URL(import.meta.url).search, import.meta.url).href)).importer(import.meta.url);
-const { recomputePosterFooter }  = await _i('../in/renderTables.js');
-const { SEPAY_TBODY }            = await _i('./bankTable.js');
-const { isVietnam, methodOfRow } = await _i('./paymentMethods.js');
+import { recomputePosterFooter }  from '../in/renderTables.js';
+import { SEPAY_TBODY }            from './bankTable.js';
+import { isVietnam, methodOfRow } from './paymentMethods.js';
 
 /** «Show hidden rows» is on when the eye is NOT pressed (pressed = hide). */
 export const showHiddenFrom = (btn) => btn?.getAttribute('aria-pressed') === 'false';

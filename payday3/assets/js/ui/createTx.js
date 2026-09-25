@@ -16,12 +16,11 @@
 
 'use strict';
 
-const _i = (await import(new URL('./cacheBust.js' + new URL(import.meta.url).search, import.meta.url).href)).importer(import.meta.url);
-const { api } = await _i('../api.js');
-const { TX_TYPE, CREATE_TX_SELECTOR, readCreateTxTrigger, splitDateTime } = await _i('./rowCreateTx.js');
-const { esc, fmtVnd, parseVnd } = await _i('./format.js');
-const { setStatus }  = await _i('./busy.js');
-const { buildCategoryTree, walkCategories, customName } = await _i('./categoryTree.js');
+import { api } from '../api.js';
+import { TX_TYPE, CREATE_TX_SELECTOR, readCreateTxTrigger, splitDateTime } from './rowCreateTx.js';
+import { esc, fmtVnd, parseVnd } from './format.js';
+import { setStatus }  from './busy.js';
+import { buildCategoryTree, walkCategories, customName } from './categoryTree.js';
 
 // The amount input shows positive VND only; empty for 0 / negative.
 const fmtVndInt   = (n) => { const v = Math.round(Number(n) || 0); return v > 0 ? fmtVnd(v) : ''; };

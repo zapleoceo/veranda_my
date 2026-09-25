@@ -6,11 +6,10 @@
 
 'use strict';
 
-const _i = (await import(new URL('../cacheBust.js' + new URL(import.meta.url).search, import.meta.url).href)).importer(import.meta.url);
-const { api }       = await _i('../../api.js');
-const { esc }       = await _i('../format.js');
-const { setStatus } = await _i('../busy.js');
-const { buildCategoryTree, walkCategories, customName } = await _i('../categoryTree.js');
+import { api }       from '../../api.js';
+import { esc }       from '../format.js';
+import { setStatus } from '../busy.js';
+import { buildCategoryTree, walkCategories, customName } from '../categoryTree.js';
 
 /**
  * A pasted t.me link → Telegram chat / thread ids (pure, tested).

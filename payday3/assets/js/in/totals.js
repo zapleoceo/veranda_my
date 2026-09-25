@@ -13,8 +13,7 @@
 
 'use strict';
 
-const _i = (await import(new URL('../ui/cacheBust.js' + new URL(import.meta.url).search, import.meta.url).href)).importer(import.meta.url);
-const { isVietnam, methodOfData } = await _i('../ui/paymentMethods.js');
+import { isVietnam, methodOfData } from '../ui/paymentMethods.js';
 
 const sum = (rows, pick) => (rows || []).reduce((acc, r) => acc + (Number(pick(r)) || 0), 0);
 

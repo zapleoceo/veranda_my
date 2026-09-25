@@ -16,9 +16,8 @@
 
 'use strict';
 
-const _i = (await import(new URL('./cacheBust.js' + new URL(import.meta.url).search, import.meta.url).href)).importer(import.meta.url);
-const { linkPlan }       = await _i('./selection.js');
-const { withBusy: busy } = await _i('./busy.js');
+import { linkPlan }       from './selection.js';
+import { withBusy as busy } from './busy.js';
 
 /**
  * Run labelled side-effects side by side; resolve to the failures only.
