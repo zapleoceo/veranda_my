@@ -250,3 +250,25 @@
 }
 .mob-cta .btn { flex: 1; justify-content: center; padding-left: 18px; }
 @media (min-width: 760px) { .mob-cta { display: none; } }
+
+/* ─── FAQ: нативный <details>, сворачивание без JS ───────────── */
+.faq__list { margin-top: var(--s-6); border-top: 1px solid var(--hair); }
+.faq__item { border-bottom: 1px solid var(--hair); }
+.faq__q {
+    display: flex; align-items: center; justify-content: space-between; gap: var(--s-4);
+    padding: var(--s-4) 0; cursor: pointer; list-style: none;
+    font-family: var(--sans); font-weight: 600; font-size: clamp(15px, 1.6vw, 17px);
+    color: var(--text); transition: color .3s var(--ease-out);
+}
+.faq__q::-webkit-details-marker { display: none; }
+.faq__q:hover { color: var(--red-soft); }
+.faq__ic {
+    flex: 0 0 auto; width: 28px; height: 28px; border-radius: 50%;
+    display: inline-flex; align-items: center; justify-content: center;
+    border: 1px solid var(--hair-2); color: var(--ember-2);
+    transition: transform .4s var(--ease-out), background .3s;
+}
+.faq__ic svg { width: 14px; height: 14px; }
+.faq__item[open] .faq__ic { transform: rotate(180deg); background: var(--hair); }
+.faq__a { margin: 0 0 var(--s-5); padding-right: var(--s-8); color: var(--text-2); line-height: 1.6; }
+@media (max-width: 760px) { .faq__a { padding-right: 0; } }

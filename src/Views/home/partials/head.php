@@ -11,7 +11,7 @@ use App\Home\View\Html;
  * @var string                $locale
  */
 
-$v = '20260608n'; // cache-bust (бронза вместо желтизны + кино-сеансы)
+$v = '20260926a'; // cache-bust (бронза вместо желтизны + кино-сеансы)
 ?>
 <head>
 <meta charset="UTF-8">

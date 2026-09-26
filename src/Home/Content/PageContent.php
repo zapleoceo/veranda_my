@@ -44,6 +44,7 @@ final class PageContent
             'worlds'   => ['eyebrow' => $l->t('worlds.eyebrow'),   'titleHtml' => $l->t('worlds.title'),   'lead' => $l->t('worlds.lead')],
             'bento'    => ['eyebrow' => $l->t('bento.eyebrow'),    'titleHtml' => $l->t('bento.title'),    'lead' => ''],
             'location' => ['eyebrow' => $l->t('location.eyebrow'), 'titleHtml' => $l->t('location.title'), 'lead' => $l->t('location.lead')],
+            'faq'      => ['eyebrow' => $l->t('faq.eyebrow'),      'titleHtml' => $l->t('faq.title'),      'lead' => ''],
         ];
     }
 
@@ -86,5 +87,23 @@ final class PageContent
     public function directions(): string
     {
         return $this->lang->t('location.directions');
+    }
+
+    /** Сколько пар «вопрос-ответ» лежит в словаре (faq.q1..faq.aN). */
+    private const FAQ_COUNT = 8;
+
+    /**
+     * Вопросы и ответы: и для видимого блока, и для FAQPage-разметки.
+     *
+     * @return array<array{q:string,a:string}>
+     */
+    public function faq(): array
+    {
+        $out = [];
+        for ($i = 1; $i <= self::FAQ_COUNT; $i++) {
+            $out[] = ['q' => $this->lang->t("faq.q{$i}"), 'a' => $this->lang->t("faq.a{$i}")];
+        }
+
+        return $out;
     }
 }

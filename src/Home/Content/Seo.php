@@ -77,6 +77,32 @@ final class Seo
     }
 
     /**
+     * Schema.org FAQPage — из тех же пар «вопрос-ответ», что и видимый блок на странице.
+     * Сниппета в Google это не даст (FAQ-rich-results отключены), но делает Q&A
+     * машиночитаемыми для ИИ-краулеров.
+     *
+     * @param array<array{q:string,a:string}> $faq
+     * @return array<string,mixed>
+     */
+    public function faqJsonLd(array $faq): array
+    {
+        return [
+            '@context' => 'https://schema.org',
+            '@type' => 'FAQPage',
+            '@id' => $this->canonical() . '#faq',
+            'inLanguage' => $this->locale,
+            'mainEntity' => array_map(
+                static fn (array $i): array => [
+                    '@type' => 'Question',
+                    'name' => $i['q'],
+                    'acceptedAnswer' => ['@type' => 'Answer', 'text' => $i['a']],
+                ],
+                $faq,
+            ),
+        ];
+    }
+
+    /**
      * Schema.org Restaurant — расширенно: адрес, гео, часы, кухни, соцсети, бронь.
      *
      * @return array<string,mixed>
@@ -95,13 +121,14 @@ final class Seo
             'description' => $this->description(),
             'inLanguage' => $this->locale,
             'telephone' => $c->phone,
-            'priceRange' => '$$',
-            'servesCuisine' => ['Slavic', 'European', 'Vietnamese'],
+            'priceRange' => '100,000-200,000 VND',
+            'servesCuisine' => ['European', 'Russian', 'Home cooking'],
             'address' => [
                 '@type' => 'PostalAddress',
                 'streetAddress' => 'Trần Khát Chân, Đường Đệ',
                 'addressLocality' => 'Nha Trang',
                 'addressRegion' => 'Khánh Hòa',
+                'postalCode' => '650000',
                 'addressCountry' => 'VN',
             ],
             'geo' => [
@@ -115,8 +142,12 @@ final class Seo
                 ['@type' => 'OpeningHoursSpecification', 'dayOfWeek' => ['Friday', 'Saturday', 'Sunday'], 'opens' => '10:00', 'closes' => '23:00'],
             ],
             'sameAs' => [$c->instagram, 'https://www.facebook.com/vngamezone/', $c->telegram],
+            // schema.org помечает menu как устаревшее в пользу hasMenu, но документация
+            // Google описывает только menu — держим оба, это один и тот же URL.
             'hasMenu' => $this->base . '/links/menu',
-            'acceptsReservations' => 'True',
+            'menu' => $this->base . '/links/menu',
+            // Нативный Boolean: строка "True" разметкой читается как текст, а не как «да».
+            'acceptsReservations' => true,
             'potentialAction' => [
                 '@type' => 'ReserveAction',
                 'target' => $this->base . '/tr3/',

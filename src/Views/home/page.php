@@ -29,8 +29,9 @@ use App\Home\View\Html;
 <?= $view->partial('partials/gallery',  ['content' => $content]) ?>
 <?= $view->partial('partials/gazebos',  ['content' => $content, 'contacts' => $contacts, 'lang' => $lang]) ?>
 <?= $view->partial('partials/location', ['content' => $content, 'contacts' => $contacts, 'lang' => $lang]) ?>
+<?= $view->partial('partials/faq',      ['content' => $content, 'lang' => $lang]) ?>
 <?= $view->partial('partials/footer',   ['content' => $content, 'contacts' => $contacts, 'lang' => $lang]) ?>
 <?= $view->partial('partials/mobile-cta', ['contacts' => $contacts, 'lang' => $lang]) ?>
-<?= $view->partial('partials/scripts',  ['seo' => $seo]) ?>
+<?= $view->partial('partials/scripts',  ['seo' => $seo, 'content' => $content]) ?>
 </body>
 </html>
