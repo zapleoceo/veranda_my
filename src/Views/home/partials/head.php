@@ -17,6 +17,8 @@ $v = '20260926a'; // cache-bust (бронза вместо желтизны + к
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#14100b">
+<!-- Подтверждение владения сайтом для Bing Webmaster Tools (публичный токен, не секрет) -->
+<meta name="msvalidate.01" content="E21A25F59EB7E21E63E7D1241BA5B281">
 <title><?= Html::e($seo->title()) ?></title>
 <meta name="description" content="<?= Html::e($seo->description()) ?>">
 <link rel="canonical" href="<?= Html::e($seo->canonical()) ?>">
