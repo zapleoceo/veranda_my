@@ -28,3 +28,10 @@ tr.total td { font-weight: 900; background: rgba(26,115,232,0.06); }
 .roma-col-discount { width: 180px; text-align: right; }
 .roma-col-payed { width: 180px; text-align: right; }
 .roma-col-saldo { width: 180px; text-align: right; }
+
+/* Editable calculation percent — top of the card */
+.roma-pct-box { display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:12px; padding:12px 14px; border:1px solid rgba(46,125,50,0.35); background: rgba(46,125,50,0.08); border-radius:12px; }
+.roma-pct-box > label { font-size:13px; font-weight:800; color: var(--text); }
+.roma-pct-input { display:flex; align-items:center; gap:6px; }
+.roma-pct-input input { width:96px; padding:8px 10px; border:1px solid #d1d5db; border-radius:10px; font-size:18px; font-weight:900; text-align:right; }
+.roma-pct-input span { font-size:18px; font-weight:900; }
