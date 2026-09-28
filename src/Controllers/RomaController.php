@@ -29,7 +29,7 @@ class RomaController
         $pageTitle    = 'Roma — кальяны';
         $currentPath  = '/roma';
         $headExtra    = '<link rel="stylesheet" href="/assets/css/common.css">' . "\n"
-                      . '<link rel="stylesheet" href="/assets/css/roma.css?v=20260928">';
+                      . '<link rel="stylesheet" href="/assets/css/roma.css?v=20260928_2">';
 
         ob_start();
         require __DIR__ . '/../Views/roma_content.php';

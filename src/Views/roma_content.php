@@ -1,13 +1,5 @@
 <div class="wrap">
     <div class="card">
-        <div class="roma-pct-box">
-            <label for="romaPct">Коэффициент расчёта</label>
-            <div class="roma-pct-input">
-                <input type="number" id="romaPct" min="0" max="100" step="1" value="65" inputmode="numeric">
-                <span>%</span>
-            </div>
-            <span class="muted">меняется на лету — пересчёт мгновенный, выбор запоминается</span>
-        </div>
         <div class="row">
             <div class="roma-header-info">
                 <h1>/roma — продажи кальянов (категория 47)</h1>
@@ -44,9 +36,15 @@
             <tfoot id="tfoot"></tfoot>
         </table>
 
-        <div class="romaTotal">
-            <div class="romaBox">
-                <span id="romaBase">0</span> * <span id="romaPctLabel">65</span>% = <span id="romaSum">0</span>
+        <div class="roma-foot">
+            <label class="roma-pct">
+                Коэффициент
+                <input type="number" id="romaPct" min="0" max="100" step="1" value="65" inputmode="numeric"><span class="roma-pct-sign">%</span>
+            </label>
+            <div class="romaTotal">
+                <div class="romaBox">
+                    <span id="romaBase">0</span> * <span id="romaPctLabel">65</span>% = <span id="romaSum">0</span>
+                </div>
             </div>
         </div>
     </div>

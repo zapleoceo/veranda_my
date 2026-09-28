@@ -15,7 +15,7 @@ th, td { padding: 10px; border-bottom: 1px solid var(--border); vertical-align: 
 th { text-align:left; font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); background: transparent; }
 td.num { text-align:right; font-variant-numeric: tabular-nums; white-space: nowrap; }
 tr.total td { font-weight: 900; background: rgba(26,115,232,0.06); }
-.romaTotal { margin-top: 12px; display:flex; justify-content: flex-end; }
+.romaTotal { display:flex; justify-content: flex-end; }
 .romaBox { border: 1px solid rgba(46,125,50,0.35); background: rgba(46,125,50,0.08); padding: 10px 12px; border-radius: 12px; font-weight: 900; }
 .error { margin-top: 10px; color: #b91c1c; font-weight: 700; }
 
@@ -29,9 +29,8 @@ tr.total td { font-weight: 900; background: rgba(26,115,232,0.06); }
 .roma-col-payed { width: 180px; text-align: right; }
 .roma-col-saldo { width: 180px; text-align: right; }
 
-/* Editable calculation percent — top of the card */
-.roma-pct-box { display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:12px; padding:12px 14px; border:1px solid rgba(46,125,50,0.35); background: rgba(46,125,50,0.08); border-radius:12px; }
-.roma-pct-box > label { font-size:13px; font-weight:800; color: var(--text); }
-.roma-pct-input { display:flex; align-items:center; gap:6px; }
-.roma-pct-input input { width:96px; padding:8px 10px; border:1px solid #d1d5db; border-radius:10px; font-size:18px; font-weight:900; text-align:right; }
-.roma-pct-input span { font-size:18px; font-weight:900; }
+/* Coefficient — minimalist, under the table on the left */
+.roma-foot { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-top:12px; flex-wrap:wrap; }
+.roma-pct { display:inline-flex; align-items:center; gap:8px; font-size:13px; color: var(--muted); }
+.roma-pct input { width:60px; padding:5px 8px; border:1px solid var(--border); border-radius:8px; font-size:14px; text-align:right; color: var(--text); background: var(--card); font-variant-numeric: tabular-nums; }
+.roma-pct-sign { color: var(--muted); margin-left:-2px; }
