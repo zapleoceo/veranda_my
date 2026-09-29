@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Controllers\Admin;
 
+use App\Infrastructure\Config;
 use App\Infrastructure\Database;
 use App\Infrastructure\Permissions;
 use Psr\Http\Message\ResponseInterface;
@@ -60,6 +61,7 @@ class AccessController
 
         ob_start();
         $permissionKeys = self::PERMISSION_KEYS;
+        $lastLogin      = $this->_getPosterLastLogin();
         require __DIR__ . '/../../Views/admin/access.php';
         $content = ob_get_clean();
 
@@ -124,6 +126,46 @@ class AccessController
             )->fetchAll();
         } catch (\Throwable $e) {
             $flash['err'] = 'Ошибка чтения: ' . $e->getMessage();
+            return [];
+        }
+    }
+
+    /**
+     * Карта email(login) → last_in из Poster (последний вход сотрудника в
+     * Poster). Сопоставляем по email в нижнем регистре. Если Poster недоступен
+     * или токен не задан — отдаём пустую карту, страница не падает.
+     *
+     * @return array<string,string>
+     */
+    private function _getPosterLastLogin(): array
+    {
+        $token = trim((string) (
+            Config::get('POSTER_API_TOKEN')
+            ?: ($_ENV['POSTER_API_TOKEN'] ?? '')
+            ?: (getenv('POSTER_API_TOKEN') ?: '')
+        ));
+        if ($token === '') {
+            return [];
+        }
+        try {
+            require_once __DIR__ . '/../../classes/PosterAPI.php';
+            $api  = new \App\Classes\PosterAPI($token);
+            $rows = $api->request('access.getEmployees', [], 'GET');
+            $map  = [];
+            if (is_array($rows)) {
+                foreach ($rows as $e) {
+                    if (!is_array($e)) {
+                        continue;
+                    }
+                    $login  = strtolower(trim((string) ($e['login'] ?? '')));
+                    $lastIn = trim((string) ($e['last_in'] ?? ''));
+                    if ($login !== '' && $lastIn !== '') {
+                        $map[$login] = $lastIn;
+                    }
+                }
+            }
+            return $map;
+        } catch (\Throwable $e) {
             return [];
         }
     }

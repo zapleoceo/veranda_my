@@ -16,6 +16,7 @@
                 <th>Telegram</th>
                 <th>Права</th>
                 <th>Добавлен</th>
+                <th>Последний вход</th>
                 <th></th>
             </tr>
         </thead>
@@ -31,6 +32,10 @@
                 <td><?= htmlspecialchars((string)($u['telegram_username'] ?? '')) ?></td>
                 <td style="font-size:.75rem;color:#6b7280"><?= htmlspecialchars(implode(', ', $permLabels)) ?: '—' ?></td>
                 <td style="font-size:.75rem;color:#9ca3af"><?= $u['created_at'] ? date('d.m.Y', strtotime($u['created_at'])) : '—' ?></td>
+                <td style="font-size:.75rem;color:#9ca3af;white-space:nowrap">
+                    <?php $li = $lastLogin[strtolower((string)($u['email'] ?? ''))] ?? ''; ?>
+                    <?= $li !== '' ? htmlspecialchars(date('d.m.Y H:i', strtotime($li))) : '—' ?>
+                </td>
                 <td>
                     <button class="btn btn-sm btn-secondary" onclick="openPerms(<?= htmlspecialchars(json_encode($u), ENT_QUOTES) ?>)">Права</button>
                     <a href="?delete=<?= urlencode((string)$u['email']) ?>"
@@ -40,7 +45,7 @@
             </tr>
         <?php endforeach; ?>
         <?php if (empty($users)): ?>
-            <tr><td colspan="6" style="text-align:center;color:#9ca3af;padding:1rem">Нет пользователей</td></tr>
+            <tr><td colspan="7" style="text-align:center;color:#9ca3af;padding:1rem">Нет пользователей</td></tr>
         <?php endif; ?>
         </tbody>
     </table>
