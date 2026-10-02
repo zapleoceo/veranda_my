@@ -40,7 +40,7 @@ $todayExternal = str_starts_with($today->url, 'http');
                     <div class="tonight__feature-info">
                         <span class="tonight__badge" id="tonightBadge"
                               data-today="<?= Html::e($lang->t('tonight.badgeToday')) ?>"
-                              data-week="<?= Html::e($lang->t('tonight.badgeWeek')) ?>"><?= Html::e($lang->t('tonight.badgeToday')) ?></span>
+                              data-week="<?= Html::e($lang->t('tonight.badgeWeek')) ?>"><?= Html::e($lang->t('tonight.badgeToday') . ' · ' . $program->dayDate($todayIdx)) ?></span>
                         <h3 class="tonight__title" id="tonightTitle"><?= Html::e($today->title . ($today->time !== '' ? ' · ' . $today->time : '')) ?></h3>
                         <p class="tonight__note" id="tonightNote"><?= Html::e($today->note) ?></p>
                     </div>
@@ -55,15 +55,17 @@ $todayExternal = str_starts_with($today->url, 'http');
                     class="tonight__day-card<?= $day === $todayIdx ? ' is-active' : '' ?>"
                     data-day="<?= (int) $day ?>"
                     data-dayname="<?= Html::e($program->dayFullName($day)) ?>"
+                    data-date="<?= Html::e($program->dayDate($day)) ?>"
                     data-title="<?= Html::e($ev->title) ?>"
                     data-time="<?= Html::e($ev->time) ?>"
                     data-note="<?= Html::e($ev->note) ?>"
                     data-image="<?= Html::e($ev->image) ?>"
                     data-url="<?= Html::e($ev->url) ?>"
                     data-cta="<?= Html::e($ev->ctaLabel !== '' ? $ev->ctaLabel : $lang->t('tonight.book')) ?>">
-                <span class="tonight__day-card-name"><?= Html::e($program->dayName($day)) ?></span>
+                <span class="tonight__day-card-name"><?= Html::e($program->dayName($day) . ' · ' . $program->dayDate($day)) ?></span>
                 <span class="tonight__day-card-title"><?= Html::e($ev->title) ?></span>
-                <span class="tonight__day-card-time"><?= Html::e($ev->time) ?></span>
+                <?php if ($ev->time !== ''): ?><span class="tonight__day-card-time"><?= Html::e($ev->time) ?></span><?php endif; ?>
+                <?php if ($ev->note !== ''): ?><span class="tonight__day-card-note"><?= Html::e($ev->note) ?></span><?php endif; ?>
             </button>
             <?php endforeach; ?>
         </div>

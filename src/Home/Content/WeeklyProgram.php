@@ -85,6 +85,12 @@ final class WeeklyProgram
         return $this->lang->list('days.short')[$day] ?? '';
     }
 
+    /** Дата дня на текущей неделе (Пн→Вс), например «29.09». */
+    public function dayDate(int $day): string
+    {
+        return date('d.m', strtotime('monday this week +' . (($day + 6) % 7) . ' days'));
+    }
+
     public function dayFullName(int $day): string
     {
         return $this->lang->list('days.full')[$day] ?? '';

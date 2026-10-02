@@ -69,7 +69,7 @@
                 if (/^https?:/.test(d.url || '')) { ctaEl.target = '_blank'; ctaEl.rel = 'noopener'; }
                 else { ctaEl.removeAttribute('target'); ctaEl.removeAttribute('rel'); }
             }
-            if (badgeEl) badgeEl.textContent = (Number(d.day) === today ? badgeEl.dataset.today : badgeEl.dataset.week) || badgeEl.textContent;
+            if (badgeEl) badgeEl.textContent = ((Number(d.day) === today ? badgeEl.dataset.today : badgeEl.dataset.week) || '') + (d.date ? ' · ' + d.date : '');
             setBg(d.image);
         }
 

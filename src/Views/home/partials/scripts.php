@@ -9,7 +9,7 @@ declare(strict_types=1);
  * @var \App\Home\Content\PageContent $content
  */
 
-$v = '20261002a';
+$v = '20261002b';
 ?>
 <script type="application/ld+json"><?= json_encode($seo->jsonLd(), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?></script>
 <script type="application/ld+json"><?= json_encode($seo->faqJsonLd($content->faq()), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?></script>
