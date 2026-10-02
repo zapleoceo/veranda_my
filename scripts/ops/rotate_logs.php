@@ -2,6 +2,12 @@
 
 declare(strict_types=1);
 
+// Только из консоли: scripts/ лежит в корне сайта, nginx отдал бы его по HTTP.
+if (PHP_SAPI !== 'cli') {
+    http_response_code(404);
+    exit;
+}
+
 /**
  * Ротация журналов крона (cron.log, telegram.log, menu_sync.log, …).
  *
