@@ -187,7 +187,7 @@ class TelegramBotClient
     {
         $params = [
             'url'             => $url,
-            'allowed_updates' => json_encode(['message', 'callback_query']),
+            'allowed_updates' => json_encode(['message', 'edited_message', 'callback_query']),
         ];
         if ($secret !== '') {
             $params['secret_token'] = $secret;
