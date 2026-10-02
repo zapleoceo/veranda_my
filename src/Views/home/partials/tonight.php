@@ -41,7 +41,7 @@ $todayExternal = str_starts_with($today->url, 'http');
                         <span class="tonight__badge" id="tonightBadge"
                               data-today="<?= Html::e($lang->t('tonight.badgeToday')) ?>"
                               data-week="<?= Html::e($lang->t('tonight.badgeWeek')) ?>"><?= Html::e($lang->t('tonight.badgeToday')) ?></span>
-                        <h3 class="tonight__title" id="tonightTitle"><?= Html::e($today->title . ' · ' . $today->time) ?></h3>
+                        <h3 class="tonight__title" id="tonightTitle"><?= Html::e($today->title . ($today->time !== '' ? ' · ' . $today->time : '')) ?></h3>
                         <p class="tonight__note" id="tonightNote"><?= Html::e($today->note) ?></p>
                     </div>
                     <a class="btn btn--primary" id="tonightCta" href="<?= Html::e($today->url) ?>"<?= $todayExternal ? ' target="_blank" rel="noopener"' : '' ?> data-magnetic><span class="tonight__cta-label"><?= Html::e($todayCta) ?></span> <span class="btn__ic"><?= Icons::get('arrow') ?></span></a>

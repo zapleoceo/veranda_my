@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Home;
 
+use App\Afisha\AfishaStore;
 use App\Home\Content\Contacts;
 use App\Home\Content\PageContent;
 use App\Home\Content\Seo;
@@ -30,7 +31,9 @@ final class HomeController
 
         $contacts = new Contacts();
         $content = new PageContent($lang);
-        $program = new WeeklyProgram($lang, (int) date('w'), $contacts->reserve, $contacts->filmSchedule); // 0=Вс..6=Сб
+        // Афиша недели из Telegram (если есть) — поверх стандартного расписания.
+        $afisha = (new AfishaStore())->cardsFor(date('Y-m-d', strtotime('monday this week')), $locale);
+        $program = new WeeklyProgram($lang, (int) date('w'), $contacts->reserve, $contacts->filmSchedule, $afisha); // 0=Вс..6=Сб
         $directory = new VenueDirectory($lang, $contacts);
         $seo = new Seo($lang, $locale, $base, $contacts);
 

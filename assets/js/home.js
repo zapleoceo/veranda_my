@@ -60,7 +60,7 @@
             cards.forEach(function (c) { c.classList.remove('is-active'); });
             card.classList.add('is-active');
             if (dayEl) dayEl.textContent = d.dayname;
-            if (titleEl) titleEl.textContent = d.title + ' · ' + d.time;
+            if (titleEl) titleEl.textContent = d.title + (d.time ? ' · ' + d.time : '');
             if (noteEl) noteEl.textContent = d.note;
             if (ctaEl) {
                 if (d.url) ctaEl.href = d.url;

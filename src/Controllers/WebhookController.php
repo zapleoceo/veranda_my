@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Controllers;
 
 use App\Actions\ActionContext;
+use App\Actions\AfishaUndoAction;
 use App\Actions\ActionInterface;
 use App\Actions\IgnoreItemAction;
 use App\Actions\IgnoreTxAction;
@@ -13,6 +14,9 @@ use App\Actions\VposterAction;
 use App\Actions\VposterCancelAction;
 use App\Actions\VposterFixAction;
 use App\Actions\VrestoreAction;
+use App\Afisha\AfishaStore;
+use App\Afisha\AfishaUpdater;
+use App\Infrastructure\AiBrokerClient;
 use App\Infrastructure\Config;
 use App\Infrastructure\Database;
 use App\Infrastructure\TelegramBotClient;
@@ -30,6 +34,7 @@ class WebhookController
         'vrestore'       => VrestoreAction::class,
         'vposter_fix'    => VposterFixAction::class,
         'vposter_cancel' => VposterCancelAction::class,
+        'afisha_undo'    => AfishaUndoAction::class,
     ];
 
     private const POSTER_ACTIONS = ['vposter', 'vdecline', 'vrestore', 'vposter_fix', 'vposter_cancel'];
@@ -78,6 +83,13 @@ class WebhookController
             return $this->_handleMessage($response, (array) $update['message']);
         }
 
+        // Правка анонса в группе — тоже повод пересобрать афишу сайта.
+        if (!empty($update['edited_message'])) {
+            $this->_maybeUpdateAfisha((array) $update['edited_message']);
+            $response->getBody()->write('ok');
+            return $response;
+        }
+
         if (!empty($update['callback_query'])) {
             return $this->_handleCallbackQuery($response, (array) $update['callback_query']);
         }
@@ -100,6 +112,8 @@ class WebhookController
         $cmd    = strtolower((string) preg_replace('/\s+.*/', '', $text));
 
         // Log every incoming text so /start delivery is traceable.
+        $this->_maybeUpdateAfisha($msg);
+
         $this->logger->info('webhook.message', [
             'chat'    => $chatId,
             'type'    => $chat['type'] ?? null,
@@ -221,6 +235,8 @@ class WebhookController
         $allowed = match (true) {
             in_array($actionName, self::POSTER_ACTIONS, true) => $perms['canPoster'],
             in_array($actionName, self::IGNORE_ACTIONS, true) => $perms['canIgnore'],
+            // Откат афиши — только из чата, куда бот шлёт отчёты об её обновлении.
+            $actionName === 'afisha_undo' => $chatId !== '' && $chatId === Config::get('AFISHA_NOTIFY_CHAT_ID'),
             default                                            => false,
         };
 
@@ -278,6 +294,33 @@ class WebhookController
 
         $response->getBody()->write('ok');
         return $response;
+    }
+
+    /**
+     * Сообщение из группы-афиши → обновить расписание на сайте.
+     *
+     * Разбор идёт через ИИ и занимает секунды, поэтому работаем ПОСЛЕ ответа
+     * Telegram: иначе он решит, что вебхук завис, и начнёт слать повторы.
+     */
+    private function _maybeUpdateAfisha(array $msg): void
+    {
+        if (!AfishaUpdater::isCandidate($msg)) {
+            return;
+        }
+        $updater = new AfishaUpdater(new AfishaStore(), AiBrokerClient::fromConfig(), $this->bot, $this->logger);
+        $logger  = $this->logger;
+        register_shutdown_function(static function () use ($updater, $msg, $logger): void {
+            if (function_exists('fastcgi_finish_request')) {
+                fastcgi_finish_request();
+            }
+            ignore_user_abort(true);
+            set_time_limit(120);
+            try {
+                $updater->handle($msg);
+            } catch (\Throwable $e) {
+                $logger->error('afisha.crashed', ['err' => $e->getMessage(), 'file' => $e->getFile(), 'line' => $e->getLine()]);
+            }
+        });
     }
 
     private function _permissions(string $username): array

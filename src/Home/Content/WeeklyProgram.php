@@ -10,6 +10,10 @@ use App\Home\I18n\Lang;
  * Недельная афиша: событие на каждый день недели + логика «сегодня».
  * Индекс дня — 0=Вс … 6=Сб (как JS getDay / PHP date('w')).
  * Тексты (title/time/note) и имена дней — из словаря Lang; фото — структура.
+ *
+ * Словарь — это стандартное расписание. Если на текущую неделю есть афиша из
+ * Telegram ($override, см. App\Afisha), её карточки перекрывают стандартные
+ * по дням; дни, которых в афише нет, остаются стандартными.
  */
 final class WeeklyProgram
 {
@@ -35,13 +39,15 @@ final class WeeklyProgram
         private readonly int $today,
         string $reserveUrl,
         string $filmUrl = '',
+        array $override = [],
     ) {
         foreach (self::IMAGE as $day => $image) {
-            $isFilm = in_array($day, self::FILM_DAYS, true) && $filmUrl !== '';
+            $card = $override[$day] ?? null;
+            $isFilm = $filmUrl !== '' && ($card !== null ? $card['type'] === 'film' : in_array($day, self::FILM_DAYS, true));
             $this->byDay[$day] = new Event(
-                $lang->t("ev.d{$day}.title"),
-                $lang->t("ev.d{$day}.time"),
-                $lang->t("ev.d{$day}.note"),
+                $card['title'] ?? $lang->t("ev.d{$day}.title"),
+                $card['time'] ?? $lang->t("ev.d{$day}.time"),
+                $card['note'] ?? $lang->t("ev.d{$day}.note"),
                 $image,
                 $isFilm ? $filmUrl : $reserveUrl,
                 $isFilm ? $lang->t('tonight.films') : '',
