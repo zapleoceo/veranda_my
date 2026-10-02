@@ -227,6 +227,10 @@ $app->map(['GET', 'POST'], '/tr3/api.php', [Tr3Controller::class, 'api']);
 $app->map(['GET', 'POST'], '/bloggers[/]', [BloggerCabinetController::class, 'index']);
 $app->get('/bloggers/logout', [BloggerCabinetController::class, 'logout']);
 
+// Ежемесячный отчёт бани для cron на сервере Веры (→ Telegram «Веранда и Баня»).
+// Без сессии: доступ только по X-Report-Secret == BANYA_REPORT_SECRET.
+$app->get('/internal/banya-month-summary', [\App\Controllers\BanyaReportController::class, 'monthSummary']);
+
 // Phase 4: reservations (auth-protected)
 $app->map(['GET', 'POST'], '/reservations[/]', [ReservationsController::class, 'index'])
     ->add(AuthMiddleware::class);
