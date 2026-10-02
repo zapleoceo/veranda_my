@@ -169,6 +169,23 @@ class AfishaPlanTest extends TestCase
         $this->assertSame(['весь вечер — Бункер, Мафия, Uno'], AfishaPlan::legacyLines('весь вечер', 'Бункер, Мафия, Uno'));
     }
 
+    public function test_unknown_performer_leaves_only_the_start_time(): void
+    {
+        // Не «группы чередуются»: исполнитель не известен — пишем только время.
+        $ai = $this->ai($this->monday);
+        $ai['days'][0]['ru']['sessions'] = [['time' => '19:00', 'text' => '']];
+
+        $ru = AfishaPlan::fromAi($ai, $this->today)['days'][5]['ru'];
+
+        $this->assertSame(['19:00'], AfishaPlan::lines($ru));
+    }
+
+    public function test_default_music_days_name_no_rotating_bands(): void
+    {
+        $this->assertSame(['19:00 — Рядновы'], AfishaPlan::legacyLines('19:00', 'Рядновы'));
+        $this->assertSame(['19:00'], AfishaPlan::legacyLines('19:00', ''));
+    }
+
     public function test_sessions_are_sanitized_and_capped(): void
     {
         $ai = $this->ai($this->monday);

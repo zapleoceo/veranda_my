@@ -132,8 +132,10 @@ final class AfishaPlan
                 continue;
             }
             $text = self::clean((string) ($s['text'] ?? ''), self::MAX_SESSION);
-            if ($text !== '') {
-                $sessions[] = ['time' => self::clean((string) ($s['time'] ?? ''), self::MAX_TIME), 'text' => $text];
+            $time = self::clean((string) ($s['time'] ?? ''), self::MAX_TIME);
+            // Исполнитель не известен — оставляем только время начала, не гадаем.
+            if ($text !== '' || $time !== '') {
+                $sessions[] = ['time' => $time, 'text' => $text];
             }
         }
 
@@ -155,7 +157,9 @@ final class AfishaPlan
     {
         $lines = [];
         foreach ((array) ($texts['sessions'] ?? []) as $s) {
-            $lines[] = ($s['time'] ?? '') !== '' ? $s['time'] . ' — ' . $s['text'] : (string) $s['text'];
+            $time = (string) ($s['time'] ?? '');
+            $text = (string) ($s['text'] ?? '');
+            $lines[] = $time !== '' && $text !== '' ? $time . ' — ' . $text : $time . $text;
         }
         if ($lines === [] && isset($texts['time'])) {
             // Карточки старого формата (общая строка времени + заметка).
