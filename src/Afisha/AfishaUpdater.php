@@ -129,8 +129,9 @@ final class AfishaUpdater
 - week_start — дата понедельника нужной недели, YYYY-MM-DD. Если в тексте есть даты — бери неделю по ним; если нет — ближайший подходящий день от «сегодня».
 - Для каждого затронутого дня верни ПОЛНУЮ карточку на трёх языках (ru, en, vi):
   title — короткое название до 40 символов, без эмодзи. В ru сохраняй авторское название как есть («Chill Day», «Live Music»), не переводи и не переименовывай;
-  time — «19:00» или «18:00 · 20:00»; если времени нет — пустая строка;
-  note — до 160 символов, сначала конкретика. Кино: каждый сеанс как «18:00 — «Название» (год), детский сеанс»; несколько сеансов через « · ». Музыка: кто выступает и что играет — имена артистов/групп и жанр, если они названы в сообщении. Ничего не выдумывай: если исполнитель или фильм не указан, просто коротко перескажи описание. Без «вход свободный» и без призывов.
+  sessions — список событий дня, КАЖДОЕ со своим временем начала (в анонсе указано именно начало, а не промежуток). Один элемент = одно начало: time «18:00», text — что начинается. Кино: «Название» (год) и пометка «детский сеанс»/«взрослый сеанс», если указана. Музыка: исполнитель и жанр, если названы, иначе «живая музыка». Два сеанса кино — два элемента. Если у дня нет событий со временем — пустой список;
+  note — одна короткая фраза-описание дня до 120 символов (атмосфера, что за день), без времени и без повтора sessions. Без «вход свободный» и без призывов.
+- Ничего не выдумывай: исполнителей, фильмы и время бери только из сообщения.
 - type: film — кино; music — живая музыка; games — игры; chill — день без программы; other — остальное.
 - При patch верни только изменённые дни. Если событие ДОБАВЛЯЕТСЯ к уже стоящему в этот день — объедини оба в одной карточке (title по главному событию, второе упомяни в note). Если день отменён или заменён — верни новую карточку.
 - en и vi — естественный перевод; названия фильмов давай в общепринятом прокатном варианте.
@@ -162,10 +163,9 @@ TXT;
             foreach (array_keys(self::DAY_SHORT) as $wd) {
                 $c = $cards[$wd] ?? [
                     'title' => $defaults->t("ev.d{$wd}.title"),
-                    'time' => $defaults->t("ev.d{$wd}.time"),
-                    'note' => $defaults->t("ev.d{$wd}.note"),
+                    'lines' => AfishaPlan::legacyLines($defaults->t("ev.d{$wd}.time"), $defaults->t("ev.d{$wd}.note")),
                 ];
-                $lines[] = sprintf('  %s: %s | %s | %s', self::DAY_SHORT[$wd], $c['title'], $c['time'], $c['note']);
+                $lines[] = sprintf('  %s: %s | %s', self::DAY_SHORT[$wd], $c['title'], implode('; ', $c['lines']));
             }
             $out[] = "{$label} (с {$weekStart}):\n" . implode("\n", $lines);
         }
@@ -191,9 +191,10 @@ TXT;
                 continue;
             }
             $ru = $plan['days'][$wd]['ru'];
-            $lines[] = '<b>' . self::DAY_SHORT[$wd] . '</b> — ' . self::esc($ru['title'])
-                . ($ru['time'] !== '' ? ' · ' . self::esc($ru['time']) : '')
-                . ($ru['note'] !== '' ? "\n     " . self::esc($ru['note']) : '');
+            $lines[] = '<b>' . self::DAY_SHORT[$wd] . '</b> — ' . self::esc($ru['title']);
+            foreach (AfishaPlan::lines($ru) as $line) {
+                $lines[] = '     ' . self::esc($line);
+            }
         }
         $lines[] = '';
         $lines[] = 'Автор: ' . self::esc(self::author($msg)) . self::linkLine($msg);
@@ -255,8 +256,17 @@ TXT;
         $texts = [
             'type' => 'object',
             'additionalProperties' => false,
-            'required' => ['title', 'time', 'note'],
-            'properties' => ['title' => ['type' => 'string'], 'time' => ['type' => 'string'], 'note' => ['type' => 'string']],
+            'required' => ['title', 'sessions', 'note'],
+            'properties' => [
+                'title' => ['type' => 'string'],
+                'sessions' => ['type' => 'array', 'items' => [
+                    'type' => 'object',
+                    'additionalProperties' => false,
+                    'required' => ['time', 'text'],
+                    'properties' => ['time' => ['type' => 'string'], 'text' => ['type' => 'string']],
+                ]],
+                'note' => ['type' => 'string'],
+            ],
         ];
 
         return [

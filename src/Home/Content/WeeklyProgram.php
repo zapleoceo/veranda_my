@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Home\Content;
 
+use App\Afisha\AfishaPlan;
 use App\Home\I18n\Lang;
 
 /**
@@ -44,10 +45,13 @@ final class WeeklyProgram
         foreach (self::IMAGE as $day => $image) {
             $card = $override[$day] ?? null;
             $isFilm = $filmUrl !== '' && ($card !== null ? $card['type'] === 'film' : in_array($day, self::FILM_DAYS, true));
+            // События дня — в столбик, у каждого своё время начала. Общей строки
+            // времени нет: «18:00 · 20:00» читалось как промежуток, а это два начала.
+            $lines = $card['lines'] ?? AfishaPlan::legacyLines($lang->t("ev.d{$day}.time"), $lang->t("ev.d{$day}.note"));
             $this->byDay[$day] = new Event(
                 $card['title'] ?? $lang->t("ev.d{$day}.title"),
-                $card['time'] ?? $lang->t("ev.d{$day}.time"),
-                $card['note'] ?? $lang->t("ev.d{$day}.note"),
+                '',
+                implode("\n", $lines),
                 $image,
                 $isFilm ? $filmUrl : $reserveUrl,
                 $isFilm ? $lang->t('tonight.films') : '',

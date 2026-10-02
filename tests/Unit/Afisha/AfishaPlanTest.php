@@ -136,10 +136,48 @@ class AfishaPlanTest extends TestCase
             'days' => [[
                 'weekday' => 5,
                 'type' => 'music',
-                'ru' => ['title' => 'Live Music', 'time' => '19:00', 'note' => 'Уют, звёзды и музыка'],
-                'en' => ['title' => 'Live Music', 'time' => '19:00', 'note' => 'Cosy evening under the stars'],
-                'vi' => ['title' => 'Nhạc sống', 'time' => '19:00', 'note' => 'Buổi tối ấm cúng'],
+                'ru' => ['title' => 'Live Music', 'sessions' => [['time' => '19:00', 'text' => 'живая музыка']], 'note' => 'Уют, звёзды и музыка'],
+                'en' => ['title' => 'Live Music', 'sessions' => [['time' => '19:00', 'text' => 'live music']], 'note' => 'Cosy evening under the stars'],
+                'vi' => ['title' => 'Nhạc sống', 'sessions' => [['time' => '19:00', 'text' => 'nhạc sống']], 'note' => 'Buổi tối ấm cúng'],
             ]],
         ];
+    }
+
+    public function test_each_event_gets_its_own_line_with_its_start_time(): void
+    {
+        // «18:00 · 20:00» одной строкой читалось как промежуток — это два начала.
+        $lines = AfishaPlan::lines(['title' => 'Кино', 'note' => 'Кино под открытым небом', 'sessions' => [
+            ['time' => '18:00', 'text' => '«Тайна зубных фей» (2025), детский сеанс'],
+            ['time' => '20:00', 'text' => '«Апгрейд» (2018)'],
+        ]]);
+
+        $this->assertSame(['18:00 — «Тайна зубных фей» (2025), детский сеанс', '20:00 — «Апгрейд» (2018)'], $lines);
+    }
+
+    public function test_day_without_timed_events_shows_its_description(): void
+    {
+        $this->assertSame(['Отдыхаем и наслаждаемся атмосферой'], AfishaPlan::lines(['title' => 'Chill Day', 'sessions' => [], 'note' => 'Отдыхаем и наслаждаемся атмосферой']));
+    }
+
+    public function test_default_schedule_is_split_into_start_times_too(): void
+    {
+        $this->assertSame(
+            ['18:00 — детский сеанс', '20:00 — взрослый сеанс'],
+            AfishaPlan::legacyLines('18:00 · 20:00', '18:00 — детский сеанс · 20:00 — взрослый сеанс')
+        );
+        $this->assertSame(['19:00 — Каверы англоязычных хитов'], AfishaPlan::legacyLines('19:00', 'Каверы англоязычных хитов'));
+        $this->assertSame(['весь вечер — Бункер, Мафия, Uno'], AfishaPlan::legacyLines('весь вечер', 'Бункер, Мафия, Uno'));
+    }
+
+    public function test_sessions_are_sanitized_and_capped(): void
+    {
+        $ai = $this->ai($this->monday);
+        $ai['days'][0]['ru']['sessions'] = array_fill(0, 20, ['time' => '19:00', 'text' => '<b>Джаз</b>']);
+        $ai['days'][0]['ru']['sessions'][] = 'мусор';
+
+        $sessions = AfishaPlan::fromAi($ai, $this->today)['days'][5]['ru']['sessions'];
+
+        $this->assertCount(6, $sessions);
+        $this->assertSame(['time' => '19:00', 'text' => 'Джаз'], $sessions[0]);
     }
 }

@@ -14,7 +14,9 @@ final class AfishaPlan
     public const LOCALES = ['ru', 'en', 'vi'];
 
     private const MAX_TITLE = 60;
-    private const MAX_TIME = 30;
+    private const MAX_TIME = 12;
+    private const MAX_SESSION = 120;
+    private const MAX_SESSIONS = 6;
     private const MAX_NOTE = 220;
 
     /** На сколько недель вперёд принимаем анонс (текущая + две следующие). */
@@ -120,15 +122,66 @@ final class AfishaPlan
 
     /**
      * @param array<string,mixed> $t
-     * @return array{title:string,time:string,note:string}
+     * @return array{title:string,sessions:array<array{time:string,text:string}>,note:string}
      */
     private static function texts(array $t): array
     {
+        $sessions = [];
+        foreach (array_slice((array) ($t['sessions'] ?? []), 0, self::MAX_SESSIONS) as $s) {
+            if (!is_array($s)) {
+                continue;
+            }
+            $text = self::clean((string) ($s['text'] ?? ''), self::MAX_SESSION);
+            if ($text !== '') {
+                $sessions[] = ['time' => self::clean((string) ($s['time'] ?? ''), self::MAX_TIME), 'text' => $text];
+            }
+        }
+
         return [
             'title' => self::clean((string) ($t['title'] ?? ''), self::MAX_TITLE),
-            'time' => self::clean((string) ($t['time'] ?? ''), self::MAX_TIME),
+            'sessions' => $sessions,
             'note' => self::clean((string) ($t['note'] ?? ''), self::MAX_NOTE),
         ];
+    }
+
+    /**
+     * Строки карточки дня — каждое событие со своим временем начала, в столбик.
+     * Нет событий со временем — показываем описание дня.
+     *
+     * @param array<string,mixed> $texts тексты одного языка
+     * @return string[]
+     */
+    public static function lines(array $texts): array
+    {
+        $lines = [];
+        foreach ((array) ($texts['sessions'] ?? []) as $s) {
+            $lines[] = ($s['time'] ?? '') !== '' ? $s['time'] . ' — ' . $s['text'] : (string) $s['text'];
+        }
+        if ($lines === [] && isset($texts['time'])) {
+            // Карточки старого формата (общая строка времени + заметка).
+            return self::legacyLines((string) $texts['time'], (string) ($texts['note'] ?? ''));
+        }
+
+        return $lines !== [] ? $lines : array_values(array_filter([(string) ($texts['note'] ?? '')]));
+    }
+
+    /**
+     * Стандартное расписание из словаря хранит время и заметку двумя строками.
+     * «18:00 — … · 20:00 — …» разбираем на отдельные начала; одиночное «19:00»
+     * ставим перед заметкой; «весь вечер» оставляем как есть.
+     *
+     * @return string[]
+     */
+    public static function legacyLines(string $time, string $note): array
+    {
+        if (preg_match('/^\d{1,2}:\d{2}\s*—/u', $note)) {
+            return array_map('trim', explode(' · ', $note));
+        }
+        if ($time !== '' && $note !== '') {
+            return [$time . ' — ' . $note];
+        }
+
+        return array_values(array_filter([$time . $note]));
     }
 
     private static function clean(string $s, int $max): string

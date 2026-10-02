@@ -31,9 +31,10 @@ final class AfishaStore
     }
 
     /**
-     * Карточки недели на нужном языке: [день недели 0..6 => type/title/time/note].
+     * Карточки недели на нужном языке: [день недели 0..6 => type/title/lines].
+     * lines — события дня в столбик, каждое со своим временем начала.
      *
-     * @return array<int,array{type:string,title:string,time:string,note:string}>
+     * @return array<int,array{type:string,title:string,lines:string[]}>
      */
     public function cardsFor(string $weekStart, string $locale): array
     {
@@ -46,8 +47,7 @@ final class AfishaStore
             $out[(int) $weekday] = [
                 'type' => (string) ($card['type'] ?? 'other'),
                 'title' => (string) $t['title'],
-                'time' => (string) ($t['time'] ?? ''),
-                'note' => (string) ($t['note'] ?? ''),
+                'lines' => AfishaPlan::lines($t),
             ];
         }
 

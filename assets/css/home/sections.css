@@ -121,7 +121,8 @@
 .tonight__day-card.is-active .tonight__day-card-name { color: var(--red-soft); }
 .tonight__day-card-title { font-family: var(--serif); font-size: 18px; color: var(--text); line-height: 1.2; margin-bottom: 4px; }
 .tonight__day-card-time { font-size: 13px; font-weight: 600; color: var(--ember-2); }
-.tonight__day-card-note { margin-top: 8px; font-size: 12px; line-height: 1.45; color: var(--text-2); display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 5; overflow: hidden; }
+.tonight__day-card-note { margin-top: 8px; font-size: 12px; line-height: 1.5; color: var(--text-2); white-space: pre-line; }
+.tonight__note { white-space: pre-line; }
 .tonight__free { text-align: center; margin-top: var(--s-6); font-family: var(--serif); font-style: italic; font-size: 19px; color: var(--text-3); }
 @media (hover: hover) { .tonight__day-card:hover { transform: translateY(-3px); border-color: var(--hair-2); } }
 @media (max-width: 760px) {
