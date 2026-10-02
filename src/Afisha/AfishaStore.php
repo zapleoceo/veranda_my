@@ -4,12 +4,14 @@ declare(strict_types=1);
 
 namespace App\Afisha;
 
+use App\Infrastructure\Config;
+
 /**
- * Хранилище недельной афиши — JSON-файлы в cache/afisha/.
+ * Хранилище недельной афиши — JSON-файлы в закрытой папке (Config::privateDir).
  *
  * Почему файлы, а не БД: главную читает каждый посетитель, и она не должна
- * зависеть от базы. Папка cache/ исключена из rsync-деплоя, так что афиша
- * переживает выкатки. Пропал файл — сайт просто покажет стандартное расписание.
+ * зависеть от базы. Папка вне корня сайта: деплой её не трогает, из интернета
+ * её не видно. Пропал файл — сайт просто покажет стандартное расписание.
  *
  * На каждую неделю хранится текущая версия и одна предыдущая (для отката).
  */
@@ -21,7 +23,7 @@ final class AfishaStore
 
     public function __construct(?string $dir = null)
     {
-        $this->dir = $dir ?? dirname(__DIR__, 2) . '/cache/afisha';
+        $this->dir = $dir ?? Config::privateDir('afisha');
     }
 
     /** @return array<string,mixed>|null */

@@ -18,7 +18,7 @@ class Logger
         $monolog = new Monolog('app');
 
         $logLevel = Level::fromName(strtolower($level));
-        $logPath  = dirname(__DIR__, 2) . '/logs/app.log';
+        $logPath  = Config::privateDir('logs') . '/app.log';
 
         @mkdir(dirname($logPath), 0755, true);
 

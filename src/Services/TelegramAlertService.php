@@ -337,17 +337,18 @@ class TelegramAlertService
                 }
             }
 
-            // Keep a rolling window of recent status message IDs and delete old ones
-            $prevIds[] = $currentId;
-            $prevIds   = array_values(array_unique(array_map(fn($v) => (int) $v, $prevIds)));
-            $prevIds   = array_slice($prevIds, -self::STATUS_MSG_HISTORY);
-            $this->meta->set('telegram_status_msg_ids_json', json_encode($prevIds));
-
-            foreach ($prevIds as $id) {
-                if ((int) $id !== $currentId) {
-                    $this->bot->deleteMessage((int) $id);
+            // Старые статус-сообщения удаляем и ЗАБЫВАЕМ. Раньше id оставались в
+            // окне навсегда: статус правится на месте, окно не прокручивалось, и
+            // 9 давно удалённых сообщений «удалялись» каждые 5 минут (~2700
+            // ошибок «message to delete not found» в сутки с 2026-09-19).
+            // В окне остаются только текущее и те, чьё удаление не дошло (сеть).
+            $keep = [$currentId];
+            foreach (array_unique(array_map('intval', $prevIds)) as $id) {
+                if ($id > 0 && $id !== $currentId && $this->bot->tryDeleteMessage($id) === null) {
+                    $keep[] = $id;
                 }
             }
+            $this->meta->set('telegram_status_msg_ids_json', json_encode(array_slice($keep, 0, self::STATUS_MSG_HISTORY)));
         } catch (\Throwable $e) {
             Logger::get()->warning('telegram_alerts.status_fail', ['error' => $e->getMessage()]);
         } finally {

@@ -138,6 +138,29 @@ class TelegramBotClient
         return stripos($desc, 'message is not modified') !== false;
     }
 
+    /**
+     * Удалить сообщение, различая исходы:
+     *   true  — удалено;
+     *   false — Telegram окончательно отказал (сообщения уже нет / нельзя удалить),
+     *           повторять бессмысленно;
+     *   null  — сеть, таймаут, 429 или 5xx: исход неизвестен, можно повторить.
+     */
+    public function tryDeleteMessage(int $messageId): ?bool
+    {
+        $result = $this->_call('deleteMessage', [
+            'chat_id'    => $this->chatId,
+            'message_id' => $messageId,
+        ]);
+        if ($result === null) {
+            return null;
+        }
+        if (!empty($result['ok'])) {
+            return true;
+        }
+        $code = (int) ($result['error_code'] ?? 0);
+        return ($code === 429 || $code >= 500) ? null : false;
+    }
+
     public function deleteMessage(int $messageId): bool
     {
         $result = $this->_call('deleteMessage', [

@@ -20,6 +20,28 @@ class TelegramBotClientTest extends TestCase
         $this->bot  = new TelegramBotClient('test_token', $this->http, '1234567890');
     }
 
+    /**
+     * Окно статус-сообщений забывает id по этому ответу: false = «удалять больше
+     * нечего». Перепутать false и null — значит либо снова долбить удалённое
+     * (баг 2026-09-19…10-03), либо потерять сообщение, которое ещё можно удалить.
+     */
+    public function test_tryDeleteMessage_distinguishes_outcomes(): void
+    {
+        $this->http->method('postJson')->willReturnOnConsecutiveCalls(
+            ['ok' => true, 'result' => true],
+            ['ok' => false, 'error_code' => 400, 'description' => 'Bad Request: message to delete not found'],
+            null,
+            ['ok' => false, 'error_code' => 429, 'description' => 'Too Many Requests'],
+            ['ok' => false, 'error_code' => 502, 'description' => 'Bad Gateway'],
+        );
+
+        $this->assertTrue($this->bot->tryDeleteMessage(1));
+        $this->assertFalse($this->bot->tryDeleteMessage(2), 'сообщения нет — повторять бессмысленно');
+        $this->assertNull($this->bot->tryDeleteMessage(3), 'сеть — исход неизвестен');
+        $this->assertNull($this->bot->tryDeleteMessage(4), '429 — повторить позже');
+        $this->assertNull($this->bot->tryDeleteMessage(5), '5xx — повторить позже');
+    }
+
     public function test_sendMessage_returns_true_on_ok_response(): void
     {
         $this->http->expects($this->once())

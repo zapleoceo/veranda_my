@@ -47,6 +47,24 @@ class Config
         return self::$_data[$key] ?? $_ENV[$key] ?? $default;
     }
 
+    /**
+     * Папка для служебных файлов (журналы, кэши), недоступная из интернета.
+     *
+     * Корень сайта отдаётся nginx напрямую, и .htaccess его не защищает:
+     * logs/app-*.log скачивались по https://veranda.my/logs/... На проде
+     * PRIVATE_DIR указывает вне корня сайта; без неё (локально) — корень репо.
+     */
+    public static function privateDir(string $sub): string
+    {
+        $base = rtrim(self::get('PRIVATE_DIR'), '/');
+        $dir = ($base !== '' ? $base : dirname(__DIR__, 2)) . '/' . trim($sub, '/');
+        if (!is_dir($dir)) {
+            @mkdir($dir, 0750, true);
+        }
+
+        return $dir;
+    }
+
     /** @throws \RuntimeException when key is missing */
     public static function require(string $key): string
     {

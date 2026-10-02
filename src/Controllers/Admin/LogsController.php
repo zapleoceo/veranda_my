@@ -67,12 +67,12 @@ class LogsController
 
     private function _logMap(): array
     {
-        $base = dirname(__DIR__, 3);
+        $logs = \App\Infrastructure\Config::privateDir('logs');
         return [
-            'kitchen'  => $base . '/cron.log',
-            'telegram' => $base . '/telegram.log',
-            'menu'     => $base . '/menu_sync.log',
-            'php'      => $base . '/php_errors.log',
+            'kitchen'  => $logs . '/cron.log',
+            'telegram' => $logs . '/telegram.log',
+            'menu'     => $logs . '/menu_sync.log',
+            'php'      => dirname(__DIR__, 3) . '/php_errors.log',
         ];
     }
 
@@ -80,20 +80,29 @@ class LogsController
     {
         $php  = '/opt/php82/bin/php';
         $base = dirname(__DIR__, 3);
+        $logs = \App\Infrastructure\Config::privateDir('logs');
         return [
-            'kitchen'  => "{$php} {$base}/cron/kitchen_sync.php >> {$base}/cron.log 2>&1",
-            'telegram' => "{$php} {$base}/cron/telegram_alerts.php >> {$base}/telegram.log 2>&1",
+            'kitchen'  => "{$php} {$base}/cron/kitchen_sync.php >> {$logs}/cron.log 2>&1",
+            'telegram' => "{$php} {$base}/cron/telegram_alerts.php >> {$logs}/telegram.log 2>&1",
         ];
     }
 
     private function _tailFile(string $path, int $maxLines): string
     {
         if (!is_file($path)) { return ''; }
-        $data = @file($path, FILE_IGNORE_NEW_LINES);
-        if (!is_array($data)) { return ''; }
-        if (count($data) > $maxLines) {
-            $data = array_slice($data, -$maxLines);
+        // Читаем только хвост: file() на журнале в сотни МБ клал страницу по памяти.
+        $size = (int) filesize($path);
+        $want = min($size, max(65536, $maxLines * 400), 4 * 1024 * 1024);
+        $fh = @fopen($path, 'rb');
+        if ($fh === false) { return ''; }
+        fseek($fh, -$want, SEEK_END);
+        $chunk = (string) fread($fh, $want);
+        fclose($fh);
+        $data = explode("\n", rtrim($chunk, "\n"));
+        if ($want < $size) {
+            array_shift($data); // первая строка обрезана посередине
         }
+        $data = array_slice($data, -$maxLines);
         return implode("\n", array_reverse($data));
     }
 

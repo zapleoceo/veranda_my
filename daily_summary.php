@@ -165,9 +165,12 @@ $sendTelegramFile = function (string $token, string $chatId, string $filePath, s
 };
 
 $root = __DIR__;
-$cronLog = $root . '/cron.log';
-$menuLog = $root . '/menu_sync.log';
-$tgLog = $root . '/telegram.log';
+// Журналы крона живут в закрытой папке (см. Config::privateDir), если она задана.
+$privateDir = rtrim((string)($_ENV['PRIVATE_DIR'] ?? ''), '/');
+$logDir = $privateDir !== '' ? $privateDir . '/logs' : $root;
+$cronLog = $logDir . '/cron.log';
+$menuLog = $logDir . '/menu_sync.log';
+$tgLog = $logDir . '/telegram.log';
 
 $yesterday = (new DateTimeImmutable('now', $spotTz))->modify('-1 day')->format('Y-m-d');
 $today = (new DateTimeImmutable('now', $spotTz))->format('Y-m-d');
