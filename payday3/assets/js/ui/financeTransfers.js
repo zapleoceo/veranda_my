@@ -11,6 +11,7 @@ import { esc, fmtVnd, withRange } from './format.js';
 import { coalesce }       from './coalesce.js';
 import { withBusy }       from './busy.js';
 import { grabRowState }   from './grabTopUp.js';
+import { financeAllClosed } from './financeClosed.js';
 
 const KINDS = ['vietnam', 'tips', 'grab'];
 
@@ -114,6 +115,14 @@ function renderGrab(payload) {
     if (btn) btn.disabled = st.disabled;
 }
 
+/** Red/green outline on the balances ✈ button: are all three rows closed? null → no outline. */
+function paintTelegramBtn(allClosed) {
+    const b = document.getElementById('pd3BalancesTelegramBtn');
+    if (!b) return;
+    b.classList.toggle('pd3-pill--alert', allClosed === false);
+    b.classList.toggle('pd3-pill--ok',    allClosed === true);
+}
+
 let lastAccounts = null;
 
 /**
@@ -130,7 +139,9 @@ function makeLoader(state) {
             renderRow('vietnam', data.vietnam);
             renderRow('tips',    data.tips);
             renderGrab(data.grab);
+            paintTelegramBtn(financeAllClosed(data));
         } catch (e) {
+            paintTelegramBtn(null);
             for (const k of KINDS) {
                 const s = document.getElementById('pd3FinanceStatus_' + k);
                 if (s) s.textContent = 'Ошибка: ' + (e.message || 'load failed');
