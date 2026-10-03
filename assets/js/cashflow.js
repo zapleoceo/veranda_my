@@ -83,7 +83,11 @@
                      (j.hookahCount ? ' · ' + j.hookahCount + ' шт' : '') + '</div>';
             } else {
                 h += '<div class="cf-formula">Итого по Poster <b>' + fmt(j.total) + '</b> − Кальяны <b>' +
-                     fmt(j.hookah) + '</b> = Еда <b>' + fmt(j.food) + '</b> ₫</div>';
+                     fmt(j.hookah) + '</b>' +
+                     (j.grab ? ' − Заказы Grab по меню <b>' + fmt(j.grab) + '</b> (' + j.grabChecks + ' шт, депозит)' : '') +
+                     ' = Еда <b>' + fmt(j.food) + '</b> ₫' +
+                     (j.grab ? '<br><span class="cf-modal-note">Деньги Grab считаются по факту прихода — колонка «Grab (поступления)».</span>' : '') +
+                     '</div>';
             }
             h += '<table class="cf-mtable"><thead><tr><th>Категория</th><th class="r">Выручка</th><th class="r">Поз.</th></tr></thead><tbody>';
             (j.categories || []).forEach(function (c) {

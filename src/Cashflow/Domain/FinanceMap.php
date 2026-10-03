@@ -35,6 +35,7 @@ final class FinanceMap
         return [
             ['key' => 'food',       'label' => 'Продажи еды/напитков',        'short' => 'Еда/напитки',    'kind' => 'revenue', 'cats' => []],
             ['key' => 'hookah',     'label' => 'Продажи кальянов',            'short' => 'Кальяны',        'kind' => 'revenue', 'cats' => []],
+            ['key' => 'grab',       'label' => 'Grab (поступления)',          'short' => 'Grab',           'kind' => 'income',  'cats' => [25]],
             ['key' => 'events',     'label' => 'Приходы за мероприятия/сцену', 'short' => 'Мероприятия',    'kind' => 'income',  'cats' => [16]],
             ['key' => 'commission', 'label' => 'Комиссия за кальяны',         'short' => 'Комиссия кальян','kind' => 'expense', 'cats' => [17]],
             ['key' => 'salary',     'label' => 'Зарплата',                    'short' => 'Зарплата',       'kind' => 'expense', 'cats' => [6, 15]],
@@ -55,12 +56,19 @@ final class FinanceMap
      *        Маша её в «Всякие» не включает — исключение даёт точное совпадение
      *        июньских «Всяких» с Excel до донга);
      *   14 — e-wallets (та же выручка); 22 — Инвесторы (ниже линии, дивиденды);
-     *   23 — Баня (отдельный учёт);
-     *   25 — GRAB (с 09.2026, дочерняя к «Кассовым сменам»): выплаты Grab на
-     *        Vietnam Comp за заказы, которые уже пробиты обычными чеками и сидят
-     *        в выручке — это инкассация, а не доход (иначе двойной учёт).
+     *   23 — Баня (отдельный учёт).
+     *
+     * 25 GRAB — НЕ исключена, это колонка «Grab (поступления)». Заказы Grab
+     * закрываются виртуальным депозитом клиента GRAB_CLIENT_ID (цены и комиссия
+     * Grab неизвестны), живые деньги приходят позже на Vietnam Comp категорией
+     * 25. Правило владельца (2026-10-04): верим только этой сумме — поэтому
+     * чеки клиента GRAB вычитаются из «еды» (RevenueService), а доходом идёт
+     * поступление по дате прихода.
      */
-    public const EXCLUDED_CATS = [1, 2, 4, 14, 22, 23, 25];
+    public const EXCLUDED_CATS = [1, 2, 4, 14, 22, 23];
+
+    /** Клиент Poster «GRAB»: его чеки — заказы Grab по цене меню, не деньги. */
+    public const GRAB_CLIENT_ID = 359;
 
     /** Expense/income column keys (everything summed from finance). */
     public static function financeColumnKeys(): array

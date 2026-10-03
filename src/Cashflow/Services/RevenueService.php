@@ -4,16 +4,19 @@ declare(strict_types=1);
 
 namespace App\Cashflow\Services;
 
+use App\Cashflow\Domain\FinanceMap;
 use App\Cashflow\Domain\PosterMoney;
 
 /**
  * Live revenue per day straight from Poster — no DB, no manual entry.
  *
  * Per day: total = Σ dash.getCategoriesSales (÷100), hookah = category 47,
- * food = total − hookah. food + hookah == total by construction, so the
- * 12-July class of double-count is structurally impossible. Σ(day categories)
- * equals the month dash.getAnalytics.revenue (verified), which drives the
- * reconciliation badge.
+ * grabMenu = Σ payed_sum чеков клиента GRAB (виртуальный депозит, не деньги —
+ * сами деньги Grab идут колонкой «Grab (поступления)» из финмодуля),
+ * food = total − hookah − grabMenu. food + hookah + grabMenu == total by
+ * construction, so the 12-July class of double-count is structurally
+ * impossible. Σ(day categories) equals the month dash.getAnalytics.revenue
+ * (verified), which drives the reconciliation badge.
  *
  * "Day" = Poster business day (date_close), timezone Asia/Ho_Chi_Minh.
  */
@@ -27,7 +30,7 @@ final class RevenueService
     public function __construct(private readonly PosterHttp $http) {}
 
     /**
-     * @return array{rows:list<array{day:int,date:string,weekday:int,food:int,hookah:int,total:int}>,totals:array{food:int,hookah:int,total:int},reconcile:array{sumOfDays:int,analytics:?int,delta:?int,ok:bool},isCurrentMonth:bool,lastDay:int}
+     * @return array{rows:list<array{day:int,date:string,weekday:int,food:int,hookah:int,grabMenu:int,total:int}>,totals:array{food:int,hookah:int,grabMenu:int,total:int},reconcile:array{sumOfDays:int,analytics:?int,delta:?int,ok:bool},isCurrentMonth:bool,lastDay:int}
      */
     public function month(int $year, int $month): array
     {
@@ -48,9 +51,10 @@ final class RevenueService
             $days
         );
         $responses = $this->http->getMany('dash.getCategoriesSales', $paramSets);
+        $grabByDay = $this->grabMenuByDay($first);
 
         $rows = [];
-        $sum  = ['food' => 0, 'hookah' => 0, 'total' => 0];
+        $sum  = ['food' => 0, 'hookah' => 0, 'grabMenu' => 0, 'total' => 0];
         foreach ($days as $i => $d) {
             $cats   = is_array($responses[$i] ?? null) ? $responses[$i] : [];
             $total  = 0;
@@ -62,19 +66,22 @@ final class RevenueService
                     $hookah += $rev;
                 }
             }
-            $food = $total - $hookah;
-            $date = new \DateTimeImmutable(sprintf('%04d-%02d-%02d', $year, $month, $d), $tz);
+            $date     = new \DateTimeImmutable(sprintf('%04d-%02d-%02d', $year, $month, $d), $tz);
+            $grabMenu = $grabByDay[$date->format('Y-m-d')] ?? 0;
+            $food     = $total - $hookah - $grabMenu;
             $rows[] = [
-                'day'     => $d,
-                'date'    => $date->format('Y-m-d'),
-                'weekday' => (int) $date->format('N'),
-                'food'    => $food,
-                'hookah'  => $hookah,
-                'total'   => $total,
+                'day'      => $d,
+                'date'     => $date->format('Y-m-d'),
+                'weekday'  => (int) $date->format('N'),
+                'food'     => $food,
+                'hookah'   => $hookah,
+                'grabMenu' => $grabMenu,
+                'total'    => $total,
             ];
-            $sum['food']   += $food;
-            $sum['hookah'] += $hookah;
-            $sum['total']  += $total;
+            $sum['food']     += $food;
+            $sum['hookah']   += $hookah;
+            $sum['grabMenu'] += $grabMenu;
+            $sum['total']    += $total;
         }
 
         $analyticsTotal = null;
@@ -100,5 +107,39 @@ final class RevenueService
             'isCurrentMonth' => $isCurrent,
             'lastDay'        => $lastDay,
         ];
+    }
+
+    /**
+     * Чеки клиента GRAB за месяц (один dash.getTransactions, ~2–6 с) → сумма
+     * payed_sum по дню закрытия. Это та же величина, что сидит в выручке по
+     * категориям (Σ payed_sum всех чеков == Σ getCategoriesSales, сверено на
+     * сентябре 2026). Сбой Poster → пусто: Grab останется внутри «еды», отчёт
+     * не падает.
+     *
+     * @return array<string,int> Y-m-d → ₫
+     */
+    private function grabMenuByDay(\DateTimeImmutable $first): array
+    {
+        try {
+            $checks = $this->http->get('dash.getTransactions', [
+                'dateFrom' => $first->format('Ymd'),
+                'dateTo'   => $first->modify('last day of this month')->format('Ymd'),
+                'status'   => 2,
+            ]);
+        } catch (\Throwable) {
+            return [];
+        }
+        $out = [];
+        foreach ($checks as $t) {
+            if (!is_array($t) || (int) ($t['client_id'] ?? 0) !== FinanceMap::GRAB_CLIENT_ID) {
+                continue;
+            }
+            $day = substr((string) ($t['date_close_date'] ?? ''), 0, 10);
+            if ($day === '') {
+                continue;
+            }
+            $out[$day] = ($out[$day] ?? 0) + PosterMoney::fromDashCents($t['payed_sum'] ?? $t['sum'] ?? 0);
+        }
+        return $out;
     }
 }

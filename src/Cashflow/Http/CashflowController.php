@@ -64,8 +64,8 @@ final class CashflowController
 
         $pageTitle   = 'Финансовый отчёт';
         $currentPath = '/cashflowreport';
-        $headExtra   = '<link rel="stylesheet" href="/assets/css/cashflow.css?v=20260807_3">' . "\n"
-                     . '<script src="/assets/js/cashflow.js?v=20260807_3" defer></script>';
+        $headExtra   = '<link rel="stylesheet" href="/assets/css/cashflow.css?v=20261004_grab">' . "\n"
+                     . '<script src="/assets/js/cashflow.js?v=20261004_grab" defer></script>';
 
         ob_start();
         require __DIR__ . '/../../Views/cashflow_content.php';

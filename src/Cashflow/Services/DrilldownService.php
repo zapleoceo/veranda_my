@@ -47,11 +47,29 @@ final class DrilldownService
         }
         usort($list, static fn ($a, $b) => $b['revenue'] <=> $a['revenue']);
 
+        // Заказы Grab по цене меню (депозит клиента GRAB) — вычитаются из еды,
+        // их деньги идут колонкой «Grab (поступления)».
+        $grab = 0;
+        $grabChecks = 0;
+        try {
+            $checks = $this->http->get('dash.getTransactions', ['dateFrom' => $ymd, 'dateTo' => $ymd, 'status' => 2]);
+            foreach ($checks as $t) {
+                if (is_array($t) && (int) ($t['client_id'] ?? 0) === FinanceMap::GRAB_CLIENT_ID) {
+                    $grab += PosterMoney::fromDashCents($t['payed_sum'] ?? $t['sum'] ?? 0);
+                    $grabChecks++;
+                }
+            }
+        } catch (\Throwable) {
+            // без Grab-разбивки формула покажет «еду» как раньше
+        }
+
         return [
             'date'        => $date,
             'total'       => $total,
             'hookah'      => $hookah,
-            'food'        => $total - $hookah,
+            'grab'        => $grab,
+            'grabChecks'  => $grabChecks,
+            'food'        => $total - $hookah - $grab,
             'hookahCount' => $hookahCount,
             'categories'  => $list,
         ];

@@ -10,7 +10,8 @@ use App\Cashflow\Domain\FinanceMap;
  * Composes the full monthly P&L grid: revenue (RevenueService) + expenses
  * (ExpenseService) → per-day columns as in Excel «Лист1», plus computed profit.
  *
- * profit(day) = (food + hookah + events) − Σ(expense columns)
+ * profit(day) = (food + hookah + Σ income columns: Grab, events) − Σ(expense columns)
+ * where food already excludes Grab orders at menu price (RevenueService).
  */
 final class ReportService
 {
@@ -49,11 +50,12 @@ final class ReportService
                 $values[$k] = $byDay[$date][$k] ?? 0;
             }
 
-            $expenseSum = 0;
-            foreach ($expenseKeys as $k) {
-                $expenseSum += $values[$k];
+            // Не от $r['total']: там сидят и чеки Grab по цене меню (депозит,
+            // не деньги). Доход Grab — колонка «Grab (поступления)».
+            $profit = $r['food'] + $r['hookah'];
+            foreach ($financeKeys as $k) {
+                $profit += in_array($k, $expenseKeys, true) ? -$values[$k] : $values[$k];
             }
-            $profit = $r['total'] + ($values['events'] ?? 0) - $expenseSum;
 
             $rows[] = [
                 'day'     => $r['day'],
