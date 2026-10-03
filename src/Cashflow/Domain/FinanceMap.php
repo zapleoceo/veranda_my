@@ -55,9 +55,12 @@ final class FinanceMap
      *        Маша её в «Всякие» не включает — исключение даёт точное совпадение
      *        июньских «Всяких» с Excel до донга);
      *   14 — e-wallets (та же выручка); 22 — Инвесторы (ниже линии, дивиденды);
-     *   23 — Баня (отдельный учёт).
+     *   23 — Баня (отдельный учёт);
+     *   25 — GRAB (с 09.2026, дочерняя к «Кассовым сменам»): выплаты Grab на
+     *        Vietnam Comp за заказы, которые уже пробиты обычными чеками и сидят
+     *        в выручке — это инкассация, а не доход (иначе двойной учёт).
      */
-    public const EXCLUDED_CATS = [1, 2, 4, 14, 22, 23];
+    public const EXCLUDED_CATS = [1, 2, 4, 14, 22, 23, 25];
 
     /** Expense/income column keys (everything summed from finance). */
     public static function financeColumnKeys(): array
