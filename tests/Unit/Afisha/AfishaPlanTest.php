@@ -186,6 +186,25 @@ class AfishaPlanTest extends TestCase
         $this->assertSame(['19:00'], AfishaPlan::legacyLines('19:00', ''));
     }
 
+    public function test_only_telegram_post_links_reach_the_page(): void
+    {
+        $this->assertSame('https://t.me/gamezone_vietnam/1729/6776', AfishaStore::postUrl('https://t.me/gamezone_vietnam/1729/6776'));
+        $this->assertSame('https://t.me/gamezone_vietnam/6776', AfishaStore::postUrl('https://t.me/gamezone_vietnam/6776'));
+        $this->assertSame('', AfishaStore::postUrl('javascript:alert(1)'));
+        $this->assertSame('', AfishaStore::postUrl('https://evil.example/t.me/x/1'));
+        $this->assertSame('', AfishaStore::postUrl(null));
+    }
+
+    public function test_each_day_keeps_the_post_it_came_from(): void
+    {
+        $store = new AfishaStore(sys_get_temp_dir() . '/afisha-phpunit-' . bin2hex(random_bytes(4)));
+        $days = AfishaPlan::fromAi($this->ai($this->monday), $this->today)['days'];
+        $days[5]['post'] = 'https://t.me/gamezone_vietnam/1729/6776';
+        $store->save($this->monday, ['days' => $days]);
+
+        $this->assertSame('https://t.me/gamezone_vietnam/1729/6776', $store->cardsFor($this->monday, 'ru')[5]['post']);
+    }
+
     public function test_sessions_are_sanitized_and_capped(): void
     {
         $ai = $this->ai($this->monday);

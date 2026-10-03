@@ -36,7 +36,9 @@ final class AfishaStore
      * Карточки недели на нужном языке: [день недели 0..6 => type/title/lines].
      * lines — события дня в столбик, каждое со своим временем начала.
      *
-     * @return array<int,array{type:string,title:string,lines:string[]}>
+     * post — пост в Telegram, из которого взят день ('' — нет).
+     *
+     * @return array<int,array{type:string,title:string,lines:string[],post:string}>
      */
     public function cardsFor(string $weekStart, string $locale): array
     {
@@ -50,10 +52,19 @@ final class AfishaStore
                 'type' => (string) ($card['type'] ?? 'other'),
                 'title' => (string) $t['title'],
                 'lines' => AfishaPlan::lines($t),
+                'post' => self::postUrl($card['post'] ?? ''),
             ];
         }
 
         return $out;
+    }
+
+    /** Ссылку пускаем на страницу, только если это пост Telegram. */
+    public static function postUrl(mixed $url): string
+    {
+        $url = is_string($url) ? trim($url) : '';
+
+        return preg_match('~^https://t\.me/[A-Za-z0-9_]{4,32}(/\d{1,10}){1,2}$~', $url) ? $url : '';
     }
 
     /**

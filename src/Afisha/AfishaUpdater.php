@@ -115,6 +115,13 @@ final class AfishaUpdater
             $plan['kind'] = 'full';
         }
 
+        // Каждый затронутый день помнит пост, из которого взят: полная афиша —
+        // пост афиши, точечный анонс («сегодня Рядновы») — этот пост.
+        $post = self::postUrl($msg);
+        foreach ($plan['days'] as $wd => $card) {
+            $plan['days'][$wd]['post'] = $post;
+        }
+
         $weekStart = $plan['week_start'];
         $existing = (array) ($this->store->week($weekStart)['days'] ?? []);
         $days = AfishaPlan::merge($existing, $plan['days'], $plan['kind']);
@@ -275,6 +282,18 @@ TXT;
     /** @param array<string,mixed> $msg */
     private static function linkLine(array $msg): string
     {
+        $url = self::postUrl($msg);
+
+        return $url !== '' ? "\n" . $url : '';
+    }
+
+    /**
+     * Публичная ссылка на сообщение в группе (t.me/<группа>/<ветка>/<id>).
+     *
+     * @param array<string,mixed> $msg
+     */
+    private static function postUrl(array $msg): string
+    {
         $username = (string) ($msg['chat']['username'] ?? '');
         $id = (int) ($msg['message_id'] ?? 0);
         if ($username === '' || $id <= 0) {
@@ -282,7 +301,7 @@ TXT;
         }
         $thread = (int) ($msg['message_thread_id'] ?? 0);
 
-        return "\n" . 'https://t.me/' . $username . ($thread > 0 ? '/' . $thread : '') . '/' . $id;
+        return 'https://t.me/' . $username . ($thread > 0 ? '/' . $thread : '') . '/' . $id;
     }
 
     private static function esc(string $s): string

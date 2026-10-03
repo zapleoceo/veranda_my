@@ -55,6 +55,7 @@ final class WeeklyProgram
                 $image,
                 $isFilm ? $filmUrl : $reserveUrl,
                 $isFilm ? $lang->t('tonight.films') : '',
+                $card['post'] ?? '',
             );
         }
     }

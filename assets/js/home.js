@@ -69,6 +69,11 @@
                 if (/^https?:/.test(d.url || '')) { ctaEl.target = '_blank'; ctaEl.rel = 'noopener'; }
                 else { ctaEl.removeAttribute('target'); ctaEl.removeAttribute('rel'); }
             }
+            var postEl = document.getElementById('tonightPost');
+            if (postEl) {
+                if (d.post) { postEl.href = d.post; postEl.hidden = false; }
+                else { postEl.hidden = true; }
+            }
             if (badgeEl) badgeEl.textContent = ((Number(d.day) === today ? badgeEl.dataset.today : badgeEl.dataset.week) || '') + (d.date ? ' · ' + d.date : '');
             setBg(d.image);
         }

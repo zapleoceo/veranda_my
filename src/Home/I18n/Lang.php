@@ -61,6 +61,7 @@ final class Lang
             'tonight.badgeWeek' => 'This week',
             'tonight.book' => 'Book',
             'tonight.films' => 'Film schedule',
+            'tonight.post' => 'Announcement on Telegram',
             'tonight.free' => 'Free entry to all events',
 
             'days.full' => ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'],
@@ -188,6 +189,7 @@ final class Lang
             'tonight.badgeWeek' => 'В афише',
             'tonight.book' => 'Забронировать',
             'tonight.films' => 'Афиша фильмов',
+            'tonight.post' => 'Анонс в Telegram',
             'tonight.free' => 'Вход на все события — свободный',
 
             'days.full' => ['Воскресенье', 'Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота'],
@@ -315,6 +317,7 @@ final class Lang
             'tonight.badgeWeek' => 'Trong tuần',
             'tonight.book' => 'Đặt bàn',
             'tonight.films' => 'Lịch phim',
+            'tonight.post' => 'Thông báo trên Telegram',
             'tonight.free' => 'Vào cửa tất cả sự kiện miễn phí',
 
             'days.full' => ['Chủ nhật', 'Thứ hai', 'Thứ ba', 'Thứ tư', 'Thứ năm', 'Thứ sáu', 'Thứ bảy'],

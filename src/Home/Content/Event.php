@@ -18,6 +18,7 @@ final class Event
         public readonly string $image,
         public readonly string $url,
         public readonly string $ctaLabel = '', // подпись кнопки; '' = глобальная «Забронировать»
+        public readonly string $postUrl = '',  // пост в Telegram с анонсом дня; '' — нет
     ) {
     }
 }
