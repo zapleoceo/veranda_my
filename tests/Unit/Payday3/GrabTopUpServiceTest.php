@@ -157,6 +157,18 @@ final class GrabTopUpServiceTest extends TestCase
         $svc->create(self::range(), new Actor('op@x'));
     }
 
+    public function test_older_fact_without_surplus_means_nothing_to_top_up(): void
+    {
+        // Carried-over Факт. equals Poster → Δ «Вьет.» = 0, nothing to top up.
+        $svc = $this->service(new ScriptedPoster(), factVnd: 263_830, factDate: '2026-10-02');
+        $st  = $svc->status(self::range());
+        $this->assertSame('no_surplus', $st['reason']);
+        $this->assertSame(0, $st['surplus_vnd']);
+        $this->assertFalse($st['can_create']);
+        $this->expectException(\DomainException::class);
+        $svc->create(self::range(), new Actor('op@x'));
+    }
+
     public function test_existing_grab_income_is_found_and_blocks_create(): void
     {
         $poster = new ScriptedPoster([

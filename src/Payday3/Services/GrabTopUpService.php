@@ -159,6 +159,17 @@ final class GrabTopUpService implements GrabTopUpServiceInterface
         $found  = $this->existingGrab($range->to, $cfg->accountVietnamId);
         $reason = self::decide($fact, $poster === null ? null : (int)$poster, $vOk, $tOk, $found !== []);
 
+        // No Факт. for this day yet, but the latest one (the value the
+        // balances card shows) leaves no surplus → nothing to top up, the
+        // row is closed. A positive carried-over surplus still asks for
+        // today's Факт. before anything can be booked.
+        $carried = $snap?->vietnam?->amount;
+        if ($reason === 'no_fact' && $carried !== null && $poster !== null
+            && $carried - (int)$poster <= 0) {
+            $reason  = 'no_surplus';
+            $surplus = $carried - (int)$poster;
+        }
+
         return [
             'surplus_vnd' => $surplus,
             'fact_vnd'    => $fact,
