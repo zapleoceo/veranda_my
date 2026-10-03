@@ -17,9 +17,13 @@ $head = $content->heads()['location'];
     <div class="wrap">
         <div class="location__grid">
             <div class="location__media frame reveal">
-                <div class="frame__inner location__map" id="locationMap"
-                     data-lat="<?= Html::e($contacts->mapLat) ?>" data-lng="<?= Html::e($contacts->mapLng) ?>"
-                     role="img" aria-label="<?= Html::e($lang->t('location.mapAlt')) ?>"></div>
+                <?php /* Статичная карта (OSM, собрана scripts/ops/build_static_map.mjs, центр = Veranda):
+                         без внешних тайлов/скриптов, поэтому не ломается. Клик — маршрут в Google Maps. */ ?>
+                <a class="frame__inner location__map" href="<?= Html::e($contacts->maps) ?>" target="_blank" rel="noopener">
+                    <?= Html::img('map-veranda', $lang->t('location.mapAlt'), '(min-width: 860px) 50vw, 100vw') ?>
+                    <span class="map-pin" aria-hidden="true"><span class="map-pin__pulse"></span><span class="map-pin__dot"></span></span>
+                    <span class="location__attr">© OpenStreetMap</span>
+                </a>
             </div>
             <div class="reveal">
                 <span class="eyebrow"><?= Html::e($head['eyebrow']) ?></span>

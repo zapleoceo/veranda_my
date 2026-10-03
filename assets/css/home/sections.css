@@ -209,13 +209,12 @@
 .facts__txt a { color: var(--text); border-bottom: 1px solid var(--hair-2); }
 .location__cta { display: flex; gap: var(--s-3); flex-wrap: wrap; }
 
-/* Живая карта (Leaflet + тёмные тайлы CARTO). */
-.location__map { background: var(--bg-2); }
-.leaflet-container { background: var(--bg-2) !important; font-family: var(--sans) !important; }
-.leaflet-bar a { background: rgba(20, 16, 11, .85) !important; color: var(--text) !important; border-color: var(--hair) !important; }
-.leaflet-bar a:hover { background: var(--surface) !important; }
-.leaflet-control-attribution { background: rgba(20, 16, 11, .45) !important; color: var(--text-3) !important; font-size: 9px !important; line-height: 1.4 !important; padding: 0 6px !important; opacity: .6; }
-.leaflet-control-attribution a { color: var(--ember-2) !important; }
+/* Статичная карта (своя картинка, центр = Veranda) + метка по центру. */
+.location__map { display: block; background: var(--bg-2); }
+.location__map img { transition: transform .6s var(--ease-out); }
+.location__map:hover img { transform: scale(1.03); }
+.map-pin { position: absolute; left: 50%; top: 50%; width: 0; height: 0; pointer-events: none; }
+.location__attr { position: absolute; right: 8px; bottom: 6px; font-size: 9px; line-height: 1.4; padding: 0 6px; color: var(--text-3); background: rgba(20, 16, 11, .45); opacity: .7; }
 /* Кастомная метка — пульсирующая красная точка (без картинок). */
 .map-pin__dot, .map-pin__pulse { position: absolute; left: 50%; top: 50%; width: 14px; height: 14px; margin: -7px 0 0 -7px; border-radius: 50%; background: var(--red); }
 .map-pin__dot { box-shadow: 0 0 0 3px var(--glow-red), 0 2px 8px rgba(0, 0, 0, .6); }
