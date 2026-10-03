@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Payday3\Http\Actions;
 
 use App\Payday3\Contracts\FinanceTransferServiceInterface;
+use App\Payday3\Contracts\GrabTopUpServiceInterface;
 use App\Payday3\Domain\DateRange;
 use App\Payday3\Http\JsonResponder;
 use Psr\Http\Message\ResponseInterface;
@@ -14,7 +15,10 @@ use App\Payday3\Http\CurrentUser;
 /**
  * POST /payday3/api/finance/transfers/create
  *
- * Body (JSON): { kind: "vietnam" | "tips", dateFrom, dateTo }
+ * Body (JSON): { kind: "vietnam" | "tips" | "grab", dateFrom, dateTo }
+ *
+ * kind=grab → GrabTopUpService (income «Пополнение Grab» on the Vietnam
+ * account; amount and gating recomputed server-side, rejections → 400).
  *
  * Powers the "Создать" buttons in the Финансовые транзакции
  * card. Idempotent — service walks today's finance.getTransactions
@@ -23,7 +27,10 @@ use App\Payday3\Http\CurrentUser;
  */
 final class FinanceTransferCreateAction
 {
-    public function __construct(private readonly FinanceTransferServiceInterface $service) {}
+    public function __construct(
+        private readonly FinanceTransferServiceInterface $service,
+        private readonly GrabTopUpServiceInterface       $grab,
+    ) {}
 
     public function __invoke(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
     {
@@ -41,7 +48,9 @@ final class FinanceTransferCreateAction
                 'dateFrom' => (string)($payload['dateFrom'] ?? ''),
                 'dateTo'   => (string)($payload['dateTo']   ?? ''),
             ]);
-            $result = $this->service->createTransfer($kind, $range, CurrentUser::email());
+            $result = $kind === 'grab'
+                ? $this->grab->create($range, CurrentUser::actor())
+                : $this->service->createTransfer($kind, $range, CurrentUser::email());
         } catch (\Throwable $e) {
             return JsonResponder::fromException($response, $e, 502);
         }

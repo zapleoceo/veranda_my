@@ -10,8 +10,9 @@ import { api }            from '../api.js';
 import { esc, fmtVnd, withRange } from './format.js';
 import { coalesce }       from './coalesce.js';
 import { withBusy }       from './busy.js';
+import { grabRowState }   from './grabTopUp.js';
 
-const KINDS = ['vietnam', 'tips'];
+const KINDS = ['vietnam', 'tips', 'grab'];
 
 // A missing total shows as a dash on this card.
 const fmt = (n) => fmtVnd(n, { empty: '—' });
@@ -99,6 +100,20 @@ function renderRow(kind, payload) {
     if (btn) btn.disabled = disabled;
 }
 
+// «Пополнить Grab»: amount + gating come from the server (GrabTopUpService);
+// grabRowState() only maps them to text / button state.
+function renderGrab(payload) {
+    const totalEl  = document.getElementById('pd3FinanceTotal_grab');
+    const statusEl = document.getElementById('pd3FinanceStatus_grab');
+    const btn      = document.getElementById('pd3FinanceCreateBtn_grab');
+    if (!totalEl || !statusEl) return;
+    const st = grabRowState(payload);
+    totalEl.textContent = st.total;
+    statusEl.innerHTML = `<span class="${st.disabled && !st.showFound ? 'pd3-finance__empty' : 'muted'}">${esc(st.text)}</span>`
+        + (st.showFound ? renderMiniTable(payload.found) : '');
+    if (btn) btn.disabled = st.disabled;
+}
+
 let lastAccounts = null;
 
 /**
@@ -114,6 +129,7 @@ function makeLoader(state) {
             lastAccounts = data.accounts || null;
             renderRow('vietnam', data.vietnam);
             renderRow('tips',    data.tips);
+            renderGrab(data.grab);
         } catch (e) {
             for (const k of KINDS) {
                 const s = document.getElementById('pd3FinanceStatus_' + k);
@@ -123,7 +139,7 @@ function makeLoader(state) {
     }));
 }
 
-export function initFinanceTransfers({ state }) {
+export function initFinanceTransfers({ state, onCreated = () => {} }) {
     if (!document.getElementById('pd3Finance')) return { reload: async () => {} };
     const load = makeLoader(state);
 
@@ -152,13 +168,22 @@ export function initFinanceTransfers({ state }) {
                 if (status) {
                     status.innerHTML = res?.already
                         ? '<span class="muted">Уже была создана сегодня.</span>'
-                        : '<span class="muted">Создана в Poster. Обновляю…</span>';
+                        : `<span class="muted">Создана в Poster${res?.amount_vnd ? ': ' + esc(fmt(res.amount_vnd)) : ''}. Обновляю…</span>`;
                 }
                 await load();                 // reload list so the new tx appears
+                if (!res?.already) onCreated(kind);   // Poster balances changed
             } catch (err) {
                 if (status) status.innerHTML = '<span class="pd3-finance__empty">Ошибка: '
                     + esc(err.message || 'не удалось создать') + '</span>';
-                b.disabled = false;
+                if (kind === 'grab') {
+                    // Server rejected on re-validation — re-read the true
+                    // state, keeping the error text visible.
+                    const msg = status?.innerHTML;
+                    await load();
+                    if (status && msg) status.innerHTML = msg + status.innerHTML;
+                } else {
+                    b.disabled = false;
+                }
             }
         });
     });

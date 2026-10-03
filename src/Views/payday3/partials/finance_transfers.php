@@ -6,6 +6,8 @@ declare(strict_types=1);
  *     checks paid with poster_payment_method_id=11 in the range.
  *   - Tips           — expected transfer = sum of tip_sum on linked
  *     checks (excluding Vietnam checks) in the range.
+ *   - Пополнить Grab — income (category GRAB) on the Vietnam account for
+ *     the surplus Факт. − Poster of «Вьет.» (GrabTopUpService).
  *
  * Server renders an empty shell; ui/financeTransfers.js fills the
  * mini-tables from /payday3/api/finance/transfers on page boot and
@@ -30,6 +32,8 @@ declare(strict_types=1);
     <?php foreach ([
         ['kind' => 'vietnam', 'title' => 'Vietnam'],
         ['kind' => 'tips',    'title' => 'Tips'],
+        ['kind' => 'grab',    'title' => 'Пополнить Grab', 'btn' => 'Пополнить',
+         'help' => 'Приход в Poster на счёт Vietnam, категория GRAB, на сумму излишка (Δ «Вьет.» в «Итоговом балансе»). Доступна когда излишек > 0, Vietnam и Tips сведены и пополнения за этот день ещё нет.'],
     ] as $row): ?>
         <div class="pd3-finance__row" data-kind="<?= htmlspecialchars($row['kind']) ?>">
             <div class="pd3-finance__head">
@@ -40,8 +44,8 @@ declare(strict_types=1);
                         id="pd3FinanceCreateBtn_<?= htmlspecialchars($row['kind']) ?>"
                         data-kind="<?= htmlspecialchars($row['kind']) ?>"
                         title="Создать транзакцию"
-                        data-help-abs="Создать перевод в Poster на ожидаемую сумму. Доступна когда сумма ненулевая и совпадающей транзакции в Poster ещё нет."
-                        disabled>Создать</button>
+                        data-help-abs="<?= htmlspecialchars($row['help'] ?? 'Создать перевод в Poster на ожидаемую сумму. Доступна когда сумма ненулевая и совпадающей транзакции в Poster ещё нет.') ?>"
+                        disabled><?= htmlspecialchars($row['btn'] ?? 'Создать') ?></button>
             </div>
             <div class="pd3-finance__status muted" id="pd3FinanceStatus_<?= htmlspecialchars($row['kind']) ?>">Загрузка…</div>
         </div>

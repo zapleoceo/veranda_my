@@ -238,45 +238,36 @@ final class FinanceTransferService implements FinanceTransferServiceInterface
 
         // Already ts-filtered to the range by the fetcher.
         $rows = $this->fetcher->financeTransactions($range, ['account_id' => $accTarget, 'type' => 1]);
-        if ($rows === []) return [];
-
-        // Memoised per request — shared by vietnam() and tips().
-        $employees = $this->fetcher->employeeNames();
-        $accounts  = $this->fetcher->accountNames();
-
-        $out = [];
-        foreach ($rows as $row) {
-            $tRaw   = (string)($row['type'] ?? '');
-            $isXfer = ($tRaw === '2');
-            $isIn   = ($tRaw === '1' || strtoupper($tRaw) === 'I' || strtolower($tRaw) === 'in');
-            $isOut  = ($tRaw === '0' || strtoupper($tRaw) === 'O' || strtolower($tRaw) === 'out');
-            if (!$isXfer && !$isIn && !$isOut) continue;
-
-            $accId = FinanceTransferFetcher::rowAccountId($row, $isXfer, $isOut, $accTarget);
-            if ($accId !== $accTarget) continue;
-
-            $uId = FinanceTransferFetcher::rowUserId($row);
-            $userName = '';
-            if ($uId > 0 && isset($employees[$uId])) {
-                $userName = (string)$employees[$uId];
-            } elseif (is_array($row['user'] ?? null)) {
-                $u = $row['user'];
-                $userName = trim((string)($u['name'] ?? $u['user_name'] ?? $u['username'] ?? $u['title'] ?? ''));
-            }
-            if ($userName === '' && $uId > 0) $userName = '#' . $uId;
-
-            $out[] = [
-                'transaction_id' => (int)($row['transaction_id'] ?? $row['id'] ?? 0),
-                'ts'             => (int)FinanceTransferFetcher::rowTs($row),
-                // Name kept for the wire contract; the value is VND.
-                'sum_minor'      => abs(FinanceTransferFetcher::rowAmountVnd($row)),
-                'type'           => $tRaw,
-                'comment'        => trim((string)($row['comment'] ?? $row['description'] ?? '')),
-                'user'           => $userName,
-                'account'        => (string)($accounts[$accId] ?? ('#' . $accId)),
-            ];
+        if ($kind === 'vietnam') {
+            // «Пополнение Grab» incomes land on the same account — never
+            // let one pass for the Vietnam transfer (found / reconciliation).
+            $rows = array_values(array_filter($rows, static fn(array $r) => !GrabTopUpService::isGrabRow($r)));
         }
-        usort($out, static fn($a, $b) => ($b['ts'] ?? 0) <=> ($a['ts'] ?? 0));
-        return $out;
+        return $this->fetcher->cardRows($rows, $accTarget);
+    }
+
+    /**
+     * Pure rule (unit-tested): is a Vietnam/Tips card payload "сведён"?
+     * Same test the UI uses for "already exists": a found transaction
+     * whose VND amount equals the expected total.
+     *
+     *   expected null / fetch error → NOT reconciled (unknown state);
+     *   expected 0                  → reconciled: nothing has to be
+     *                                 transferred, the card itself shows
+     *                                 «Сумма = 0» and never asks for an
+     *                                 action, so it can't block GRAB.
+     *
+     * @param array{total_vnd:?int, found?:list<array>, error?:string} $card
+     */
+    public static function isReconciled(array $card): bool
+    {
+        if (isset($card['error'])) return false;
+        $total = $card['total_vnd'] ?? null;
+        if ($total === null) return false;
+        if ((int)$total <= 0) return true;
+        foreach ($card['found'] ?? [] as $f) {
+            if (abs((int)($f['sum_minor'] ?? 0)) === (int)$total) return true;
+        }
+        return false;
     }
 }

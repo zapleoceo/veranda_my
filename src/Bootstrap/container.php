@@ -342,13 +342,25 @@ return [
         $c->get(PosterApiProviderInterface::class),
         $c->get(\App\Payday3\Contracts\NamedLockInterface::class),
     ),
+    \App\Payday3\Contracts\GrabTopUpServiceInterface::class => fn($c) => new \App\Payday3\Services\GrabTopUpService(
+        $c->get(FinanceTransferServiceInterface::class),
+        $c->get(\App\Payday3\Services\FinanceTransferFetcher::class),
+        $c->get(ActualBalanceRepositoryInterface::class),
+        $c->get(PosterBalanceServiceInterface::class),
+        $c->get(LocalSettingsRepositoryInterface::class),
+        $c->get(PosterApiProviderInterface::class),
+        $c->get(\App\Payday3\Contracts\NamedLockInterface::class),
+        $c->get(\App\Payday3\Contracts\AuditLogInterface::class),
+    ),
     FinanceTransfersAction::class => fn($c) => new FinanceTransfersAction(
         $c->get(FinanceTransferServiceInterface::class),
         $c->get(LocalSettingsRepositoryInterface::class),
+        $c->get(\App\Payday3\Contracts\GrabTopUpServiceInterface::class),
     ),
     \App\Payday3\Http\Actions\FinanceTransferCreateAction::class => fn($c) =>
         new \App\Payday3\Http\Actions\FinanceTransferCreateAction(
             $c->get(FinanceTransferServiceInterface::class),
+            $c->get(\App\Payday3\Contracts\GrabTopUpServiceInterface::class),
         ),
     BalanceScreenshotAction::class => fn($c) => new BalanceScreenshotAction(
         $c->get(TelegramNotifierInterface::class),

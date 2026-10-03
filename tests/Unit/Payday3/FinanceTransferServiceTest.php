@@ -145,6 +145,24 @@ final class FinanceTransferServiceTest extends TestCase
         $this->assertSame(8, $create[0]['params']['account_to']);
     }
 
+    public function test_grab_topups_are_excluded_from_vietnam_card(): void
+    {
+        $poster = new ScriptedPoster([
+            'dash.getTransactions'    => $this->checks(),
+            'finance.getTransactions' => [
+                // Same amount as the expected Vietnam transfer, but GRAB by category…
+                ['transaction_id' => 70, 'type' => '1', 'account_id' => 9, 'category_id' => PosterIds::CATEGORY_GRAB,
+                 'amount' => 10500000, 'date' => '2026-09-18 23:55:00', 'comment' => 'x'],
+                // …and by comment only.
+                ['transaction_id' => 71, 'type' => '1', 'account_id' => 9,
+                 'amount' => 10500000, 'date' => '2026-09-18 23:55:00', 'comment' => 'Пополнение Grab 18.09.2026'],
+            ],
+        ]);
+        $v = $this->service($poster)->vietnam(DateRange::of('2026-09-18', '2026-09-18'));
+        $this->assertSame([], $v['found']);
+        $this->assertFalse(FinanceTransferService::isReconciled($v));
+    }
+
     public function test_poster_failure_is_reported_not_hidden(): void
     {
         $poster = new ScriptedPoster([

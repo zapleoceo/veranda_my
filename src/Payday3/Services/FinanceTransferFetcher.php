@@ -135,6 +135,65 @@ final class FinanceTransferFetcher
         return false;
     }
 
+    /**
+     * finance.getTransactions rows → mini-table rows of the Финансовые
+     * транзакции card (newest first). Only rows touching $accTarget.
+     * Shared by the Vietnam/Tips rows and the «Пополнить Grab» row.
+     *
+     * @param list<array<string,mixed>> $rows
+     * @return list<array{transaction_id:int,ts:int,sum_minor:int,type:string,comment:string,user:string,account:string}>
+     */
+    public function cardRows(array $rows, int $accTarget): array
+    {
+        if ($rows === []) return [];
+        // Memoised per request — shared by every card row.
+        $employees = $this->employeeNames();
+        $accounts  = $this->accountNames();
+
+        $out = [];
+        foreach ($rows as $row) {
+            $tRaw   = (string)($row['type'] ?? '');
+            $isXfer = ($tRaw === '2');
+            $isIn   = ($tRaw === '1' || strtoupper($tRaw) === 'I' || strtolower($tRaw) === 'in');
+            $isOut  = ($tRaw === '0' || strtoupper($tRaw) === 'O' || strtolower($tRaw) === 'out');
+            if (!$isXfer && !$isIn && !$isOut) continue;
+
+            $accId = self::rowAccountId($row, $isXfer, $isOut, $accTarget);
+            if ($accId !== $accTarget) continue;
+
+            $uId = self::rowUserId($row);
+            $userName = '';
+            if ($uId > 0 && isset($employees[$uId])) {
+                $userName = (string)$employees[$uId];
+            } elseif (is_array($row['user'] ?? null)) {
+                $u = $row['user'];
+                $userName = trim((string)($u['name'] ?? $u['user_name'] ?? $u['username'] ?? $u['title'] ?? ''));
+            }
+            if ($userName === '' && $uId > 0) $userName = '#' . $uId;
+
+            $out[] = [
+                'transaction_id' => (int)($row['transaction_id'] ?? $row['id'] ?? 0),
+                'ts'             => (int)self::rowTs($row),
+                // Name kept for the wire contract; the value is VND.
+                'sum_minor'      => abs(self::rowAmountVnd($row)),
+                'type'           => $tRaw,
+                'comment'        => trim((string)($row['comment'] ?? $row['description'] ?? '')),
+                'user'           => $userName,
+                'account'        => (string)($accounts[$accId] ?? ('#' . $accId)),
+            ];
+        }
+        usort($out, static fn($a, $b) => ($b['ts'] ?? 0) <=> ($a['ts'] ?? 0));
+        return $out;
+    }
+
+    /** Finance category id of a row (int or {category_id|id}), 0 when absent. */
+    public static function rowCategoryId(array $row): int
+    {
+        $v = $row['category_id'] ?? $row['category'] ?? $row['finance_category_id'] ?? 0;
+        if (is_array($v)) return (int)($v['category_id'] ?? $v['id'] ?? 0);
+        return (int)$v;
+    }
+
     /** Account id stored in a Poster field that may be an int or {account_id|id}. */
     public static function accountField(mixed $v): int
     {

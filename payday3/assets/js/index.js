@@ -119,7 +119,8 @@ const incomeLinks = initIncomeLinks({ state, onChanged: repaint });
 
 // Balances BEFORE createTx: the «+» popups refresh the Poster column
 // after finance.createTransactions succeeds.
-const balances = initBalances({ state });
+// onChanged: Факт. saved / Poster ↻ / UPLD → the Grab row amount moves.
+const balances = initBalances({ state, onChanged: () => finance.reload() });
 // Same modal host as the toolbar buttons (set up by initModals above).
 initCreateTx({
     state,
@@ -143,7 +144,9 @@ initFontScale();
 
 // AJAX refresh of the incoming side — replaces window.location.reload().
 const loadInData = makeInLoader({ state, renderer, onRendered: afterSideRender('in') });
-const finance    = initFinanceTransfers({ state });
+// Any created transaction (Vietnam/Tips transfer, «Пополнить Grab»)
+// moves Poster balances — refresh the Итоговый баланс card too.
+const finance    = initFinanceTransfers({ state, onCreated: () => balances.reload({ notify: false }) });
 const dataActions = initDataActions({
     state,
     refresh: async () => {

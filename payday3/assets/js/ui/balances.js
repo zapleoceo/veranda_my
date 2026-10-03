@@ -158,6 +158,10 @@ async function loadActual(state) {
 // it starts — nothing is dropped, and `await saveActualNow()` resolves
 // only after the values on screen reached the server.
 
+// Set by initBalances: tells dependants (the «Пополнить Grab» row) that
+// Факт. or the Poster column changed.
+let notifyChanged = () => {};
+
 let lastSavedKeys = {};   // what the server confirmed
 let lastSentKeys  = {};   // what is on its way (≥ lastSavedKeys)
 let saveTimer = 0;
@@ -186,6 +190,7 @@ const saveActualNow = coalesce(async (state) => {
     try {
         await api.post('/payday3/api/balances', body);
         lastSavedKeys = keysOf(body);
+        notifyChanged();
         setStatus('Сохранено в ' + date, 'ok');
     } catch (e) {
         lastSentKeys = { ...lastSavedKeys };   // retry on the next commit
@@ -259,6 +264,7 @@ async function runUpld(state) {
         const res = await api.post('/payday3/api/balances/sync/commit', { nonce: plan.nonce });
         setStatus(res?.already ? 'Уже была создана сегодня' : 'Транзакция создана в Poster', 'ok');
         await reloadPoster();   // pick up the new balance immediately
+        notifyChanged();
     } catch (e) {
         setStatus('UPLD: ' + (e.message || 'error'), 'error');
     } finally {
@@ -321,8 +327,14 @@ async function sendBalancesToTelegram(state) {
  * @returns {{reload: () => Promise<void>}} — re-reads Poster balances;
  *   used after a "+" transaction is created so the Poster column moves.
  */
-export function initBalances({ state }) {
-    const reload = () => reloadPoster().then(syncBtnRefresh);
+export function initBalances({ state, onChanged = () => {} }) {
+    notifyChanged = onChanged;
+    // notify:false when the caller already refreshes itself (finance card
+    // after its own create) — avoids a redundant second card load.
+    const reload = ({ notify = true } = {}) => reloadPoster().then(() => {
+        syncBtnRefresh();
+        if (notify) notifyChanged();
+    });
     if (!document.getElementById('pd3Balances')) return { reload: async () => {} };
 
     document.querySelectorAll('.pd3-bal-input').forEach((el) => {
@@ -345,7 +357,7 @@ export function initBalances({ state }) {
         el.addEventListener('input', () => scheduleAutoSave(state));
     });
 
-    document.getElementById('pd3BalancesReloadBtn')?.addEventListener('click', reload);
+    document.getElementById('pd3BalancesReloadBtn')?.addEventListener('click', () => reload());
     const tgBtn = document.getElementById('pd3BalancesTelegramBtn');
     tgBtn?.addEventListener('click', withBusy(tgBtn, () => sendBalancesToTelegram(state)));
     document.getElementById('pd3BalancesUpldBtn')?.addEventListener('click', () => runUpld(state));

@@ -22,6 +22,13 @@ final class PosterIds
     /** Finance category used for the UPLD balance correction. */
     public const CATEGORY_BALANCE_CORRECTION = 4;
 
+    /**
+     * Finance category «GRAB» (#25, child of «Кассовые смены»): income on
+     * the Vietnam account for Grab payouts — «Пополнить Grab» row.
+     * Excluded from the P&L in Cashflow\Domain\FinanceMap::EXCLUDED_CATS.
+     */
+    public const CATEGORY_GRAB = 25;
+
     /** spot_tablet_id sent with transactions.removeTransaction. */
     public const SPOT_TABLET_ID = 1;
 
