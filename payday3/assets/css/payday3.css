@@ -1425,8 +1425,8 @@ html.pd3-scale-1-5 .pd3-modal-host { zoom: 1.5; }
 .pd3-toast--warn  { border-color: #f59e0b; }
 .pd3-toast--error { border-color: #ef4444; }
 
-/* Balances ✈ button: red until every «Финансовые транзакции» row is closed, green when all are. */
-.pd3-pill.pd3-pill--alert { box-shadow: 0 0 0 2px #e5484d; color: #e5484d; }
-.pd3-pill.pd3-pill--ok    { box-shadow: 0 0 0 2px #30a46c; color: #30a46c; }
+/* Balances ✈ button: plane icon red until every «Финансовые транзакции» row is closed, green when all are. */
+.pd3-pill.pd3-pill--alert { color: #e5484d; }
+.pd3-pill.pd3-pill--ok    { color: #30a46c; }
 .pd3-card__actions .pd3-pill.pd3-pill--alert:hover { color: #e5484d; }
 .pd3-card__actions .pd3-pill.pd3-pill--ok:hover    { color: #30a46c; }
