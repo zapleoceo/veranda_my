@@ -20,7 +20,9 @@ use Psr\Log\LoggerInterface;
  *
  * Настройка (.env):
  *   AFISHA_CHAT_ID         — id группы (пусто = функция выключена)
- *   AFISHA_THREAD_ID       — id ветки форума (пусто = вся группа)
+ *   AFISHA_THREAD_ID       — id веток форума через запятую (пусто = вся группа).
+ *                            Анонсы разбросаны по тематическим веткам: «Афиша и
+ *                            анонсы», «Музыкальные мероприятия», «Movie night»…
  *   AFISHA_NOTIFY_CHAT_ID  — куда слать «афиша обновлена»
  */
 final class AfishaUpdater
@@ -63,8 +65,8 @@ final class AfishaUpdater
         if ($chatId === '' || (string) ($msg['chat']['id'] ?? '') !== $chatId) {
             return false;
         }
-        $thread = Config::get('AFISHA_THREAD_ID');
-        if ($thread !== '' && (string) ($msg['message_thread_id'] ?? '') !== $thread) {
+        $threads = array_filter(array_map('trim', explode(',', Config::get('AFISHA_THREAD_ID'))));
+        if ($threads !== [] && !in_array((string) ($msg['message_thread_id'] ?? ''), $threads, true)) {
             return false;
         }
         if (!empty($msg['from']['is_bot'])) {
