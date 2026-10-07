@@ -25,6 +25,15 @@ function tr3_api_menu_preorder(array $ctx): void {
   $mi = $db->t('menu_items');
   $miTr = $db->t('menu_item_tr');
 
+  // Состав/цены из Poster и ИИ-переводы новинок — как на /links/menu.
+  // tr3/api.php идёт без composer-автозагрузчика: подключаем здесь.
+  try {
+    require_once __DIR__ . '/../vendor/autoload.php';
+    \App\Infrastructure\Config::load(__DIR__ . '/../.env');
+    \App\Services\MenuFreshness::beforeRender();
+    \App\Services\MenuFreshness::afterResponse();
+  } catch (\Throwable $e) {}
+
   $lastMenuSyncAt = null;
   try {
     $row = $db->query("SELECT meta_value FROM {$metaTable} WHERE meta_key = 'menu_last_sync_at' LIMIT 1")->fetch();
