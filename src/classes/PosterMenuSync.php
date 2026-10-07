@@ -36,6 +36,11 @@ class PosterMenuSync {
 
         $workshops = $this->fetchWorkshops();
         $products = $this->fetchProducts();
+        if ($products === []) {
+            // fetchProducts глотает ошибки Poster и отдаёт []; без этой проверки
+            // markMissingItemsInactive снял бы с сайта всё меню разом.
+            throw new \RuntimeException('Poster не вернул товары — синк меню пропущен');
+        }
         $categories = $this->fetchCategories();
         $usedFallbackCategories = false;
         if (empty($categories['main']) || empty($categories['sub'])) {
@@ -128,7 +133,7 @@ class PosterMenuSync {
                 try {
                     $this->db->query(
                         "INSERT INTO {$mi} (poster_item_id, category_id, image_url, is_published, sort_order)
-                         VALUES (?, NULL, NULL, 0, 0)
+                         VALUES (?, NULL, NULL, 1, 0)
                          ON DUPLICATE KEY UPDATE poster_item_id = {$mi}.poster_item_id",
                         [$posterItemId]
                     );
@@ -139,8 +144,8 @@ class PosterMenuSync {
 
         $this->markMissingItemsInactive(array_keys($seenPosterIds));
 
-        // Авто-заведение новинок в меню (создать строку + привязать категорию/цех),
-        // БЕЗ публикации. Не валим синк, если что-то пойдёт не так.
+        // Авто-заведение новинок в меню (создать строку + привязать категорию/цех)
+        // сразу опубликованными. Не валим синк, если что-то пойдёт не так.
         try {
             $this->autofillMenuItems($canInsertUnlinkedItems, $canInsertUnlinkedCategories);
         } catch (\Throwable $e) {
@@ -160,9 +165,10 @@ class PosterMenuSync {
 
     /**
      * Авто-заведение: подтягивает активные товары в menu_items и привязывает
-     * категорию/цех. БЕЗ публикации (is_published=0) — новинки видны в админке
-     * в своей категории, но на публичное меню не попадают, пока не опубликуешь
-     * их вручную (чтобы не выкладывать «мусор» из Poster на сайт).
+     * категорию/цех. Новинки сразу опубликованы (is_published=1): всё, что
+     * видно в Poster, видно и на сайте. Снять позицию с сайта вручную можно
+     * в админке — повторный синк ручное is_published=0 не трогает.
+     * Что показывать целиком, решают флаги show_on_site у категорий/цехов.
      */
     private function autofillMenuItems(bool $canNullCategory, bool $canNullWorkshop): void
     {
@@ -176,7 +182,7 @@ class PosterMenuSync {
             // Схема допускает NULL-категорию — заводим всех без строки.
             $this->db->query(
                 "INSERT INTO {$mi} (poster_item_id, category_id, image_url, is_published, sort_order)
-                 SELECT p.id, NULL, NULL, 0, 0
+                 SELECT p.id, NULL, NULL, 1, 0
                  FROM {$pmi} p
                  LEFT JOIN {$mi} i ON i.poster_item_id = p.id
                  WHERE i.id IS NULL AND p.is_active = 1"
@@ -185,7 +191,7 @@ class PosterMenuSync {
             // category_id NOT NULL — заводим только тех, чья Poster-подкатегория есть на сайте.
             $this->db->query(
                 "INSERT INTO {$mi} (poster_item_id, category_id, image_url, is_published, sort_order)
-                 SELECT p.id, c.id, NULL, 0, 0
+                 SELECT p.id, c.id, NULL, 1, 0
                  FROM {$pmi} p
                  JOIN {$mc} c ON c.poster_id = p.sub_category_id
                  LEFT JOIN {$mi} i ON i.poster_item_id = p.id
@@ -212,7 +218,37 @@ class PosterMenuSync {
              WHERE {$workshopCond} AND p.sub_category_id IS NOT NULL AND p.main_category_id IS NOT NULL"
         );
 
-        // Шага публикации нет намеренно — is_published остаётся 0.
+        $this->publishBacklogOnce();
+    }
+
+    /**
+     * До 2026-10 новинки заводились неопубликованными, и ~50 позиций (сырники,
+     * крылья, новые чаи…) так и не попали на сайт. Публикуем этот хвост один
+     * раз; дальше ручное снятие с публикации в админке уважаем.
+     */
+    private function publishBacklogOnce(): void
+    {
+        $meta = $this->db->t('system_meta');
+        $flag = 'menu_autopublish_backlog_v1';
+        $done = $this->db->query("SELECT meta_value FROM {$meta} WHERE meta_key = ? LIMIT 1", [$flag])->fetchColumn();
+        if ($done !== false && $done !== '') {
+            return;
+        }
+
+        $pmi = $this->db->t('poster_menu_items');
+        $mi  = $this->db->t('menu_items');
+        $n = $this->db->query(
+            "UPDATE {$mi} i
+             JOIN {$pmi} p ON p.id = i.poster_item_id
+             SET i.is_published = 1
+             WHERE i.is_published = 0 AND p.is_active = 1"
+        )->rowCount();
+
+        $this->db->query(
+            "INSERT INTO {$meta} (meta_key, meta_value) VALUES (?, ?)
+             ON DUPLICATE KEY UPDATE meta_value = VALUES(meta_value)",
+            [$flag, date('Y-m-d H:i:s') . ' published=' . $n]
+        );
     }
 
     private function getFixedWorkshopTranslations(): array {

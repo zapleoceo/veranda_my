@@ -80,6 +80,10 @@ $mcTr = $db->t('menu_category_tr');
 $mi = $db->t('menu_items');
 $miTr = $db->t('menu_item_tr');
 
+// Состав/цены из Poster и ИИ-переводы новинок — см. MenuFreshness.
+\App\Services\MenuFreshness::beforeRender();
+\App\Services\MenuFreshness::afterResponse();
+
 $lastMenuSyncAt = null;
 try {
     $row = $db->query("SELECT meta_value FROM {$metaTable} WHERE meta_key = 'menu_last_sync_at' LIMIT 1")->fetch();

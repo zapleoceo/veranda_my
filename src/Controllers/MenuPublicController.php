@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Controllers;
 
+use App\Services\MenuFreshness;
 use App\Services\MenuPublicService;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
@@ -26,6 +27,10 @@ class MenuPublicController
         if ($requested !== null && $lang === strtolower($requested)) {
             setcookie('links_lang', $lang, ['expires' => time() + 31536000, 'path' => '/', 'samesite' => 'Lax']);
         }
+
+        // Состав/цены из Poster и ИИ-переводы новинок — см. MenuFreshness.
+        MenuFreshness::beforeRender();
+        MenuFreshness::afterResponse();
 
         $groups       = $this->service->getMenuData($lang);
         $lastSyncAt   = $this->service->getLastSyncAt();
