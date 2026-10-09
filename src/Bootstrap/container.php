@@ -151,6 +151,29 @@ return [
 
     LoggerInterface::class => fn() => Logger::get(),
 
+    // ─── @Veranda_aibot (finance drafts) ─────────────────────
+    'aibot.webhook_secret' => fn($c) => new \App\Middleware\WebhookSecretMiddleware(
+        $c->get(ResponseFactoryInterface::class), 'AIBOT_WEBHOOK_SECRET', false
+    ),
+    \App\AiBot\FinanceDraftService::class => fn($c) => new \App\AiBot\FinanceDraftService(
+        new \App\AiBot\MysqlFinanceDraftRepository($c->get(Database::class)),
+        $c->get(\App\Payday3\Contracts\PosterTransactionCreateServiceInterface::class),
+        $c->get(\App\Payday3\Contracts\PosterApiProviderInterface::class),
+        $c->get(\App\Payday3\Contracts\LocalSettingsRepositoryInterface::class),
+        $c->get(\App\Payday3\Contracts\PosterLookupServiceInterface::class),
+        $c->get(\App\Payday3\Contracts\AuditLogInterface::class),
+        $c->get(\App\Payday3\Contracts\NamedLockInterface::class),
+    ),
+    \App\AiBot\AiBotWebhookController::class => fn($c) => new \App\AiBot\AiBotWebhookController(
+        \App\AiBot\AiBotConfig::fromConfig(),
+        $c->get(\App\AiBot\FinanceDraftService::class),
+        // Отдельный бот: токен ai_tg_bot, не основной @VerandamyBot.
+        new TelegramBotClient(token: Config::require('ai_tg_bot'), http: new HttpClient(timeoutSeconds: 15)),
+        new \App\AiBot\PayoutParser(),
+        new \App\AiBot\LlmPayoutExtractor(\App\Infrastructure\AiBrokerClient::fromConfig()),
+        $c->get(LoggerInterface::class),
+    ),
+
     // ─── Payday3 ──────────────────────────────────────────────
     SepayRepositoryInterface::class  => fn($c) => new SepayRepository($c->get(Database::class)),
     PosterRepositoryInterface::class => fn($c) => new PosterRepository($c->get(Database::class)),

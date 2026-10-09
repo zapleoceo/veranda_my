@@ -13,8 +13,15 @@ use Psr\Http\Server\RequestHandlerInterface;
 
 class WebhookSecretMiddleware implements MiddlewareInterface
 {
+    /**
+     * @param string $secretKey     ключ .env с секретом этого вебхука (у каждого бота свой)
+     * @param bool   $allowWaEvent  пропускать ?wa_event= (только основной вебхук: его WA-мост
+     *                              проверяет себя сам); у остальных ботов — нет
+     */
     public function __construct(
-        private readonly ResponseFactoryInterface $responseFactory
+        private readonly ResponseFactoryInterface $responseFactory,
+        private readonly string $secretKey = 'TELEGRAM_WEBHOOK_SECRET',
+        private readonly bool $allowWaEvent = true,
     ) {}
 
     public function process(ServerRequestInterface $request, RequestHandlerInterface $handler): ResponseInterface
@@ -23,11 +30,11 @@ class WebhookSecretMiddleware implements MiddlewareInterface
         // WA_NODE_SECRET/WA_BRIDGE_SECRET через hash_equals и отдаёт 403 при
         // пустом или неверном значении (см. WaEventHandler::_authorised).
         // Поэтому пропуск здесь — не дыра, а передача проверки владельцу.
-        if (isset($request->getQueryParams()['wa_event'])) {
+        if ($this->allowWaEvent && isset($request->getQueryParams()['wa_event'])) {
             return $handler->handle($request);
         }
 
-        $expected = Config::get('TELEGRAM_WEBHOOK_SECRET');
+        $expected = Config::get($this->secretKey);
 
         // Пустой секрет = отказ, а НЕ «пропустить всё».
         //

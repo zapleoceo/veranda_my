@@ -124,6 +124,10 @@ $app->map(['GET', 'POST'], '/telegram_webhook', [WebhookController::class, 'hand
 $app->map(['GET', 'POST'], '/telegram_webhook.php', [WebhookController::class, 'handle'])
     ->add(WebhookSecretMiddleware::class);
 
+// @Veranda_aibot — черновики расходов «Инвесторы» в Poster. Свой секрет (AIBOT_WEBHOOK_SECRET).
+$app->post('/aibot_webhook', [\App\AiBot\AiBotWebhookController::class, 'handle'])
+    ->add('aibot.webhook_secret');
+
 // Admin panel (protected by session auth).
 // Both /admin and /admin/ render the dashboard. We cannot 301 /admin/ → /admin
 // because Apache mod_dir auto-redirects /admin → /admin/ (admin/ is a real

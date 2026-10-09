@@ -41,9 +41,15 @@ class TelegramBotClient
             : null;
     }
 
-    public function sendMessageWithKeyboard(string $text, array $keyboard, ?int $threadId = null): int|null
+    public function sendMessageWithKeyboard(string $text, array $keyboard, ?int $threadId = null, ?int $replyToMessageId = null): int|null
     {
         $params = $this->_msgParams($text, $threadId);
+        if ($replyToMessageId !== null && $replyToMessageId > 0) {
+            // allow_sending_without_reply: исходное сообщение могли удалить — всё равно ответить.
+            $params['reply_parameters'] = json_encode(
+                ['message_id' => $replyToMessageId, 'allow_sending_without_reply' => true]
+            );
+        }
         $params['reply_markup'] = json_encode(
             ['inline_keyboard' => $keyboard],
             JSON_UNESCAPED_UNICODE
