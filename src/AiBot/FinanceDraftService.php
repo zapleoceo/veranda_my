@@ -33,6 +33,8 @@ final class FinanceDraftService
 
     private const DUP_WINDOW_DAYS = 3;
     private const DATE_PICK_DAYS = 6;
+    private const EXEC_STALE_SEC = 120;
+    public const MAX_PEOPLE = 30;
 
     /** @var array<int,string>|null */
     private ?array $accountNames = null;
@@ -118,6 +120,13 @@ final class FinanceDraftService
      */
     public function applyChoice(int $draftId, string $action, string $arg): string
     {
+        // Тот же лок, что у execute(): выбор/отмена не может проскочить между
+        // проверкой статуса и началом внесения.
+        return $this->lock->synchronized('aibot_fd_' . $draftId, 10, fn() => $this->applyChoiceLocked($draftId, $action, $arg));
+    }
+
+    private function applyChoiceLocked(int $draftId, string $action, string $arg): string
+    {
         $draft = $this->drafts->get($draftId);
         if ($draft === null) {
             return 'Черновик не найден';
@@ -170,6 +179,9 @@ final class FinanceDraftService
             if ($status === 'done' || $status === 'cancelled') {
                 return ['draft' => $draft, 'message' => 'Уже ' . self::statusLabel($status)];
             }
+            if ($status === 'executing' && !$this->isStale($draft)) {
+                return ['draft' => $draft, 'message' => 'Уже вносится — подождите'];
+            }
             $blocker = $this->blocker($draft);
             if ($blocker !== null) {
                 return ['draft' => $draft, 'message' => $blocker];
@@ -190,7 +202,7 @@ final class FinanceDraftService
                 return ['draft' => (array) $this->drafts->get($draftId), 'message' => 'Не смог проверить дубли в Poster — ничего не внесено'];
             }
 
-            $this->drafts->update($draftId, ['status' => 'executing', 'poster_tx_ids_json' => self::enc($records), 'error' => null]);
+            $this->drafts->update($draftId, ['status' => 'executing', 'poster_tx_ids_json' => self::enc($records), 'error' => null, 'heartbeat_at' => ($this->clock)()]);
 
             $datetime = $this->txDateTime($date);
             foreach ($records as $i => $rec) {
@@ -201,7 +213,7 @@ final class FinanceDraftService
                 // повторе запись не считается внесённой, но сверка с Poster выше
                 // поймает её, если Poster транзакцию всё-таки создал.
                 $records[$i]['status'] = 'sending';
-                $this->drafts->update($draftId, ['poster_tx_ids_json' => self::enc($records)]);
+                $this->drafts->update($draftId, ['poster_tx_ids_json' => self::enc($records), 'heartbeat_at' => ($this->clock)()]);
                 try {
                     $res = $this->creator->create([
                         'type' => 2, // расход (UI-тип payday3)
@@ -328,6 +340,9 @@ final class FinanceDraftService
         if ($people === []) {
             return 'Нет строк для внесения';
         }
+        if (count($people) > self::MAX_PEOPLE) {
+            return 'Слишком много строк (больше ' . self::MAX_PEOPLE . ')';
+        }
         foreach ($people as $p) {
             if (!empty($p['error'])) {
                 return 'Есть ошибки разбора — исправьте сообщение';
@@ -338,6 +353,10 @@ final class FinanceDraftService
         }
         if ((int) ($draft['account_id'] ?? 0) <= 0) {
             return 'Выберите счёт';
+        }
+        // Настройки payday могли поменяться после выбора — счёт проверяется заново.
+        if (!isset($this->accountChoices()[(int) $draft['account_id']])) {
+            return 'Счёт больше не входит в настроенные — выберите заново';
         }
         if (empty($draft['tx_date'])) {
             return 'Выберите дату';
@@ -407,6 +426,9 @@ final class FinanceDraftService
             return $records;
         }
         $d = new \DateTimeImmutable($date, new \DateTimeZone(AiBotConfig::TZ));
+        // Пагинации у finance.getTransactions в коде проекта нет (ExpenseService берёт
+        // месяц одним вызовом; per_page/limit есть только у transactions./dash.getTransactions).
+        // Здесь окно 7 дней по одному счёту — объём на порядки меньше месяца.
         $rows = $this->poster->client()->request('finance.getTransactions', [
             'dateFrom' => $d->modify('-' . self::DUP_WINDOW_DAYS . ' days')->format('Ymd'),
             'dateTo' => $d->modify('+' . self::DUP_WINDOW_DAYS . ' days')->format('Ymd'),
@@ -474,11 +496,18 @@ final class FinanceDraftService
         return $records;
     }
 
+    /** «executing» без движения дольше EXEC_STALE_SEC — процесс умер посреди внесения. */
+    public function isStale(array $draft): bool
+    {
+        return (string) $draft['status'] === 'executing'
+            && ($this->clock)() - (int) ($draft['heartbeat_at'] ?? 0) > self::EXEC_STALE_SEC;
+    }
+
     private function keyboard(array $draft, array $people): array
     {
         $id = (int) $draft['id'];
         $status = (string) $draft['status'];
-        if ($status === 'partial') {
+        if ($status === 'partial' || ($status === 'executing' && $this->isStale($draft))) {
             return [[['text' => '🔁 Повторить незавершённые', 'callback_data' => 'fd_go:' . $id]]];
         }
         if ($status !== 'draft') {

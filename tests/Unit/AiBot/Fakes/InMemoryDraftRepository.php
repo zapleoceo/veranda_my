@@ -11,6 +11,7 @@ final class InMemoryDraftRepository implements FinanceDraftRepositoryInterface
 {
     /** @var array<int,array<string,mixed>> */
     public array $rows = [];
+    public bool $failInsert = false;
 
     public function findBySource(string $chatId, int $sourceMsgId, string $intent): ?array
     {
@@ -29,13 +30,16 @@ final class InMemoryDraftRepository implements FinanceDraftRepositoryInterface
 
     public function insert(array $row): int
     {
+        if ($this->failInsert) {
+            throw new \RuntimeException('db down');
+        }
         $ex = $this->findBySource((string) $row['chat_id'], (int) $row['source_msg_id'], (string) $row['intent']);
         if ($ex !== null) {
             return (int) $ex['id'];
         }
         $id = count($this->rows) + 1;
         $this->rows[$id] = $row + ['id' => $id, 'card_msg_id' => null, 'account_id' => null, 'tx_date' => null,
-            'split_mode' => 'person', 'status' => 'draft', 'poster_tx_ids_json' => null, 'error' => null];
+            'split_mode' => 'person', 'status' => 'draft', 'poster_tx_ids_json' => null, 'error' => null, 'heartbeat_at' => null];
         $this->rows[$id]['id'] = $id;
         return $id;
     }

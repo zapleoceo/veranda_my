@@ -7,12 +7,13 @@ namespace Tests\Unit\AiBot;
 use App\AiBot\AiBotConfig;
 use App\AiBot\AiBotWebhookController;
 use App\AiBot\FinanceDraftService;
+use App\AiBot\PayoutExtractorInterface;
 use App\AiBot\PayoutParser;
 use App\Infrastructure\TelegramBotClient;
 use App\Payday3\Contracts\PosterLookupServiceInterface;
 use App\Payday3\Services\PosterTransactionCreateService;
 use PHPUnit\Framework\TestCase;
-use Psr\Log\NullLogger;
+use Psr\Log\AbstractLogger;
 use Slim\Psr7\Factory\ServerRequestFactory;
 use Slim\Psr7\Factory\StreamFactory;
 use Slim\Psr7\Response;
@@ -42,6 +43,9 @@ final class AiBotFlowTest extends TestCase
     public InMemoryAuditLog $audit;
     public PassThroughLock $lock;
     public AiBotWebhookController $ctl;
+    /** @var list<array{level:string,message:string}> */
+    public array $logs = [];
+    public ?PayoutExtractorInterface $extractor = null;
     private int $nextTx = 20000;
 
     /** @param list<array<string,mixed>> $existing ответ finance.getTransactions */
@@ -72,11 +76,24 @@ final class AiBotFlowTest extends TestCase
             $svc,
             new TelegramBotClient('test-token', $this->tg),
             new PayoutParser(),
-            null,
-            new NullLogger(),
+            $this->extractor,
+            $this->logger(),
             $clock,
             static fn(\Closure $j) => $j(),
         );
+    }
+
+    private function logger(): AbstractLogger
+    {
+        $this->logs = [];
+        $sink = &$this->logs;
+        return new class ($sink) extends AbstractLogger {
+            public function __construct(private array &$sink) {}
+            public function log($level, \Stringable|string $message, array $context = []): void
+            {
+                $this->sink[] = ['level' => (string) $level, 'message' => (string) $message];
+            }
+        };
     }
 
     public function post(array $update): string
@@ -318,5 +335,130 @@ final class AiBotFlowTest extends TestCase
         $this->press('fd_date:1:20261011');
         $this->press('fd_date:1:20250101');
         $this->assertNull($this->repo->rows[1]['tx_date']);
+    }
+
+    // ─── ревью 23c87278 ───────────────────────────────────────────────────
+
+    private function readyDraft(): void
+    {
+        $this->post(self::command());
+        $this->press('fd_acc:1:1');
+        $this->press('fd_date:1:20261010');
+    }
+
+    public function test_cancel_and_choices_after_execute_are_rejected(): void
+    {
+        $this->boot();
+        $this->readyDraft();
+        $this->press('fd_go:1');
+        $this->press('fd_cancel:1');
+        $this->assertSame('done', $this->repo->rows[1]['status'], 'после внесения отмена не действует');
+
+        $this->boot();
+        $this->readyDraft();
+        $this->repo->update(1, ['status' => 'executing', 'heartbeat_at' => self::NOW]);
+        $this->press('fd_acc:1:2');
+        $this->press('fd_cancel:1');
+        $this->assertSame(1, $this->repo->rows[1]['account_id']);
+        $this->assertSame('executing', $this->repo->rows[1]['status']);
+        $this->assertContains('aibot_fd_1', $this->lock->names, 'выбор идёт под локом черновика');
+        $this->press('fd_go:1');
+        $this->assertSame([], $this->creates(), 'свежий executing — второй прогон не запускается');
+    }
+
+    public function test_stale_executing_offers_retry_and_resumes(): void
+    {
+        $this->boot();
+        $this->readyDraft();
+        $this->press('fd_go:1');
+        $this->assertCount(6, $this->creates());
+        // Процесс «умер» посреди: последняя запись в sending, executing 5 минут без движения.
+        $recs = json_decode($this->repo->rows[1]['poster_tx_ids_json'], true);
+        $recs[5]['status'] = 'sending';
+        $recs[5]['tx_ids'] = [];
+        $this->repo->update(1, ['status' => 'executing', 'heartbeat_at' => self::NOW - 300,
+            'poster_tx_ids_json' => json_encode($recs, JSON_UNESCAPED_UNICODE)]);
+        // InMemoryAuditLog не знает времени; в проде 10-секундное окно анти-даблклика давно прошло.
+        $this->audit->rows = [];
+
+        $card = $this->ctlRender();
+        $this->assertContains('fd_go:1', array_column(array_merge(...$card['keyboard']), 'callback_data'), 'кнопка «Повторить»');
+
+        $this->press('fd_go:1');
+        $this->assertSame('done', $this->repo->rows[1]['status']);
+        $c = $this->creates();
+        $this->assertCount(7, $c, 'дослана только незавершённая запись');
+        $this->assertSame(2436000, $c[6]['params']['amount_from']);
+    }
+
+    private function ctlRender(): array
+    {
+        $svc = (new \ReflectionProperty($this->ctl, 'drafts'))->getValue($this->ctl);
+        return $svc->render($this->repo->rows[1]);
+    }
+
+    public function test_deferred_job_failure_is_logged_and_reported(): void
+    {
+        $this->boot();
+        $this->repo->failInsert = true;
+        $this->assertSame('ok', $this->post(self::command()));
+        $this->assertContains('aibot.error', array_column($this->logs, 'message'));
+        $send = $this->tg->callsTo('sendMessage');
+        $this->assertCount(1, $send);
+        $this->assertStringContainsString('Не удалось', $send[0]['params']['text']);
+    }
+
+    public function test_bad_reply_targets_get_a_hint(): void
+    {
+        $cases = [
+            'no text' => ['message_id' => 500, 'date' => self::NOW, 'from' => ['id' => 333], 'photo' => [['file_id' => 'x']]],
+            'topic header' => ['message_id' => 500, 'date' => self::NOW, 'from' => ['id' => 333], 'text' => PayoutParserTest::IGOR,
+                'forum_topic_created' => ['name' => 'Финансы']],
+            'bot' => ['message_id' => 500, 'date' => self::NOW, 'from' => ['id' => 999, 'is_bot' => true], 'text' => PayoutParserTest::IGOR],
+        ];
+        foreach ($cases as $name => $reply) {
+            $this->boot();
+            $this->post(self::command(['reply_to_message' => $reply]));
+            $this->assertSame([], $this->repo->rows, $name);
+            $send = $this->tg->callsTo('sendMessage');
+            $this->assertCount(1, $send, $name);
+            $this->assertMatchesRegularExpression('/Ответьте|нет текста/u', $send[0]['params']['text'], $name);
+        }
+    }
+
+    public function test_llm_names_are_sanitized_and_capped(): void
+    {
+        $this->extractor = new class implements PayoutExtractorInterface {
+            public function isAvailable(): bool { return true; }
+            public function extract(string $sourceText): array
+            {
+                $out = [PayoutParser::row('Ол😀ег' . str_repeat('я', 80), 100000, [])];
+                for ($i = 0; $i < 35; $i++) {
+                    $out[] = PayoutParser::row('Имя' . $i, 1000, []);
+                }
+                return $out;
+            }
+        };
+        $this->boot();
+        $this->post(self::command([], 'выплаты как договорились', 800));
+        $data = json_decode($this->repo->rows[1]['rows_json'], true);
+        $this->assertCount(30, $data['people']);
+        $this->assertStringStartsWith('Олег', $data['people'][0]['name']);
+        $this->assertSame(60, mb_strlen($data['people'][0]['name']));
+        $this->assertNotSame([], $data['errors'], 'больше 30 строк — ошибка, «Внести» заблокирована');
+        $this->press('fd_acc:1:1');
+        $this->press('fd_date:1:20261010');
+        $this->press('fd_go:1');
+        $this->assertSame([], $this->creates());
+    }
+
+    public function test_account_revalidated_at_execute(): void
+    {
+        $this->boot();
+        $this->readyDraft();
+        $this->repo->update(1, ['account_id' => 99]); // счёт убрали из настроек payday
+        $this->press('fd_go:1');
+        $this->assertSame([], $this->creates());
+        $this->assertSame('draft', $this->repo->rows[1]['status']);
     }
 }

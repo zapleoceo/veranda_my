@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\AiBot;
 
+use App\Bloggers\Support\PosterText;
+
 /**
  * Детерминированный разбор сообщения о выплатах:
  *   «Раздал половину дивидендов за сентябрь: Олег 5 378 800 (переводы 5.000.000 + 378.800), Дима 3 693 200, …»
@@ -20,6 +22,8 @@ namespace App\AiBot;
 final class PayoutParser
 {
     public const MAX_AMOUNT_VND = 1_000_000_000;
+    public const MAX_NAME_LEN = 60;
+    public const MAX_PEOPLE = 30;
 
     private const NUM = '\d{1,3}(?:[ \x{00A0}\x{202F}.,]\d{3})+(?!\d)|\d+';
 
@@ -40,11 +44,23 @@ final class PayoutParser
             }
         }
 
-        return [
-            'people' => $people,
-            'period' => self::period($text),
-            'errors' => $people === [] ? ['Не нашёл ни одной строки «Имя сумма»'] : [],
-        ];
+        return self::cap($people, self::period($text));
+    }
+
+    /**
+     * Общий выход для парсера и ИИ-фолбэка: не больше MAX_PEOPLE строк.
+     *
+     * @param list<array{name:string,amount:int,parts:list<int>,error:?string}> $people
+     * @return array{people:list<array{name:string,amount:int,parts:list<int>,error:?string}>,period:?string,errors:list<string>}
+     */
+    public static function cap(array $people, ?string $period): array
+    {
+        $errors = $people === [] ? ['Не нашёл ни одной строки «Имя сумма»'] : [];
+        if (count($people) > self::MAX_PEOPLE) {
+            $errors[] = 'Больше ' . self::MAX_PEOPLE . ' строк — разбейте сообщение';
+            $people = array_slice($people, 0, self::MAX_PEOPLE);
+        }
+        return ['people' => array_values($people), 'period' => $period, 'errors' => $errors];
     }
 
     /**
@@ -55,7 +71,8 @@ final class PayoutParser
      */
     public static function row(string $name, int $amount, array|string $parts): array
     {
-        $name = trim(preg_replace('/\s+/u', ' ', $name) ?? '');
+        // Poster режет 4-байтовые символы (эмодзи) вместе со всем полем — чистим и ограничиваем длину.
+        $name = mb_substr(PosterText::safe(preg_replace('/\s+/u', ' ', $name) ?? ''), 0, self::MAX_NAME_LEN);
         if (is_string($parts)) {
             $list = [];
             if (preg_match_all('/' . self::NUM . '/u', $parts, $pm)) {

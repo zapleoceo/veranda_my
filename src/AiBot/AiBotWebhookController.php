@@ -118,13 +118,26 @@ final class AiBotWebhookController
         $sourceText = (string) ($reply['text'] ?? $reply['caption'] ?? '');
         $sourceDate = (int) ($reply['date'] ?? 0);
 
+        // Ответ должен быть на обычное сообщение человека с текстом.
+        $hint = match (true) {
+            !empty($reply['forum_topic_created']) => 'Ответьте на само сообщение с выплатами, а не на заголовок темы.',
+            !empty($reply['from']['is_bot']) => 'Ответьте на сообщение человека с выплатами, а не бота.',
+            trim($sourceText) === '' => 'В сообщении, на которое вы ответили, нет текста с выплатами.',
+            default => null,
+        };
+        if ($hint !== null) {
+            $this->logger->info('aibot.skip.reply_target', ['chat' => $chatId, 'source' => $sourceId]);
+            $bot->sendMessageWithKeyboard($hint, [], $threadId, $triggerId);
+            return;
+        }
+
         $parsed = $this->parser->parse($sourceText);
-        $job = function () use ($chatId, $sourceId, $triggerId, $fromId, $sourceDate, $parsed, $sourceText, $bot, $threadId): void {
+        $work = function () use ($chatId, $sourceId, $triggerId, $fromId, $sourceDate, $parsed, $sourceText, $bot, $threadId): void {
             if ($parsed['people'] === [] && $this->extractor !== null && $this->extractor->isAvailable()) {
                 try {
                     $people = $this->extractor->extract($sourceText);
                     if ($people !== []) {
-                        $parsed = ['people' => $people, 'period' => PayoutParser::period($sourceText), 'errors' => []];
+                        $parsed = PayoutParser::cap($people, PayoutParser::period($sourceText));
                     }
                 } catch (\Throwable $e) {
                     $this->logger->warning('aibot.llm_failed', ['err' => $e->getMessage()]);
@@ -153,6 +166,19 @@ final class AiBotWebhookController
             } else {
                 $bot->sendMessageWithKeyboard('Черновик #' . (int) $draft['id'] . ' по этому сообщению уже есть — карточка выше.',
                     [], $threadId, (int) $draft['card_msg_id']);
+            }
+        };
+        // Отложенная работа идёт уже после ответа Telegram — исключение здесь
+        // никто не увидит, поэтому ловим, пишем в лог и говорим в чат.
+        $job = function () use ($work, $bot, $threadId, $triggerId, $chatId, $sourceId): void {
+            try {
+                $work();
+            } catch (\Throwable $e) {
+                $this->logger->error('aibot.error', ['chat' => $chatId, 'source' => $sourceId, 'err' => $e->getMessage(), 'file' => $e->getFile(), 'line' => $e->getLine()]);
+                try {
+                    $bot->sendMessageWithKeyboard('⚠️ Не удалось подготовить черновик — ничего не внесено. Попробуйте ещё раз.', [], $threadId, $triggerId);
+                } catch (\Throwable) {
+                }
             }
         };
 

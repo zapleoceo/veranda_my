@@ -14,7 +14,7 @@ final class MysqlFinanceDraftRepository implements FinanceDraftRepositoryInterfa
 {
     private const COLUMNS = [
         'chat_id', 'source_msg_id', 'trigger_msg_id', 'card_msg_id', 'initiator_tg_id', 'intent',
-        'rows_json', 'account_id', 'tx_date', 'split_mode', 'status', 'poster_tx_ids_json', 'error',
+        'rows_json', 'account_id', 'tx_date', 'split_mode', 'status', 'poster_tx_ids_json', 'error', 'heartbeat_at',
     ];
 
     private static bool $tableChecked = false;
@@ -38,6 +38,7 @@ final class MysqlFinanceDraftRepository implements FinanceDraftRepositoryInterfa
             status VARCHAR(16) NOT NULL DEFAULT 'draft',
             poster_tx_ids_json LONGTEXT NULL,
             error TEXT NULL,
+            heartbeat_at INT UNSIGNED NULL,
             created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
             updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             UNIQUE KEY uq_tfd_source (chat_id, source_msg_id, intent),
