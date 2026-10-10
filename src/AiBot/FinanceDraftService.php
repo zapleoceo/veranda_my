@@ -57,6 +57,8 @@ final class FinanceDraftService
         private readonly AuditLogInterface $audit,
         private readonly NamedLockInterface $lock,
         ?\Closure $clock = null,
+        /** Право проверяется ещё раз под локом, прямо перед записью/решением. */
+        private readonly ?FinanceAuthorizerInterface $authorizer = null,
     ) {
         $this->clock = $clock ?? static fn(): int => time();
     }
@@ -226,6 +228,10 @@ final class FinanceDraftService
             $draft = $this->drafts->get($draftId);
             if ($draft === null) {
                 return ['draft' => [], 'message' => 'Черновик не найден'];
+            }
+            // Отзыв права действует сразу, в т.ч. для уже показанной карточки.
+            if ($this->authorizer !== null && !$this->authorizer->allows($actorTgId)) {
+                return ['draft' => $draft, 'message' => 'Нет доступа', 'denied' => true];
             }
             if ($expectedNonce !== null) {
                 if (!self::confirmIsFresh($draft, $expectedNonce, $notBefore)) {
@@ -753,6 +759,9 @@ final class FinanceDraftService
             }
             // Поколение сверяется под локом; не погашается — следом execute() с тем же
             // поколением вносит именно эту запись.
+            if ($this->authorizer !== null && !$this->authorizer->allows($actorTgId)) {
+                return ['Нет доступа', false, false, true];
+            }
             if ($expectedNonce !== null && !self::confirmIsFresh($draft, $expectedNonce, $notBefore)) {
                 return ['Кнопка устарела — подтвердите заново', false, true];
             }

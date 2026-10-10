@@ -257,6 +257,11 @@ final class AiBotWebhookController
             }
             $dec = $this->drafts->decideDuplicate($draftId, (int) $arg, $action, $fromId, $nonce, $this->config->confirmNotBefore);
             [$toast, $accepted] = $dec;
+            if (!empty($dec[3])) {
+                $this->logger->warning('aibot.callback.denied_under_lock', ['draft' => $draftId, 'from' => $fromId]);
+                $this->bot->answerCallbackQuery($cbId, 'Нет доступа', true);
+                return;
+            }
             $draft = (array) $this->drafts->get($draftId);
             // Вносим только если именно ЭТО нажатие разрешило повтор.
             if ($action === 'skip' || !$accepted) {
@@ -272,6 +277,11 @@ final class AiBotWebhookController
             $res = $this->drafts->execute($draftId, $fromId, $nonce, $this->config->confirmNotBefore);
             $after = $res['draft'] !== [] ? $res['draft'] : $draft;
             $card = $this->drafts->renderFresh($after);
+            if (!empty($res['denied'])) {
+                $this->logger->warning('aibot.callback.denied_under_lock', ['draft' => $draftId, 'from' => $fromId]);
+                $this->bot->answerCallbackQuery($cbId, 'Нет доступа', true);
+                return;
+            }
             if (!empty($res['stale'])) {
                 // Поколение сменилось между проверкой вне лока и захватом лока.
                 $this->logger->info('aibot.callback.stale_confirm', ['draft' => $draftId, 'from' => $fromId, 'action' => $action, 'under_lock' => true]);

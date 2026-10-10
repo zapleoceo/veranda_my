@@ -77,7 +77,7 @@ no_leak() { # $1 = имя кейса
 setup 'APP_ENV=prod\n# comment = keep\nai_tg_bot="%s"\r\nAIBOT_WEBHOOK_SECRET=\nOTHER=1\nAIBOT_FINANCE_ALLOWED_TG_IDS=5' "$TOKEN_VAL"
 code=$(run aibot_activate.sh)
 [ "$code" = 0 ] && pass "1: exit 0" || { bad "1: exit $code"; cat "$WORK/out.txt"; }
-exp=$(printf 'APP_ENV=prod\n# comment = keep\nai_tg_bot="%s"\r\nAIBOT_WEBHOOK_SECRET=%s\nOTHER=1\nAIBOT_FINANCE_ALLOWED_TG_IDS=169510539\n' "$TOKEN_VAL" "$SECRET_VAL")
+exp=$(printf 'APP_ENV=prod\n# comment = keep\nai_tg_bot="%s"\r\nAIBOT_WEBHOOK_SECRET=%s\nOTHER=1\nAIBOT_FINANCE_ALLOWED_TG_IDS=5\n' "$TOKEN_VAL" "$SECRET_VAL")
 got=$(head -n 6 "$WORK/app/.env")
 [ "$got" = "$exp" ] && pass "1: ключи, порядок и CRLF сохранены, пустой секрет заполнен на месте" || { bad "1: содержимое .env"; diff <(echo "$exp") <(echo "$got") | head; }
 grep -qx 'AIBOT_FINANCE_ANY_GROUP=1' "$WORK/app/.env" && grep -qE '^AIBOT_CONFIRM_NOT_BEFORE=[0-9]+$' "$WORK/app/.env" && pass "1: новые ключи дописаны" || bad "1: новые ключи"

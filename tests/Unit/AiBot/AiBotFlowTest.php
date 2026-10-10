@@ -22,6 +22,8 @@ use Tests\Unit\AiBot\Fakes\RecordingHttp;
 use Tests\Unit\Payday3\Fakes\FixedSettings;
 use Tests\Unit\Payday3\Fakes\InMemoryAuditLog;
 use Tests\Unit\AiBot\Fakes\InterleavingLock;
+use Tests\Unit\AiBot\Fakes\GrantTable;
+use App\AiBot\UserFinanceAuthorizer;
 use Tests\Unit\Payday3\Fakes\ScriptedPoster;
 
 /**
@@ -49,7 +51,7 @@ final class AiBotFlowTest extends TestCase
     private int $nextTx = 20000;
 
     /** @param list<array<string,mixed>> $existing ответ finance.getTransactions */
-    public function boot(array $existing = [], ?\Closure $create = null, array $owners = [self::OWNER], array $chats = [self::CHAT], int $approver = self::OWNER, int $notBefore = 0, bool $anyGroup = false): void
+    public function boot(array $existing = [], ?\Closure $create = null, array $owners = [self::OWNER], array $chats = [self::CHAT], int $approver = self::OWNER, int $notBefore = 0, bool $anyGroup = false, ?\App\AiBot\FinanceAuthorizerInterface $auth = null): void
     {
         $this->tg = new RecordingHttp();
         $this->poster = new ScriptedPoster([
@@ -69,10 +71,10 @@ final class AiBotFlowTest extends TestCase
         $svc = new FinanceDraftService(
             $this->repo,
             new PosterTransactionCreateService($this->poster, $settings, $this->audit, $this->lock),
-            $this->poster, $settings, $lookup, $this->audit, $this->lock, $clock,
+            $this->poster, $settings, $lookup, $this->audit, $this->lock, $clock, $auth,
         );
         $this->ctl = new AiBotWebhookController(
-            new AiBotConfig($owners, $chats, duplicateApproverTgId: $approver, confirmNotBefore: $notBefore, anyGroup: $anyGroup),
+            new AiBotConfig($owners, $chats, duplicateApproverTgId: $approver, confirmNotBefore: $notBefore, anyGroup: $anyGroup, authorizer: $auth),
             $svc,
             new TelegramBotClient('test-token', $this->tg),
             new PayoutParser(),
@@ -1275,5 +1277,118 @@ final class AiBotFlowTest extends TestCase
         $this->assertTrue($any->canWrite(169510539));
         $this->assertFalse($any->canWrite(555), 'в allow-list, но не владелец');
         $this->assertFalse((new AiBotConfig([], [], anyGroup: true))->canWrite(169510539), 'пустой allow-list — никто');
+    }
+
+    // ─── право aibot_finance из раздела «Доступ» (без OWNER_TG_ID / allow-list) ──
+
+    public GrantTable $grants;
+    public const ADMIN2 = 333444;
+
+    /** Как на проде: Дмитрий (OWNER) с галочкой, второй админ — admin=1 без галочки. */
+    private function bootWithGrants(bool $anyGroup = false): void
+    {
+        $this->grants = new GrantTable();
+        $this->grants->add(self::OWNER, 'demoniwwwe@gmail.com', ['admin' => true, 'aibot_finance' => true]);
+        $this->grants->add(self::ADMIN2, 'other.admin@example.com', ['admin' => true, 'payday' => true]);
+        // allow-list пуст и approver чужой: авторизация идёт только по праву.
+        $this->boot([], null, [], [self::CHAT], 999, 0, $anyGroup, new UserFinanceAuthorizer($this->grants));
+    }
+
+    public function test_grant_only_owner_other_admin_denied(): void
+    {
+        $this->bootWithGrants();
+        $this->post(self::command(['from' => ['id' => self::ADMIN2, 'username' => 'admin2']]));
+        $this->assertSame([], $this->repo->rows, 'админ без галочки — отказ');
+        $this->post(self::command(['from' => ['id' => 777777, 'username' => 'nobody']]));
+        $this->assertSame([], $this->repo->rows, 'нет связки TG id — отказ');
+        $this->post(self::command());
+        $this->assertCount(1, $this->repo->rows, 'Дмитрий с правом — черновик');
+        $this->press('fd_acc:1:1', self::ADMIN2);
+        $this->assertNull($this->repo->rows[1]['account_id'], 'кнопки другого админа не действуют');
+        $this->readyDraft();
+        $this->press('fd_go:1');
+        $this->assertCount(6, $this->creates());
+    }
+
+    public function test_revoke_before_callback_blocks_write_and_keeps_draft(): void
+    {
+        $this->bootWithGrants();
+        $this->readyDraft();
+        $this->grants->revoke(self::OWNER);
+        $this->press('fd_go:1');
+        $this->assertSame([], $this->creates());
+        $this->assertSame('draft', $this->repo->rows[1]['status']);
+    }
+
+    public function test_revoke_between_outer_check_and_lock_blocks_write(): void
+    {
+        $this->bootWithGrants();
+        $this->readyDraft();
+        // Внешняя проверка прошла, но пока ждали лок — право отозвали.
+        $this->lock->on = 'aibot_fd_1';
+        $this->lock->before = fn() => $this->grants->revoke(self::OWNER);
+        $this->press('fd_go:1');
+        $this->assertSame([], $this->creates(), 'проверка права под локом');
+        $this->assertContains('aibot.callback.denied_under_lock', array_column($this->logs, 'message'));
+    }
+
+    public function test_revoke_blocks_duplicate_decision_under_lock(): void
+    {
+        $this->bootWithGrants();
+        $this->ledger = [self::tx(9001, 1000000, 'Олег')];
+        $this->poster->responses['finance.getTransactions'] = fn(array $q) => $this->ledger;
+        $this->runSingle('Выплаты: Олег 1 000 000');
+        $this->assertSame('review', $this->repo->rows[1]['status']);
+        $this->lock->on = 'aibot_fd_1';
+        $this->lock->before = fn() => $this->grants->revoke(self::OWNER);
+        $this->press('fd_rep:1:0');
+        $this->assertSame([], $this->decisions());
+        $this->assertSame([], $this->successfulCreates());
+    }
+
+    public function test_inactive_user_with_grant_denied(): void
+    {
+        $this->bootWithGrants();
+        $this->grants->byTg[self::OWNER]['is_active'] = 0;
+        $this->post(self::command());
+        $this->assertSame([], $this->repo->rows);
+    }
+
+    public function test_identity_spoofing_with_grants(): void
+    {
+        $this->bootWithGrants(true);
+        $cases = [
+            'тот же username, другой id' => ['from' => ['id' => 555555, 'username' => 'dmitry', 'first_name' => 'Dmitry']],
+            'пересланная команда владельца' => ['forward_origin' => ['type' => 'user', 'sender_user' => ['id' => self::OWNER]], 'from' => ['id' => self::ADMIN2]],
+            'sender_chat с id владельца' => ['sender_chat' => ['id' => -1009, 'type' => 'channel']],
+            'anonymous admin' => ['from' => ['id' => 1087968824, 'username' => 'GroupAnonymousBot'], 'sender_chat' => ['id' => -1001, 'type' => 'supergroup']],
+        ];
+        $k = 0;
+        foreach ($cases as $name => $over) {
+            $this->post(self::command($over, PayoutParserTest::IGOR, 800 + $k++));
+            $this->assertSame([], $this->repo->rows, $name);
+        }
+        // В режиме любой группы владелец с правом работает и в другой группе.
+        $u = self::command();
+        $u['message']['chat'] = ['id' => -5005, 'type' => 'supergroup'];
+        $this->post($u);
+        $this->assertCount(1, $this->repo->rows);
+    }
+
+    public function test_user_finance_authorizer_rules(): void
+    {
+        $g = new GrantTable();
+        $g->add(1, 'a@x', ['aibot_finance' => true]);
+        $g->add(2, 'b@x', ['admin' => true]);
+        $g->add(3, 'c@x', ['aibot_finance' => true], 0);
+        $a = new UserFinanceAuthorizer($g);
+        $this->assertTrue($a->allows(1));
+        $this->assertFalse($a->allows(2), 'admin без явной галочки');
+        $this->assertFalse($a->allows(3), 'неактивный');
+        $this->assertFalse($a->allows(4), 'нет связки');
+        $broken = new UserFinanceAuthorizer(new class implements \App\Infrastructure\TelegramUserLookupInterface {
+            public function findByTelegramId(int $telegramUserId): ?array { throw new \RuntimeException('db down'); }
+        });
+        $this->assertFalse($broken->allows(1), 'ошибка БД — закрыто');
     }
 }

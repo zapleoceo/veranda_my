@@ -14,6 +14,7 @@
                 <th>Email</th>
                 <th>Имя</th>
                 <th>Telegram</th>
+                <th>Telegram ID</th>
                 <th>Права</th>
                 <th>Добавлен</th>
                 <th>Последний вход</th>
@@ -30,6 +31,7 @@
                 <td><?= htmlspecialchars((string)$u['email']) ?></td>
                 <td><?= htmlspecialchars((string)($u['name'] ?? '')) ?></td>
                 <td><?= htmlspecialchars((string)($u['telegram_username'] ?? '')) ?></td>
+                <td style="font-size:.75rem"><?= htmlspecialchars((string)($u['telegram_user_id'] ?? '')) ?: '—' ?></td>
                 <td style="font-size:.75rem;color:#6b7280"><?= htmlspecialchars(implode(', ', $permLabels)) ?: '—' ?></td>
                 <td style="font-size:.75rem;color:#9ca3af"><?= $u['created_at'] ? date('d.m.Y', strtotime($u['created_at'])) : '—' ?></td>
                 <td style="font-size:.75rem;color:#9ca3af;white-space:nowrap">
@@ -45,7 +47,7 @@
             </tr>
         <?php endforeach; ?>
         <?php if (empty($users)): ?>
-            <tr><td colspan="7" style="text-align:center;color:#9ca3af;padding:1rem">Нет пользователей</td></tr>
+            <tr><td colspan="8" style="text-align:center;color:#9ca3af;padding:1rem">Нет пользователей</td></tr>
         <?php endif; ?>
         </tbody>
     </table>
@@ -60,6 +62,10 @@
             <div style="margin-bottom:.75rem">
                 <label>Telegram username</label>
                 <input type="text" name="perm_tg_username" id="permTg" placeholder="username без @">
+            </div>
+            <div style="margin-bottom:.75rem">
+                <label>Telegram ID (числовой) — по нему бот проверяет право «Бот: финансы»</label>
+                <input type="text" name="perm_tg_user_id" id="permTgId" inputmode="numeric" pattern="[0-9]{0,15}" placeholder="например 123456789; пусто — не привязан">
             </div>
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:.4rem;margin-bottom:1rem">
             <?php foreach ($permissionKeys as $key => $label): ?>
@@ -82,6 +88,7 @@ const PERM_KEYS = <?= json_encode(array_keys($permissionKeys)) ?>;
 function openPerms(u) {
     document.getElementById('permEmail').value = u.email;
     document.getElementById('permTg').value = u.telegram_username || '';
+    document.getElementById('permTgId').value = u.telegram_user_id || '';
     const perms = JSON.parse(u.permissions_json || '{}');
     PERM_KEYS.forEach(k => {
         const cb = document.getElementById('perm_' + k);

@@ -163,9 +163,13 @@ return [
         $c->get(\App\Payday3\Contracts\PosterLookupServiceInterface::class),
         $c->get(\App\Payday3\Contracts\AuditLogInterface::class),
         $c->get(\App\Payday3\Contracts\NamedLockInterface::class),
+        null,
+        $c->get(\App\AiBot\FinanceAuthorizerInterface::class),
     ),
+    \App\Infrastructure\TelegramUserDirectory::class => fn($c) => new \App\Infrastructure\TelegramUserDirectory($c->get(Database::class)),
+    \App\AiBot\FinanceAuthorizerInterface::class => fn($c) => new \App\AiBot\UserFinanceAuthorizer($c->get(\App\Infrastructure\TelegramUserDirectory::class)),
     \App\AiBot\AiBotWebhookController::class => fn($c) => new \App\AiBot\AiBotWebhookController(
-        \App\AiBot\AiBotConfig::fromConfig(),
+        \App\AiBot\AiBotConfig::fromConfig($c->get(\App\AiBot\FinanceAuthorizerInterface::class)),
         $c->get(\App\AiBot\FinanceDraftService::class),
         // Отдельный бот: токен ai_tg_bot, не основной @VerandamyBot.
         new TelegramBotClient(token: Config::require('ai_tg_bot'), http: new HttpClient(timeoutSeconds: 15)),

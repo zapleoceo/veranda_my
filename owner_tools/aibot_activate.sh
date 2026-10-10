@@ -23,7 +23,6 @@ umask 077
 
 APP="${AIBOT_APP_DIR:-/var/www/veranda_my_usr/data/www/veranda.my}"
 ENV_FILE="$APP/.env"
-OWNER_ID=169510539
 WEBHOOK_URL=https://veranda.my/aibot_webhook
 DOH=https://1.1.1.1/dns-query
 BAKDIR="${HOME:-/var/www/veranda_my_usr/data}/.aibot_env_backups"
@@ -129,7 +128,9 @@ else
 fi
 
 # 4) владелец, режим любой группы, отсечка старых подтверждений (повторный запуск её сдвигает)
-SET_VALUES[AIBOT_FINANCE_ALLOWED_TG_IDS]="$OWNER_ID"
+# Кто может пользоваться ботом — право «Бот: финансы (Telegram)» в разделе «Доступ»
+# админки (users.permissions_json + users.telegram_user_id). AIBOT_FINANCE_ALLOWED_TG_IDS
+# больше не источник прав (при правах из БД игнорируется) — скрипт его не трогает.
 SET_VALUES[AIBOT_FINANCE_ANY_GROUP]=1
 SET_VALUES[AIBOT_CONFIRM_NOT_BEFORE]="$TS"
 env_commit

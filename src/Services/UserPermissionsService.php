@@ -27,6 +27,8 @@ class UserPermissionsService
         'bloggers'       => false,
         'cashflow'       => false,
         'neworder'       => false,
+        // Явная галочка; в admin-bypass НЕ входит — админам не выдаётся автоматически.
+        'aibot_finance'  => false,
     ];
 
     private const TTL = 30;

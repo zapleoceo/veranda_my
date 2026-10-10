@@ -109,8 +109,53 @@ final class AdminAccessGateTest extends TestCase
             $response = (new AccessController($db))->index($request, new Response());
             self::assertSame(200, $response->getStatusCode());
             self::assertSame((int) $grant, json_decode($saved[0], true)['neworder']);
-            self::assertSame('manager@example.com', $saved[2]);
+            self::assertSame('manager@example.com', $saved[3]);
+            self::assertNull($saved[2], 'Telegram ID не задан');
             self::assertStringContainsString('name="perm_neworder"', (string) $response->getBody());
         }
+    }
+
+    public function test_aibot_finance_is_explicit_checkbox_and_tg_id_is_saved(): void
+    {
+        $_SESSION['user_permissions'] = ['admin' => true];
+        $statement = $this->createMock(\PDOStatement::class);
+        $statement->method('fetchAll')->willReturn([]);
+        $saved = null;
+        $db = $this->createMock(Database::class);
+        $db->method('t')->willReturn('users');
+        $db->method('query')->willReturnCallback(function ($sql, $params = []) use ($statement, &$saved) {
+            if (str_starts_with($sql, 'UPDATE')) $saved = [$sql, $params];
+            return $statement;
+        });
+        $body = ['save_user_permissions' => '1', 'perm_email' => 'owner@example.com',
+            'perm_aibot_finance' => '1', 'perm_tg_user_id' => '169510539'];
+        $request = (new ServerRequestFactory())->createServerRequest('POST', '/admin/access')->withParsedBody($body);
+        $response = (new AccessController($db))->index($request, new Response());
+        self::assertSame(200, $response->getStatusCode());
+        self::assertStringContainsString('telegram_user_id = ?', $saved[0]);
+        self::assertSame(1, json_decode($saved[1][0], true)['aibot_finance']);
+        self::assertSame(169510539, $saved[1][2]);
+        $html = (string) $response->getBody();
+        self::assertStringContainsString('name="perm_aibot_finance"', $html);
+        self::assertStringContainsString('Бот: финансы (Telegram)', $html);
+        self::assertStringContainsString('name="perm_tg_user_id"', $html);
+    }
+
+    public function test_tg_id_must_be_numeric(): void
+    {
+        $_SESSION['user_permissions'] = ['admin' => true];
+        $statement = $this->createMock(\PDOStatement::class);
+        $statement->method('fetchAll')->willReturn([]);
+        $updated = false;
+        $db = $this->createMock(Database::class);
+        $db->method('t')->willReturn('users');
+        $db->method('query')->willReturnCallback(function ($sql) use ($statement, &$updated) {
+            if (str_starts_with($sql, 'UPDATE')) $updated = true;
+            return $statement;
+        });
+        $body = ['save_user_permissions' => '1', 'perm_email' => 'x@example.com', 'perm_tg_user_id' => '@zapleosoft'];
+        $request = (new ServerRequestFactory())->createServerRequest('POST', '/admin/access')->withParsedBody($body);
+        (new AccessController($db))->index($request, new Response());
+        self::assertFalse($updated, 'username вместо числа не сохраняется');
     }
 }

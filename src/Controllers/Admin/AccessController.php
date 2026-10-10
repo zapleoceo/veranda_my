@@ -7,6 +7,7 @@ namespace App\Controllers\Admin;
 use App\Infrastructure\Config;
 use App\Infrastructure\Database;
 use App\Infrastructure\Permissions;
+use App\Infrastructure\TelegramUserDirectory;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
 
@@ -30,6 +31,7 @@ class AccessController
         'vposter_button' => 'Кнопка "Бронь в Постере"',
         'exclude_toggle' => 'Игнор + ✅ Принято',
         'telegram_ack'   => '✅ Принято (Telegram)',
+        'aibot_finance'  => 'Бот: финансы (Telegram)',
     ];
 
     public function __construct(private readonly Database $db) {}
@@ -79,10 +81,25 @@ class AccessController
             }
             $perms['telegram_ack'] = !empty($perms['exclude_toggle']) ? 1 : 0;
             $tg = strtolower(ltrim(trim((string) ($body['perm_tg_username'] ?? '')), '@'));
-            $this->db->query(
-                "UPDATE {$this->db->t('users')} SET permissions_json = ?, telegram_username = ? WHERE email = ? LIMIT 1",
-                [json_encode($perms, JSON_UNESCAPED_UNICODE), $tg ?: null, $email]
-            );
+            // Числовой Telegram id — проверенная связка для бота (право aibot_finance).
+            $tgIdRaw = trim((string) ($body['perm_tg_user_id'] ?? ''));
+            if ($tgIdRaw !== '' && !preg_match('/^[1-9][0-9]{0,14}$/', $tgIdRaw)) {
+                $flash['err'] = 'Telegram ID должен быть числом.';
+                return;
+            }
+            $tgId = $tgIdRaw === '' ? null : (int) $tgIdRaw;
+            (new TelegramUserDirectory($this->db))->ensureSchema();
+            try {
+                $this->db->query(
+                    "UPDATE {$this->db->t('users')} SET permissions_json = ?, telegram_username = ?, telegram_user_id = ? WHERE email = ? LIMIT 1",
+                    [json_encode($perms, JSON_UNESCAPED_UNICODE), $tg ?: null, $tgId, $email]
+                );
+            } catch (\Throwable $e) {
+                $flash['err'] = str_contains($e->getMessage(), 'Duplicate')
+                    ? 'Этот Telegram ID уже привязан к другому пользователю.'
+                    : 'Ошибка сохранения.';
+                return;
+            }
             $flash['ok'] = "Права для {$email} сохранены.";
         }
 
@@ -120,8 +137,9 @@ class AccessController
     private function _getUsers(array &$flash): array
     {
         try {
+            (new TelegramUserDirectory($this->db))->ensureSchema();
             return $this->db->query(
-                "SELECT email, name, telegram_username, permissions_json, created_at
+                "SELECT email, name, telegram_username, telegram_user_id, permissions_json, created_at
                  FROM {$this->db->t('users')} ORDER BY created_at DESC"
             )->fetchAll();
         } catch (\Throwable $e) {

@@ -52,11 +52,19 @@ final class AiBotConfig
          * как раньше: allow-list чатов и пользователей.
          */
         public readonly bool $anyGroup = false,
+        /**
+         * Источник прав в проде: право `aibot_finance` пользователя сайта, связанного
+         * с числовым Telegram id (раздел «Доступ»). Если задан — allow-list
+         * $allowedUserIds и OWNER_TG_ID для авторизации НЕ используются.
+         */
+        public readonly ?FinanceAuthorizerInterface $authorizer = null,
     ) {}
 
-    public static function fromConfig(): self
+    public static function fromConfig(?FinanceAuthorizerInterface $authorizer = null): self
     {
         return new self(
+            // При заданном $authorizer список не участвует в авторизации (оставлен
+            // только для режима без БД-прав).
             self::intList(Config::get('AIBOT_FINANCE_ALLOWED_TG_IDS')),
             self::strList(Config::get('AIBOT_FINANCE_ALLOWED_CHAT_IDS')),
             ltrim(Config::get('AIBOT_USERNAME', 'Veranda_aibot'), '@'),
@@ -64,11 +72,15 @@ final class AiBotConfig
             self::OWNER_TG_ID,
             Config::int('AIBOT_CONFIRM_NOT_BEFORE', 0),
             Config::get('AIBOT_FINANCE_ANY_GROUP') === '1',
+            $authorizer,
         );
     }
 
     public function canWrite(int $tgUserId): bool
     {
+        if ($this->authorizer !== null) {
+            return $tgUserId > 0 && $this->authorizer->allows($tgUserId);
+        }
         if ($tgUserId <= 0 || !in_array($tgUserId, $this->allowedUserIds, true)) {
             return false;
         }
@@ -79,6 +91,10 @@ final class AiBotConfig
     /** Решение по возможному дублю: только владелец, и он же должен быть в allow-list. */
     public function canDecideDuplicate(int $tgUserId): bool
     {
+        // С правами из БД решает тот, у кого есть право `aibot_finance` (и только он).
+        if ($this->authorizer !== null) {
+            return $this->canWrite($tgUserId);
+        }
         return $this->canWrite($tgUserId) && $tgUserId === $this->duplicateApproverTgId;
     }
 
