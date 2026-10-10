@@ -14,7 +14,7 @@ final class MysqlFinanceDraftRepository implements FinanceDraftRepositoryInterfa
 {
     private const COLUMNS = [
         'chat_id', 'source_msg_id', 'trigger_msg_id', 'card_msg_id', 'initiator_tg_id', 'intent',
-        'rows_json', 'account_id', 'tx_date', 'split_mode', 'status', 'poster_tx_ids_json', 'error', 'heartbeat_at',
+        'rows_json', 'account_id', 'tx_date', 'split_mode', 'status', 'poster_tx_ids_json', 'error', 'heartbeat_at', 'confirm_nonce', 'confirm_nonce_at',
     ];
 
     private static bool $tableChecked = false;
@@ -39,6 +39,8 @@ final class MysqlFinanceDraftRepository implements FinanceDraftRepositoryInterfa
             poster_tx_ids_json LONGTEXT NULL,
             error TEXT NULL,
             heartbeat_at INT UNSIGNED NULL,
+            confirm_nonce VARCHAR(16) NULL,
+            confirm_nonce_at INT UNSIGNED NULL,
             created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
             updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             UNIQUE KEY uq_tfd_source (chat_id, source_msg_id, intent),
@@ -94,6 +96,11 @@ final class MysqlFinanceDraftRepository implements FinanceDraftRepositoryInterfa
         $t = $this->db->t('tg_finance_drafts');
         if (!self::$tableChecked) {
             $this->db->query(self::ddl($t));
+            // Таблица могла быть создана прошлой версией — догоняем колонки подтверждения.
+            $has = $this->db->query("SHOW COLUMNS FROM {$t} LIKE 'confirm_nonce'")->fetch();
+            if (!$has) {
+                $this->db->query("ALTER TABLE {$t} ADD COLUMN confirm_nonce VARCHAR(16) NULL, ADD COLUMN confirm_nonce_at INT UNSIGNED NULL");
+            }
             self::$tableChecked = true;
         }
         return $t;

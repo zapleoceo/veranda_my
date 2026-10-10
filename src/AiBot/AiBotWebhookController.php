@@ -25,7 +25,7 @@ final class AiBotWebhookController
 {
     private const TRIGGER_RE = '/^\s*(?:@\w+[\s,:]*)?(?:внеси|занеси|запиши|проведи)(?![\p{L}])/iu';
     private const INTENT_RE = '/инвестор|дивиденд/iu';
-    private const CALLBACK_RE = '/^fd_(acc|date|split|go|cancel|rep|skip):(\d+)(?::(\d+))?$/';
+    private const CALLBACK_RE = '/^fd_(acc|date|split|go|cancel|rep|skip):(\d+)(?::(\d+))?(?::([0-9a-f]{8}))?$/';
 
     /** @var \Closure(): int */
     private \Closure $clock;
@@ -145,7 +145,7 @@ final class AiBotWebhookController
             }
             $res = $this->drafts->createOrGet($chatId, $sourceId, $triggerId, $fromId, $sourceDate, $parsed,
                 function (array $draft) use ($bot, $threadId, $triggerId): ?int {
-                    $card = $this->drafts->render($draft);
+                    $card = $this->drafts->renderFresh($draft);
                     return $bot->sendMessageWithKeyboard($card['text'], $card['keyboard'], $threadId, $triggerId);
                 });
             $draft = $res['draft'];
@@ -158,7 +158,7 @@ final class AiBotWebhookController
             if (in_array($status, ['done', 'partial'], true)) {
                 $bot->sendMessageWithKeyboard($this->drafts->journal($draft), [], $threadId, $triggerId);
             } elseif (empty($draft['card_msg_id'])) {
-                $card = $this->drafts->render($draft);
+                $card = $this->drafts->renderFresh($draft);
                 $id = $bot->sendMessageWithKeyboard($card['text'], $card['keyboard'], $threadId, $triggerId);
                 if ($id) {
                     $this->drafts->attachCard((int) $draft['id'], $id);
@@ -225,6 +225,18 @@ final class AiBotWebhookController
         }
 
         $bot = $this->bot->withChatId($chatId);
+        // Всё, что ведёт к записи, — только с кнопки ТЕКУЩЕГО поколения карточки,
+        // выданного не раньше отсечки активации. Иначе (нажатие из очереди Telegram,
+        // со старой карточки, повторная доставка) — записи нет, черновик цел,
+        // карточка обновляется с новым поколением и просьбой подтвердить заново.
+        if (in_array($action, ['go', 'rep', 'skip'], true)
+            && !FinanceDraftService::confirmIsFresh($draft, (string) ($m[4] ?? ''), $this->config->confirmNotBefore)) {
+            $this->logger->info('aibot.callback.stale_confirm', ['draft' => $draftId, 'from' => $fromId, 'action' => $action]);
+            $card = $this->drafts->renderFresh($draft);
+            $bot->editMessageText($msgId, "🔄 Кнопка устарела — подтвердите заново.\n\n" . $card['text'], $card['keyboard']);
+            $this->bot->answerCallbackQuery($cbId, 'Кнопка устарела — подтвердите заново', true);
+            return;
+        }
         if ($isDupDecision) {
             // Решение по «возможному дублю» — только по явной кнопке владельца;
             // повторный callback по уже решённой записи ничего не меняет.
@@ -241,7 +253,7 @@ final class AiBotWebhookController
             $draft = (array) $this->drafts->get($draftId);
             // Вносим только если именно ЭТО нажатие разрешило повтор.
             if ($action === 'skip' || !$accepted) {
-                $card = $this->drafts->render($draft);
+                $card = $this->drafts->renderFresh($draft);
                 $bot->editMessageText($msgId, $card['text'], $card['keyboard']);
                 $this->bot->answerCallbackQuery($cbId, $toast);
                 return;
@@ -251,7 +263,7 @@ final class AiBotWebhookController
         if ($action === 'go' || $action === 'rep') {
             $res = $this->drafts->execute($draftId, $fromId);
             $after = $res['draft'] !== [] ? $res['draft'] : $draft;
-            $card = $this->drafts->render($after);
+            $card = $this->drafts->renderFresh($after);
             $bot->editMessageText($msgId, $card['text'], $card['keyboard']);
             $this->bot->answerCallbackQuery($cbId, $res['message'], !in_array((string) ($after['status'] ?? ''), ['done', 'partial', 'review', 'reconcile'], true));
             if ((string) ($draft['status'] ?? '') !== (string) ($after['status'] ?? '') || (string) ($draft['poster_tx_ids_json'] ?? '') !== (string) ($after['poster_tx_ids_json'] ?? '')) {
@@ -263,7 +275,7 @@ final class AiBotWebhookController
         }
 
         $toast = $this->drafts->applyChoice($draftId, $action, $arg);
-        $card = $this->drafts->render((array) $this->drafts->get($draftId));
+        $card = $this->drafts->renderFresh((array) $this->drafts->get($draftId));
         $bot->editMessageText($msgId, $card['text'], $card['keyboard']);
         $this->bot->answerCallbackQuery($cbId, $toast);
     }

@@ -49,7 +49,7 @@ final class AiBotFlowTest extends TestCase
     private int $nextTx = 20000;
 
     /** @param list<array<string,mixed>> $existing ответ finance.getTransactions */
-    public function boot(array $existing = [], ?\Closure $create = null, array $owners = [self::OWNER], array $chats = [self::CHAT], int $approver = self::OWNER): void
+    public function boot(array $existing = [], ?\Closure $create = null, array $owners = [self::OWNER], array $chats = [self::CHAT], int $approver = self::OWNER, int $notBefore = 0): void
     {
         $this->tg = new RecordingHttp();
         $this->poster = new ScriptedPoster([
@@ -72,7 +72,7 @@ final class AiBotFlowTest extends TestCase
             $this->poster, $settings, $lookup, $this->audit, $this->lock, $clock,
         );
         $this->ctl = new AiBotWebhookController(
-            new AiBotConfig($owners, $chats, duplicateApproverTgId: $approver),
+            new AiBotConfig($owners, $chats, duplicateApproverTgId: $approver, confirmNotBefore: $notBefore),
             $svc,
             new TelegramBotClient('test-token', $this->tg),
             new PayoutParser(),
@@ -118,9 +118,17 @@ final class AiBotFlowTest extends TestCase
         ], $over)];
     }
 
-    public function press(string $data, int $from = self::OWNER, int $cardId = 0): string
+    /**
+     * Нажатие кнопки. Для подтверждений (go/rep/skip) без явного поколения
+     * подставляется ТЕКУЩЕЕ поколение карточки — как при реальном нажатии на
+     * актуальную карточку. $raw = true шлёт callback_data как есть.
+     */
+    public function press(string $data, int $from = self::OWNER, int $cardId = 0, bool $raw = false): string
     {
         $cardId = $cardId ?: (int) ($this->repo->rows[1]['card_msg_id'] ?? 0);
+        if (!$raw && preg_match('/^fd_(go|rep|skip):(\d+)(?::(\d+))?$/', $data, $m)) {
+            $data = 'fd_' . $m[1] . ':' . $m[2] . ':' . ($m[3] ?? '0') . ':' . (string) ($this->repo->rows[(int) $m[2]]['confirm_nonce'] ?? '');
+        }
         return $this->post(['update_id' => 2, 'callback_query' => [
             'id' => 'cb' . mt_rand(), 'data' => $data, 'from' => ['id' => $from, 'username' => 'dmitry'],
             'message' => ['message_id' => $cardId, 'chat' => ['id' => (int) self::CHAT]],
@@ -386,7 +394,7 @@ final class AiBotFlowTest extends TestCase
         $this->audit->rows = [];
 
         $card = $this->ctlRender();
-        $this->assertContains('fd_go:1', array_column(array_merge(...$card['keyboard']), 'callback_data'), 'кнопка «Повторить»');
+        $this->assertContains('fd_go:1:0', array_map(fn($d) => substr($d, 0, 9), array_column(array_merge(...$card['keyboard']), 'callback_data')), 'кнопка «Повторить»');
 
         // Исход записи в sending неизвестен — повторно не шлём, нужна сверка.
         $this->press('fd_go:1');
@@ -514,7 +522,8 @@ final class AiBotFlowTest extends TestCase
         $this->assertCount(1, $journal, 'бот пишет владельцу о дубле');
         $this->assertStringContainsString('возможный дубль: #9001 от 09.10.2026, 1 000 000, «Олег». Повторить?', $journal[0]['params']['text']);
         $card = $this->ctlRender();
-        $this->assertSame(['fd_rep:1:0', 'fd_skip:1:0'], array_column($card['keyboard'][0], 'callback_data'));
+        $nonce = $this->repo->rows[1]['confirm_nonce'];
+        $this->assertSame(['fd_rep:1:0:' . $nonce, 'fd_skip:1:0:' . $nonce], array_column($card['keyboard'][0], 'callback_data'));
 
         $this->audit->rows = [];
         $this->press('fd_rep:1:0');
@@ -685,7 +694,7 @@ final class AiBotFlowTest extends TestCase
     {
         $this->bootLedger([self::tx(9001, 1000000, 'Олег')]);
         $this->runSingle('Выплаты: Олег 1 000 000');
-        $this->press('fd_rep:1');
+        $this->press('fd_rep:1', self::OWNER, 0, true);
         $this->assertSame([], $this->successfulCreates());
         $this->assertSame([], $this->decisions());
     }
@@ -930,5 +939,103 @@ final class AiBotFlowTest extends TestCase
             $this->assertSame([31001 + $k], $recs[0]['tx_ids']);
             $this->assertSame('done', $this->repo->rows[1]['status']);
         }
+    }
+
+    // ─── поколение карточки: подтверждения только с актуальной кнопки ─────────
+
+    private function nonce(): string
+    {
+        return (string) ($this->repo->rows[1]['confirm_nonce'] ?? '');
+    }
+
+    public function test_queued_callback_from_before_activation_does_not_write(): void
+    {
+        // Нажатие из очереди Telegram старого формата (без поколения) — как то,
+        // что могло накопиться до включения бота.
+        $this->boot();
+        $this->readyDraft();
+        $before = $this->nonce();
+        $this->press('fd_go:1', self::OWNER, 0, true);
+        $this->assertSame([], $this->creates(), 'записи нет');
+        $row = $this->repo->rows[1];
+        $this->assertSame('draft', $row['status'], 'черновик цел');
+        $this->assertSame(1, (int) $row['account_id']);
+        $this->assertSame('2026-10-10', $row['tx_date']);
+        $this->assertNotSame($before, $this->nonce(), 'карточка с новым поколением');
+        $edits = $this->tg->callsTo('editMessageText');
+        $this->assertStringContainsString('Кнопка устарела — подтвердите заново', end($edits)['params']['text']);
+        $this->assertContains('aibot.callback.stale_confirm', array_column($this->logs, 'message'));
+
+        // Свежее явное нажатие владельца по обновлённой карточке — работает.
+        $this->press('fd_go:1');
+        $this->assertCount(6, $this->creates());
+        $this->assertSame('done', $this->repo->rows[1]['status']);
+    }
+
+    public function test_button_from_previous_card_generation_does_not_write(): void
+    {
+        $this->boot();
+        $this->readyDraft();
+        $old = $this->nonce();
+        $this->press('fd_split:1'); // любое обновление карточки — новое поколение
+        $this->assertNotSame($old, $this->nonce());
+        $this->press('fd_go:1:0:' . $old, self::OWNER, 0, true);
+        $this->assertSame([], $this->creates());
+        $this->assertSame('draft', $this->repo->rows[1]['status']);
+    }
+
+    public function test_repeated_delivery_of_fresh_confirm_is_idempotent(): void
+    {
+        $this->boot();
+        $this->readyDraft();
+        $data = 'fd_go:1:0:' . $this->nonce();
+        $this->press($data, self::OWNER, 0, true);
+        $this->assertCount(6, $this->creates());
+        // Telegram доставил тот же callback ещё раз (и ещё).
+        $this->press($data, self::OWNER, 0, true);
+        $this->press($data, self::OWNER, 0, true);
+        $this->assertCount(6, $this->creates());
+        $this->assertSame('done', $this->repo->rows[1]['status']);
+    }
+
+    public function test_cutoff_rejects_generation_issued_before_activation(): void
+    {
+        $this->boot(notBefore: self::NOW + 60);
+        $this->readyDraft();
+        $this->press('fd_go:1'); // текущее поколение, но выдано до отсечки
+        $this->assertSame([], $this->creates());
+        $this->assertSame('draft', $this->repo->rows[1]['status']);
+
+        $this->boot(notBefore: self::NOW);
+        $this->readyDraft();
+        $this->press('fd_go:1');
+        $this->assertCount(6, $this->creates(), 'поколение выдано в момент отсечки — принимается');
+    }
+
+    public function test_stale_duplicate_decision_does_not_apply(): void
+    {
+        $this->bootLedger([self::tx(9001, 1000000, 'Олег')]);
+        $this->runSingle('Выплаты: Олег 1 000 000');
+        $this->assertSame('review', $this->repo->rows[1]['status']);
+        $this->press('fd_rep:1:0', self::OWNER, 0, true);           // старый формат
+        $this->press('fd_rep:1:0:deadbeef', self::OWNER, 0, true);  // чужое поколение
+        $this->assertSame([], $this->decisions());
+        $this->assertSame([], $this->successfulCreates());
+        $this->assertSame('review', $this->repo->rows[1]['status']);
+        // Свежая кнопка владельца — решение принимается.
+        $this->press('fd_rep:1:0');
+        $this->assertCount(1, $this->decisions());
+        $this->assertCount(1, $this->successfulCreates());
+    }
+
+    public function test_fresh_confirm_by_non_owner_still_denied(): void
+    {
+        $this->bootLedger([self::tx(9001, 1000000, 'Олег')]);
+        $this->runSingle('Выплаты: Олег 1 000 000');
+        $this->press('fd_rep:1:0:' . $this->nonce(), self::OTHER, 0, true);
+        $this->press('fd_go:1:0:' . $this->nonce(), self::OTHER, 0, true);
+        $this->assertSame([], $this->decisions());
+        $this->assertSame([], $this->successfulCreates());
+        $this->assertSame('review', $this->repo->rows[1]['status']);
     }
 }

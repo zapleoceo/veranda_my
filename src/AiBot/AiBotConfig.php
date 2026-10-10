@@ -37,6 +37,13 @@ final class AiBotConfig
         public readonly string $botUsername = 'Veranda_aibot',
         public readonly int $maxUpdateAgeSec = 600,
         public readonly int $duplicateApproverTgId = self::OWNER_TG_ID,
+        /**
+         * Подтверждения записи (Внести / Повторить / Не вносить) с карточек, чьё
+         * текущее поколение выдано раньше этого момента (unix), не исполняются —
+         * например, момент активации бота. 0 — без отсечки (поколение всё равно
+         * обязательно).
+         */
+        public readonly int $confirmNotBefore = 0,
     ) {}
 
     public static function fromConfig(): self
@@ -46,6 +53,8 @@ final class AiBotConfig
             self::strList(Config::get('AIBOT_FINANCE_ALLOWED_CHAT_IDS')),
             ltrim(Config::get('AIBOT_USERNAME', 'Veranda_aibot'), '@'),
             Config::int('AIBOT_MAX_UPDATE_AGE_SEC', 600),
+            self::OWNER_TG_ID,
+            Config::int('AIBOT_CONFIRM_NOT_BEFORE', 0),
         );
     }
 

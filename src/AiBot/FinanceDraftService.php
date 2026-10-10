@@ -108,6 +108,30 @@ final class FinanceDraftService
         });
     }
 
+    /**
+     * Новое поколение карточки: подтверждения записи принимаются только с
+     * кнопок текущего поколения. Вызывается при КАЖДОЙ отправке/правке карточки,
+     * поэтому любое старое нажатие (из очереди Telegram, с прошлой карточки,
+     * повторная доставка) не совпадёт и ничего не запишет.
+     */
+    public function renderFresh(array $draft): array
+    {
+        $id = (int) ($draft['id'] ?? 0);
+        if ($id > 0) {
+            $this->drafts->update($id, ['confirm_nonce' => bin2hex(random_bytes(4)), 'confirm_nonce_at' => ($this->clock)()]);
+            $draft = (array) $this->drafts->get($id);
+        }
+        return $this->render($draft);
+    }
+
+    /** Нажатие подтверждения — с кнопки текущего поколения, выданного не раньше отсечки. */
+    public static function confirmIsFresh(array $draft, string $nonce, int $notBefore): bool
+    {
+        $cur = (string) ($draft['confirm_nonce'] ?? '');
+        return $cur !== '' && $nonce !== '' && hash_equals($cur, $nonce)
+            && (int) ($draft['confirm_nonce_at'] ?? 0) >= $notBefore;
+    }
+
     public function get(int $id): ?array
     {
         return $this->drafts->get($id);
@@ -749,6 +773,8 @@ final class FinanceDraftService
 
     private function keyboard(array $draft, array $people): array
     {
+        // Поколение карточки — в каждой кнопке, ведущей к записи (fd_go / fd_rep / fd_skip).
+        $nonce = (string) ($draft['confirm_nonce'] ?? '');
         $id = (int) $draft['id'];
         $status = (string) $draft['status'];
         if ($status === 'review') {
@@ -759,14 +785,14 @@ final class FinanceDraftService
                 }
                 $label = mb_substr((string) $r['name'], 0, 20) . ' ' . PayoutParser::fmt((int) $r['amount']);
                 $kb[] = [
-                    ['text' => '🔁 Повторить: ' . $label, 'callback_data' => 'fd_rep:' . $id . ':' . $i],
-                    ['text' => '✖️ Не вносить', 'callback_data' => 'fd_skip:' . $id . ':' . $i],
+                    ['text' => '🔁 Повторить: ' . $label, 'callback_data' => 'fd_rep:' . $id . ':' . $i . ':' . $nonce],
+                    ['text' => '✖️ Не вносить', 'callback_data' => 'fd_skip:' . $id . ':' . $i . ':' . $nonce],
                 ];
             }
             return $kb;
         }
         if ($status === 'partial' || ($status === 'executing' && $this->isStale($draft))) {
-            return [[['text' => '🔁 Повторить незавершённые', 'callback_data' => 'fd_go:' . $id]]];
+            return [[['text' => '🔁 Повторить незавершённые', 'callback_data' => 'fd_go:' . $id . ':0:' . $nonce]]];
         }
         if ($status !== 'draft') {
             return [];
@@ -811,7 +837,7 @@ final class FinanceDraftService
 
         $last = [];
         if ($this->blocker($draft) === null) {
-            $last[] = ['text' => '✅ Внести', 'callback_data' => 'fd_go:' . $id];
+            $last[] = ['text' => '✅ Внести', 'callback_data' => 'fd_go:' . $id . ':0:' . $nonce];
         }
         $last[] = ['text' => '✖️ Отмена', 'callback_data' => 'fd_cancel:' . $id];
         $kb[] = $last;
