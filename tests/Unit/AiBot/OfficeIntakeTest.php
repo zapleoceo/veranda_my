@@ -38,6 +38,7 @@ final class OfficeIntakeTest extends TestCase
     private const TOKEN = 'test-token';
 
     private RecordingHttp $tg;
+    private InMemoryDraftRepository $drafts;
     private InMemoryOfficeRepository $repo;
     private GrantTable $grants;
     private InterleavingLock $lock;
@@ -52,7 +53,7 @@ final class OfficeIntakeTest extends TestCase
         $this->grants->add(self::USER, 'office@x', ['aibot_office' => true]);
         $this->lock = new InterleavingLock();
         $clock = static fn(): int => self::NOW;
-        $config = new AiBotConfig([], [self::CHAT]);
+        $config = new AiBotConfig([], [self::CHAT], authorizer: new UserFinanceAuthorizer($this->grants));
         $bot = new TelegramBotClient(self::TOKEN, $this->tg);
         $this->office = new OfficeTaskService($config, $this->repo, $bot,
             new TelegramPermissionAuthorizer($this->grants, 'aibot_office'), $this->lock, new NullLogger(), $clock);
@@ -64,7 +65,8 @@ final class OfficeIntakeTest extends TestCase
             public function financeAccounts(): array { return [1 => 'A']; }
             public function financeCategories(): array { return []; }
         };
-        $fin = new FinanceDraftService(new InMemoryDraftRepository(),
+        $this->drafts = new InMemoryDraftRepository();
+        $fin = new FinanceDraftService($this->drafts,
             new PosterTransactionCreateService($poster, $settings, $audit, $this->lock), $poster, $settings, $lookup, $audit, $this->lock, $clock,
             new UserFinanceAuthorizer($this->grants));
         $this->ctl = new AiBotWebhookController($config, $fin, $bot, new PayoutParser(), null, new NullLogger(), $clock,
@@ -423,13 +425,41 @@ final class OfficeIntakeTest extends TestCase
         $this->assertSame(1, $this->repo->tasks[$key]['revision']);
     }
 
-    public function test_finance_word_mid_text_in_reply_is_an_office_task(): void
+    private function payoutReply(array $over = []): array
     {
-        $this->grants->setPerm(self::USER, 'aibot_finance', true);
-        $this->post($this->msg(['text' => '@Veranda_aibot узнай у бухгалтера про дивиденды', 'reply_to_message' => [
-            'message_id' => 590, 'date' => self::NOW - 99, 'from' => ['id' => 333], 'text' => 'Игорь 1 000 000',
-        ]]));
+        return $over + ['reply_to_message' => [
+            'message_id' => 590, 'date' => self::NOW - 99, 'from' => ['id' => 333], 'text' => PayoutParserTest::IGOR,
+        ]];
+    }
+
+    public function test_finance_user_dividend_mention_reply_reaches_finance(): void
+    {
+        $this->grants->add(9, 'f@x', ['aibot_finance' => true]);
+        $this->post($this->msg($this->payoutReply(['from' => ['id' => 9], 'text' => '@Veranda_aibot дивиденды за сентябрь'])));
+        $this->assertSame([], $this->repo->tasks, 'не задача офиса');
+        $this->assertCount(1, $this->drafts->rows, 'финансовый черновик создан, как на main');
+    }
+
+    public function test_user_without_rights_mention_reply_behaves_like_main(): void
+    {
+        $this->post($this->msg($this->payoutReply(['from' => ['id' => 404], 'text' => '@Veranda_aibot привет'])));
+        $this->assertSame([], $this->repo->tasks);
+        $this->assertSame([], $this->drafts->rows);
+        $this->assertSame([], $this->sent(), 'как на main: молчание');
+    }
+
+    public function test_office_user_non_finance_mention_reply_is_an_office_task(): void
+    {
+        $this->post($this->msg($this->payoutReply(['text' => '@Veranda_aibot узнай у бухгалтера про счёт'])));
         $this->assertCount(1, $this->repo->tasks);
+        $this->assertSame([], $this->drafts->rows);
+    }
+
+    public function test_office_only_user_cannot_hit_finance_nor_get_swallowed(): void
+    {
+        $this->post($this->msg($this->payoutReply(['text' => '@Veranda_aibot дивиденды'])));
+        $this->assertSame([], $this->repo->tasks, 'finance владеет такими ответами');
+        $this->assertSame([], $this->drafts->rows, 'а права finance нет');
     }
 
     public function test_answer_starting_with_finance_verb_is_recorded_as_answer(): void
@@ -460,7 +490,7 @@ final class OfficeIntakeTest extends TestCase
     public function test_lookup_db_error_falls_through(): void
     {
         $this->repo->failLookup = true;
-        $this->post($this->msg(['text' => 'ответ', 'reply_to_message' => ['message_id' => 5, 'from' => ['id' => 1]]]));
+        $this->post($this->msg(['text' => 'ответ', 'reply_to_message' => ['message_id' => 5, 'from' => ['id' => 1, 'is_bot' => true]]]));
         $this->assertSame([], $this->repo->tasks);
     }
 

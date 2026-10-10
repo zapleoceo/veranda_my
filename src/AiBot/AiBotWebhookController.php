@@ -89,10 +89,14 @@ final class AiBotWebhookController
         }
         // Финансовая команда («внеси…» ответом на сообщение) всегда в приоритете.
         // Всё остальное — приём задач в офис (@бот + текст / ответ на вопрос бота).
-        // Финансовая команда - глагол в начале (после упоминания). Ответ на вопрос бота
-        // по задаче обрабатывается офисом ДО финансов, даже если начинается с «внеси».
-        $isFinanceCommand = $reply !== null && preg_match(self::TRIGGER_RE, $text) === 1;
-        if ($this->office !== null && $this->office->handleMessage($msg, $updateId, $isFinanceCommand)) {
+        // Приоритет: (а) ответ на вопрос бота по задаче офиса; (б) прежняя финансовая
+        // команда — как на main; (в) приём задачи в офис по «@бот …».
+        if ($this->office !== null && $this->office->handleAnswer($msg, $updateId)) {
+            return;
+        }
+        $isFinanceCommand = $reply !== null && $this->isTrigger($text)
+            && (preg_match(self::TRIGGER_RE, $text) || preg_match(self::INTENT_RE, $text));
+        if ($this->office !== null && !$isFinanceCommand && $this->office->handleIntake($msg, $updateId)) {
             return;
         }
         if ($reply === null || !$this->isTrigger($text)) {

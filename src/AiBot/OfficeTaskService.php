@@ -63,39 +63,49 @@ final class OfficeTaskService
      * @return bool true — сообщение относится к office-сценарию (принято или осознанно отклонено),
      *              остальным обработчикам дальше делать нечего
      */
-    public function handleMessage(array $msg, int $updateId, bool $financeCommand = false): bool
+    public function handleAnswer(array $msg, int $updateId): bool
     {
         $text = trim((string) ($msg['text'] ?? $msg['caption'] ?? ''));
-        $reply = is_array($msg['reply_to_message'] ?? null) ? $msg['reply_to_message'] : null;
+        $reply = $msg['reply_to_message'] ?? null;
+        // Ответ на вопрос бота: reply на сообщение бота с текстом. Остальное — не наше.
+        if (!is_array($reply) || $text === '' || empty($reply['from']['is_bot'])) {
+            return false;
+        }
         $chatId = (string) ($msg['chat']['id'] ?? '');
-        // Финансовая команда не может стать новой задачей; ответом на вопрос — может.
-        $taskText = $financeCommand ? null : $this->extractTaskText($text);
-        $canAnswer = $reply !== null && $text !== '';
+        if (!$this->admissible($msg, $chatId)) {
+            return false;
+        }
+        try {
+            $question = $this->repo->findWaitingByQuestionMsg($chatId, (int) ($reply['message_id'] ?? 0));
+        } catch (\Throwable $e) {
+            $this->logger->error('aibot.office.lookup_failed', ['err' => $e->getMessage()]);
+            return false; // сбой БД не должен ломать финансовый сценарий
+        }
+        if ($question === null) {
+            return false;
+        }
+        $this->recordAnswer($question, $msg, $text, $updateId);
+        return true;
+    }
 
-        if ($taskText === null && !$canAnswer) {
+    /**
+     * Новая задача: "@бот текст". Сообщение, которое мы не приняли (нет права, устарело,
+     * чужой чат и т.п.), НЕ поглощается: false, дальше работает прежний сценарий.
+     *
+     * @param array<string,mixed> $msg
+     */
+    public function handleIntake(array $msg, int $updateId): bool
+    {
+        $text = trim((string) ($msg['text'] ?? $msg['caption'] ?? ''));
+        $taskText = $this->extractTaskText($text);
+        if ($taskText === null) {
             if ($text === '' && self::extractMedia($msg) !== []) {
                 // Голос/фото без подписи нельзя адресовать @упоминанием.
-                $this->logger->info('aibot.office.skip.media_no_caption', ['chat' => $chatId, 'msg' => $msg['message_id'] ?? null]);
+                $this->logger->info('aibot.office.skip.media_no_caption', ['chat' => $msg['chat']['id'] ?? null, 'msg' => $msg['message_id'] ?? null]);
             }
             return false;
         }
-        // Дешёвые проверки — до любого обращения к БД.
-        if (!$this->admissible($msg, $chatId)) {
-            return $taskText !== null; // адресованное нам — гасим; чужая переписка идёт дальше
-        }
-        if ($canAnswer) {
-            try {
-                $question = $this->repo->findWaitingByQuestionMsg($chatId, (int) ($reply['message_id'] ?? 0));
-            } catch (\Throwable $e) {
-                $this->logger->error('aibot.office.lookup_failed', ['err' => $e->getMessage()]);
-                return false; // сбой БД не должен ломать финансовый сценарий
-            }
-            if ($question !== null) {
-                $this->recordAnswer($question, $msg, $text, $updateId);
-                return true;
-            }
-        }
-        if ($taskText === null) {
+        if (!$this->admissible($msg, (string) ($msg['chat']['id'] ?? ''))) {
             return false;
         }
         $this->intake($msg, $taskText, $updateId);
@@ -151,7 +161,7 @@ final class OfficeTaskService
             return false;
         }
         if (!$this->authorizer->allows($fromId)) {
-            $this->logger->warning('aibot.office.skip.user', ['chat' => $chatId, 'from' => $fromId]);
+            $this->logger->debug('aibot.office.skip.user', ['chat' => $chatId, 'from' => $fromId]);
             return false;
         }
         $age = ($this->clock)() - (int) ($msg['date'] ?? 0);
@@ -184,26 +194,26 @@ final class OfficeTaskService
                 if ($created) {
                     $outboxRow = $this->createOutboxRow($taskKey, $chatId, $threadId, $messageId, $fromId, $updateId, $taskText, $context, $media);
                     try {
-                    $this->repo->transactional(function () use ($taskKey, $chatId, $threadId, $messageId, $fromId, $updateId, $taskText, $context, $media, $outboxRow): void {
-                    $this->repo->insertTask([
-                        'task_key' => $taskKey,
-                        'chat_id' => $chatId,
-                        'thread_id' => $threadId,
-                        'origin_message_id' => $messageId,
-                        'origin_user_id' => $fromId,
-                        'update_id' => $updateId,
-                        'text' => $taskText,
-                        'context_json' => $context !== null ? self::enc($context) : null,
-                        'media_json' => $media !== [] ? self::enc($media) : null,
-                        'media_status' => $media !== [] ? 'pending' : 'none',
-                        'status' => self::STATUS_QUEUED,
-                        'revision' => 1,
-                    ]);
-                    if ($this->repo->findTaskByKey($taskKey) === null) {
-                        throw new \RuntimeException('office task not visible after insert');
-                    }
-                    $this->repo->insertOutbox($outboxRow);
-                    });
+                        $this->repo->transactional(function () use ($taskKey, $chatId, $threadId, $messageId, $fromId, $updateId, $taskText, $context, $media, $outboxRow): void {
+                        $this->repo->insertTask([
+                            'task_key' => $taskKey,
+                            'chat_id' => $chatId,
+                            'thread_id' => $threadId,
+                            'origin_message_id' => $messageId,
+                            'origin_user_id' => $fromId,
+                            'update_id' => $updateId,
+                            'text' => $taskText,
+                            'context_json' => $context !== null ? self::enc($context) : null,
+                            'media_json' => $media !== [] ? self::enc($media) : null,
+                            'media_status' => $media !== [] ? 'pending' : 'none',
+                            'status' => self::STATUS_QUEUED,
+                            'revision' => 1,
+                        ]);
+                        if ($this->repo->findTaskByKey($taskKey) === null) {
+                            throw new \RuntimeException('office task not visible after insert');
+                        }
+                        $this->repo->insertOutbox($outboxRow);
+                        });
                     } catch (\Throwable $e) {
                         $this->logger->error('aibot.office.insert_failed', ['task' => $taskKey, 'err' => $e->getMessage()]);
                         return; // ни подтверждения, ни outbox
