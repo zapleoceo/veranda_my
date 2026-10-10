@@ -1,6 +1,7 @@
 <div class="card">
     <h2>Добавить пользователя</h2>
     <form method="POST" style="display:flex;gap:.5rem;align-items:flex-end">
+        <input type="hidden" name="csrf" value="<?= htmlspecialchars($csrfToken) ?>">
         <div style="flex:1"><label>Email</label><input type="email" name="email" required placeholder="user@example.com"></div>
         <button type="submit" name="add_email" class="btn btn-primary">Добавить</button>
     </form>
@@ -40,7 +41,7 @@
                 </td>
                 <td>
                     <button class="btn btn-sm btn-secondary" onclick="openPerms(<?= htmlspecialchars(json_encode($u), ENT_QUOTES) ?>)">Права</button>
-                    <a href="?delete=<?= urlencode((string)$u['email']) ?>"
+                    <a href="?delete=<?= urlencode((string)$u['email']) ?>&amp;csrf=<?= urlencode($csrfToken) ?>"
                        class="btn btn-sm btn-danger"
                        onclick="return confirm('Удалить <?= htmlspecialchars((string)$u['email'], ENT_QUOTES) ?>?')">✕</a>
                 </td>
@@ -59,6 +60,7 @@
         <h2 style="margin-bottom:1rem;font-size:1rem">Права пользователя</h2>
         <form method="POST" id="permsForm">
             <input type="hidden" name="perm_email" id="permEmail">
+            <input type="hidden" name="csrf" value="<?= htmlspecialchars($csrfToken) ?>">
             <div style="margin-bottom:.75rem">
                 <label>Telegram username</label>
                 <input type="text" name="perm_tg_username" id="permTg" placeholder="username без @">

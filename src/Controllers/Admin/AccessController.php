@@ -7,6 +7,7 @@ namespace App\Controllers\Admin;
 use App\Infrastructure\Config;
 use App\Infrastructure\Database;
 use App\Infrastructure\Permissions;
+use App\Infrastructure\SessionCsrf;
 use App\Infrastructure\TelegramUserDirectory;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
@@ -34,6 +35,8 @@ class AccessController
         'aibot_finance'  => 'Бот: финансы (Telegram)',
     ];
 
+    private const CSRF_KEY = 'admin_access_csrf';
+
     public function __construct(private readonly Database $db) {}
 
     public function index(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
@@ -52,6 +55,19 @@ class AccessController
         $flash = ['ok' => '', 'err' => ''];
         $body  = $request->getParsedBody() ?? [];
         $query = $request->getQueryParams();
+
+        // CSRF: любое изменение (права, Telegram ID, добавление, удаление) — только с
+        // токеном этой сессии. SameSite=Lax не спасает от GET ?delete= и от атак
+        // с того же сайта. Без валидного токена — 403 и ничего не меняется.
+        $mutating = isset($body['save_user_permissions']) || isset($body['add_email']) || isset($query['delete']);
+        if ($mutating) {
+            $candidate = (string) ($body['csrf'] ?? $query['csrf'] ?? '');
+            if (!SessionCsrf::verify(self::CSRF_KEY, $candidate)) {
+                $response->getBody()->write('Forbidden: устаревшая форма — обновите страницу и повторите.');
+                return $response->withStatus(403)->withHeader('Content-Type', 'text/plain; charset=utf-8');
+            }
+        }
+        $csrfToken = SessionCsrf::token(self::CSRF_KEY);
 
         $users = $this->_getUsers($flash);
         $this->_handlePost((array) $body, $userEmail, $flash, $users);

@@ -33,6 +33,14 @@ fail() { echo "ERR $1"; exit "$2"; }
 command -v openssl >/dev/null || fail "openssl_missing" 1
 case "$BAKDIR" in "$APP"/*) fail "backup_dir_inside_webroot" 1;; esac
 
+# 0) Только чтение, ДО любых изменений: модель прав из БД (раздел «Доступ») должна
+#    пропускать подтверждённого владельца. Нет права/связки/ошибка — стоп.
+PHP_BIN="${PHP_BIN:-/opt/php82/bin/php}"
+GRANT_CHECK="$(cd "$(dirname "$0")" && pwd)/aibot_check_grant.php"
+if ! AIBOT_APP_DIR="$APP" "$PHP_BIN" "$GRANT_CHECK"; then
+  fail "grant_check_failed (.env не менялся)" 1
+fi
+
 # ─── чтение .env без внешних процессов: последний KEY=… побеждает, кавычки снимаются
 env_get() {
   local key="$1" line val=""

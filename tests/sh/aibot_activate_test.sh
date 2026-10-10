@@ -46,7 +46,9 @@ case "\$cfg" in
   *) cat "$WORK/resp_post" ;;
 esac
 EOF
-chmod +x "$STUBS/openssl" "$STUBS/curl"
+# php: проверка права из БД (aibot_check_grant.php) — результат задаётся файлом.
+printf '#!/usr/bin/env bash\nprintf "%%s %%s\\n" php "$*" >> "%s"\nif [ "$(cat "%s")" = ok ]; then echo "grant: OK"; exit 0; fi\necho "grant: MISSING"; exit 1\n' "$ARGV_LOG" "$WORK/grant" > "$STUBS/php"
+chmod +x "$STUBS/openssl" "$STUBS/curl" "$STUBS/php"
 
 GOOD_INFO='{"ok":true,"result":{"url":"https://veranda.my/aibot_webhook","has_custom_certificate":false,"pending_update_count":129,"last_error_message":"Wrong response from the webhook: 503 bot123456:TESTTOKENxyz","allowed_updates":["message","callback_query"]}}'
 
@@ -60,9 +62,10 @@ setup() { # $1 = содержимое .env (printf-формат), далее а�
   echo '{"ok":true,"result":true,"description":"Webhook was set"}' > "$WORK/resp_set"
   echo "$GOOD_INFO" > "$WORK/resp_info"
   printf '403' > "$WORK/resp_post"
+  echo ok > "$WORK/grant"
 }
 run() { # $1 = скрипт
-  HOME="$WORK/home" AIBOT_APP_DIR="$WORK/app" PATH="$SHIMS:$STUBS:$REAL_PATH" \
+  HOME="$WORK/home" AIBOT_APP_DIR="$WORK/app" PHP_BIN=php PATH="$SHIMS:$STUBS:$REAL_PATH" \
     bash "$ROOT/owner_tools/$1" "${@:2}" > "$WORK/out.txt" 2>&1
   echo $?
 }
@@ -159,6 +162,16 @@ code=$(run aibot_activate.sh); [ "$code" = 2 ] && pass "11: exit 2" || bad "11: 
 grep -q 'setWebhook: UNKNOWN' "$WORK/out.txt" && grep -q 'env: restored' "$WORK/out.txt" && pass "11: UNKNOWN + restored" || bad "11: статусы"
 cmp -s "$WORK/app/.env" "$WORK/env.orig" && pass "11: .env восстановлен" || bad "11: .env"
 no_leak "11"
+
+# ── 12. Проверка права из БД не прошла → exit 1 ДО любых изменений
+setup 'ai_tg_bot=%s\nAIBOT_WEBHOOK_SECRET=\n' "$TOKEN_VAL"
+echo missing > "$WORK/grant"
+code=$(run aibot_activate.sh); [ "$code" = 1 ] && pass "12: exit 1" || bad "12: exit $code"
+grep -q 'grant_check_failed' "$WORK/out.txt" && pass "12: статус grant_check_failed" || bad "12: статус"
+cmp -s "$WORK/app/.env" "$WORK/env.orig" && pass "12: .env не тронут" || bad "12: .env изменён"
+[ -e "$WORK/home/.aibot_env_backups" ] && bad "12: бэкап/каталог созданы до проверки" || pass "12: ничего не создано"
+[ -e "$WORK/curl_stdin.log" ] && bad "12: обращение к Telegram" || pass "12: Telegram не вызывался"
+grep -q '^php .*aibot_check_grant.php' "$ARGV_LOG" && pass "12: вызвана проверка права" || bad "12: проверка не вызвана"
 
 echo
 [ "$fails" = 0 ] && { echo "ALL PASSED"; exit 0; } || { echo "$fails FAILED"; exit 1; }
