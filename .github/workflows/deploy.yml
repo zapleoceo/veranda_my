@@ -143,6 +143,7 @@ jobs:
           SSH_OPTS="-p ${{ secrets.SSH_PORT }} -i ~/.ssh/id_ed25519 -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=10"
           ssh ${SSH_OPTS} "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" 'mkdir -p ~/veranda_ops && chmod 700 ~/veranda_ops'
           rsync -az --delete -e "ssh ${SSH_OPTS}" owner_tools/ "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:veranda_ops/"
+          ssh ${SSH_OPTS} "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" 'chmod 700 ~/veranda_ops'
 
       - name: Link static assets into public/
         shell: bash

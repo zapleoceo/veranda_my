@@ -52,10 +52,21 @@ env_get() {
 #     дописываются в конец; прочие строки, порядок и окончания строк сохраняются.
 #     Значения передаются ТОЛЬКО через ассоциативный массив в памяти bash.
 declare -A SET_VALUES=()
+TMP_FILES=()
+cleanup_tmp() { local f; for f in "${TMP_FILES[@]+"${TMP_FILES[@]}"}"; do [ -e "$f" ] && rm -f "$f"; done; return 0; }
+trap cleanup_tmp EXIT
+
+# Временный файл рядом с .env (для атомарного mv): создаётся 600 и остаётся 600,
+# пока пишется; права исходного .env переносятся только перед заменой.
+replace_env_with() { # $1 = готовый временный файл
+  chmod --reference="$ENV_FILE" "$1" 2>/dev/null || chmod 600 "$1"
+  mv -f "$1" "$ENV_FILE"
+}
+
 env_commit() {
   local tmp line key done_keys="" k
   tmp=$(mktemp "$APP/.env.aibot.XXXXXX")
-  chmod --reference="$ENV_FILE" "$tmp" 2>/dev/null || chmod 600 "$tmp"
+  TMP_FILES+=("$tmp")
   {
     while IFS= read -r line || [ -n "$line" ]; do
       local cr=""
@@ -72,20 +83,33 @@ env_commit() {
       [[ "$done_keys" == *" $k "* ]] || printf '%s=%s\n' "$k" "${SET_VALUES[$k]}"
     done
   } > "$tmp"
-  mv -f "$tmp" "$ENV_FILE"
+  replace_env_with "$tmp"
 }
 
 valid_value() { [[ -n "$1" && "$1" =~ ^[A-Za-z0-9_-]+$ ]]; }
 
-# 1) бэкап вне веб-корня
+# 1) бэкапы вне веб-корня:
+#    .env.bak.orig — состояние ДО первой активации, создаётся один раз и больше
+#                    не перезаписывается (его берёт aibot_deactivate.sh по умолчанию);
+#    .env.bak.<ts> — снимок перед этим запуском (им откатывается сбой setWebhook).
 TS=$(date +%s)
 mkdir -p "$BAKDIR"
 chmod 700 "$BAKDIR"
+ORIG="$BAKDIR/.env.bak.orig"
+if [ ! -e "$ORIG" ]; then
+  install -m 600 "$ENV_FILE" "$ORIG"
+  echo "backup (orig): $ORIG"
+fi
 BACKUP="$BAKDIR/.env.bak.$TS"
 install -m 600 "$ENV_FILE" "$BACKUP"
 echo "backup: $BACKUP"
 
-restore_env() { install -m 600 "$BACKUP" "$ENV_FILE.restore.$TS" && mv -f "$ENV_FILE.restore.$TS" "$ENV_FILE"; }
+restore_env() {
+  local tmp
+  tmp=$(mktemp "$APP/.env.aibot.XXXXXX") || return 1
+  TMP_FILES+=("$tmp")
+  cat "$BACKUP" > "$tmp" && replace_env_with "$tmp"
+}
 
 # 2) токен бота должен уже быть
 TOKEN=$(env_get ai_tg_bot)
@@ -130,9 +154,18 @@ SECRET=""
 if [[ "$RESP" == *'"ok":true'* ]]; then
   echo "setWebhook: OK"
 else
-  restore_env || true
   TOKEN=""
-  echo "setWebhook: FAIL — .env восстановлен из $BACKUP, webhook не изменён"
+  if [[ "$RESP" == *'"ok":false'* ]]; then
+    echo "setWebhook: REJECTED (Telegram отказал, webhook не изменён)"
+  else
+    # Пустой/битый ответ (таймаут): Telegram мог успеть применить новый секрет.
+    echo "setWebhook: UNKNOWN (нет ответа) — проверьте getWebhookInfo или выполните aibot_deactivate.sh"
+  fi
+  if restore_env; then
+    echo "env: restored from $BACKUP"
+  else
+    echo "env: RESTORE FAILED — восстановите вручную из $BACKUP"
+  fi
   exit 2
 fi
 
