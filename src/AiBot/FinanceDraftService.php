@@ -196,6 +196,8 @@ final class FinanceDraftService
             $records = self::dec($draft['poster_tx_ids_json'] ?? null);
             if ($records === []) {
                 $records = $this->buildRecords($draft);
+            } elseif (array_filter($records, static fn(array $r) => !in_array($r['status'], self::SETTLED, true)) === []) {
+                return ['draft' => $draft, 'message' => 'Отправлять нечего — ' . self::statusLabel((string) $draft['status'])];
             }
             $accountId = (int) $draft['account_id'];
             $date = (string) $draft['tx_date'];
@@ -484,9 +486,12 @@ final class FinanceDraftService
             ];
         }
 
+        // Проход 1 — по ВСЕМУ пулу, до сопоставления дублей: иначе более ранняя строка
+        // могла бы «забрать» кандидата и строка с неизвестным исходом ушла бы повторно.
+        $claimed = [];
         foreach ($records as $i => $r) {
             $st = (string) $r['status'];
-            if (in_array($st, self::SETTLED, true)) {
+            if ($st !== 'sending' && $st !== 'failed') {
                 continue;
             }
             // Отправка с неизвестным исходом (sending — упали после вызова, failed —
@@ -496,13 +501,20 @@ final class FinanceDraftService
             // комментарием) делает исход неопределённым. Такая запись НЕ становится
             // done и НЕ отправляется повторно — владельцу сообщается «нужна сверка».
             // Кандидатов нет — Poster запись точно не создал, отправка безопасна.
-            if ($st === 'sending' || $st === 'failed') {
-                $cand = self::uncertainCandidates($pool, (int) $r['amount'], (string) $r['name'], (string) $r['comment']);
-                if ($cand !== []) {
-                    $records[$i]['status'] = 'unverified';
-                    $records[$i]['candidates'] = array_map(static fn(int $id) => ['id' => $id] + $pool[$id], $cand);
-                    continue;
-                }
+            $cand = self::uncertainCandidates($pool, (int) $r['amount'], (string) $r['name'], (string) $r['comment']);
+            if ($cand !== []) {
+                $records[$i]['status'] = 'unverified';
+                $records[$i]['candidates'] = array_map(static fn(int $id) => ['id' => $id] + $pool[$id], $cand);
+                $claimed += array_flip($cand);
+            }
+        }
+        $pool = array_diff_key($pool, $claimed);
+
+        // Проход 2 — возможные дубли для остальных строк.
+        foreach ($records as $i => $r) {
+            $st = (string) $r['status'];
+            if (in_array($st, self::SETTLED, true)) {
+                continue;
             }
             // Владелец разрешил повтор: исходную транзакцию (dup_of) больше не сравниваем.
             if (!empty($r['repeat_ok'])) {
@@ -812,7 +824,7 @@ final class FinanceDraftService
             'done' => 'внесён',
             'partial' => 'внесён частично',
             'review' => 'ждёт решения по дублям',
-            'reconcile' => 'нужна сверка',
+            'reconcile' => 'ждёт сверки',
             'cancelled' => 'отменён',
             default => $s,
         };

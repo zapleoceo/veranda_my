@@ -780,6 +780,12 @@ final class AiBotFlowTest extends TestCase
         $this->assertSame([], $this->decisions());
         $this->assertSame('dup', json_decode($this->repo->rows[1]['poster_tx_ids_json'], true)[0]['status']);
         $this->assertContains('aibot.callback.dup_not_owner', array_column($this->logs, 'message'));
+
+        // Владелец решает и по черновику, который начал другой — черновик не зависает.
+        $this->press('fd_rep:1:0', self::OWNER);
+        $this->assertCount(1, $this->creates());
+        $this->assertSame('done', $this->repo->rows[1]['status']);
+        $this->assertSame('tg:' . self::OWNER, $this->decisions()[0]['email']);
     }
 
     public function test_default_duplicate_approver_is_the_owner_id(): void

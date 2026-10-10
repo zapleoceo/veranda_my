@@ -214,15 +214,18 @@ final class AiBotWebhookController
             $this->bot->answerCallbackQuery($cbId, 'Черновик не найден', true);
             return;
         }
-        // Подтверждает только тот же владелец, что дал команду.
-        if ((int) $draft['initiator_tg_id'] !== $fromId) {
+        // Подтверждает только тот же владелец, что дал команду. Решение по дублю —
+        // отдельное правило: его принимает только владелец (проверка ниже), даже если
+        // команду дал другой пользователь из allow-list.
+        $isDupDecision = $action === 'rep' || $action === 'skip';
+        if (!$isDupDecision && (int) $draft['initiator_tg_id'] !== $fromId) {
             $this->logger->warning('aibot.callback.not_initiator', ['draft' => $draftId, 'from' => $fromId]);
             $this->bot->answerCallbackQuery($cbId, 'Подтвердить может только автор команды', true);
             return;
         }
 
         $bot = $this->bot->withChatId($chatId);
-        if ($action === 'rep' || $action === 'skip') {
+        if ($isDupDecision) {
             // Решение по «возможному дублю» — только по явной кнопке владельца;
             // повторный callback по уже решённой записи ничего не меняет.
             if ($arg === '') {
