@@ -49,7 +49,7 @@ final class AiBotFlowTest extends TestCase
     private int $nextTx = 20000;
 
     /** @param list<array<string,mixed>> $existing ответ finance.getTransactions */
-    public function boot(array $existing = [], ?\Closure $create = null, array $owners = [self::OWNER], array $chats = [self::CHAT], int $approver = self::OWNER, int $notBefore = 0): void
+    public function boot(array $existing = [], ?\Closure $create = null, array $owners = [self::OWNER], array $chats = [self::CHAT], int $approver = self::OWNER, int $notBefore = 0, bool $anyGroup = false): void
     {
         $this->tg = new RecordingHttp();
         $this->poster = new ScriptedPoster([
@@ -72,7 +72,7 @@ final class AiBotFlowTest extends TestCase
             $this->poster, $settings, $lookup, $this->audit, $this->lock, $clock,
         );
         $this->ctl = new AiBotWebhookController(
-            new AiBotConfig($owners, $chats, duplicateApproverTgId: $approver, confirmNotBefore: $notBefore),
+            new AiBotConfig($owners, $chats, duplicateApproverTgId: $approver, confirmNotBefore: $notBefore, anyGroup: $anyGroup),
             $svc,
             new TelegramBotClient('test-token', $this->tg),
             new PayoutParser(),
@@ -1133,5 +1133,147 @@ final class AiBotFlowTest extends TestCase
         $this->assertSame('done', $r1['draft']['status'] ?? $this->repo->rows[1]['status']);
         $this->assertTrue($r2['stale'] ?? false);
         $this->assertCount(6, $this->creates());
+    }
+
+    // ─── режим «любая группа, только владелец» (AIBOT_FINANCE_ANY_GROUP=1) ──────
+
+    private function bootAnyGroup(array $owners = [self::OWNER]): void
+    {
+        $this->boot([], null, $owners, [], self::OWNER, 0, true);
+    }
+
+    private function commandIn(string $chat, array $over = [], int $sourceId = 500): array
+    {
+        $u = self::command($over, PayoutParserTest::IGOR, $sourceId);
+        $u['message']['chat'] = ['id' => (int) $chat, 'type' => 'supergroup'];
+        return $u;
+    }
+
+    private function draftIn(string $chat): ?array
+    {
+        foreach ($this->repo->rows as $r) {
+            if ((string) $r['chat_id'] === $chat) {
+                return $r;
+            }
+        }
+        return null;
+    }
+
+    private function pressIn(string $chat, string $data, int $from = self::OWNER, ?int $cardId = null): string
+    {
+        $d = $this->draftIn($chat);
+        $id = (int) ($d['id'] ?? 0);
+        if (preg_match('/^fd_(go|rep|skip):(\d+)(?::(\d+))?$/', $data, $m)) {
+            $data = 'fd_' . $m[1] . ':' . $m[2] . ':' . ($m[3] ?? '0') . ':' . (string) ($this->repo->rows[(int) $m[2]]['confirm_nonce'] ?? '');
+        }
+        return $this->post(['update_id' => 3, 'callback_query' => [
+            'id' => 'cb' . mt_rand(), 'data' => $data, 'from' => ['id' => $from, 'username' => 'dmitry'],
+            'message' => ['message_id' => $cardId ?? (int) ($d['card_msg_id'] ?? 0), 'chat' => ['id' => (int) $chat]],
+        ]]);
+    }
+
+    public function test_any_group_owner_works_in_different_groups(): void
+    {
+        $this->bootAnyGroup();
+        foreach (['-2001', '-2002'] as $chat) {
+            $this->post($this->commandIn($chat));
+            $id = (int) $this->draftIn($chat)['id'];
+            $this->pressIn($chat, "fd_acc:{$id}:1");
+            $this->pressIn($chat, "fd_date:{$id}:20261010");
+            $this->pressIn($chat, "fd_go:{$id}");
+        }
+        $this->assertCount(2, $this->repo->rows, 'по черновику на группу');
+        $this->assertCount(12, $this->creates());
+        $this->assertSame(['done'], array_values(array_unique(array_column($this->repo->rows, 'status'))));
+    }
+
+    public function test_any_group_other_user_refused_even_if_allow_listed(): void
+    {
+        $this->bootAnyGroup([self::OWNER, self::OTHER]);
+        $this->post($this->commandIn('-2001', ['from' => ['id' => self::OTHER, 'username' => 'x']]));
+        $this->assertSame([], $this->repo->rows);
+        // Черновик владельца — чужие кнопки не действуют.
+        $this->post($this->commandIn('-2001'));
+        $id = (int) $this->draftIn('-2001')['id'];
+        $this->pressIn('-2001', "fd_acc:{$id}:1", self::OTHER);
+        $this->pressIn('-2001', "fd_go:{$id}", self::OTHER);
+        $this->assertNull($this->repo->rows[$id]['account_id']);
+        $this->assertSame([], $this->creates());
+    }
+
+    public function test_any_group_identity_spoofing_is_refused(): void
+    {
+        $this->bootAnyGroup();
+        $cases = [
+            'anonymous admin' => ['from' => ['id' => 1087968824, 'username' => 'GroupAnonymousBot'], 'sender_chat' => ['id' => -2001, 'type' => 'supergroup']],
+            'sender_chat при id владельца' => ['sender_chat' => ['id' => -1009, 'type' => 'channel']],
+            'пересланная команда владельца' => ['forward_origin' => ['type' => 'user', 'sender_user' => ['id' => self::OWNER]], 'from' => ['id' => self::OTHER]],
+            'display name / username владельца' => ['from' => ['id' => 424242, 'first_name' => 'Dmitry', 'username' => 'dmitry']],
+            'цитата команды' => ['quote' => ['text' => 'внеси']],
+            'via_bot' => ['via_bot' => ['id' => 99, 'is_bot' => true]],
+        ];
+        $k = 0;
+        foreach ($cases as $name => $over) {
+            $this->post($this->commandIn('-2001', $over, 700 + $k++));
+            $this->assertSame([], $this->repo->rows, $name);
+        }
+        // Личный чат с ботом — не группа.
+        $u = self::command();
+        $u['message']['chat'] = ['id' => self::OWNER, 'type' => 'private'];
+        $this->post($u);
+        $this->assertSame([], $this->repo->rows, 'личный чат');
+        $this->assertSame([], $this->creates());
+    }
+
+    public function test_any_group_callback_from_other_chat_is_refused(): void
+    {
+        $this->bootAnyGroup();
+        $this->post($this->commandIn('-2001'));
+        $d = $this->draftIn('-2001');
+        $id = (int) $d['id'];
+        $this->pressIn('-2001', "fd_acc:{$id}:1");
+        $this->pressIn('-2001', "fd_date:{$id}:20261010");
+        // Та же кнопка (тот же card_msg_id и поколение), но из другой группы.
+        $nonce = $this->repo->rows[$id]['confirm_nonce'];
+        $this->post(['update_id' => 4, 'callback_query' => [
+            'id' => 'cbx', 'data' => "fd_go:{$id}:0:{$nonce}", 'from' => ['id' => self::OWNER],
+            'message' => ['message_id' => (int) $this->repo->rows[$id]['card_msg_id'], 'chat' => ['id' => -2002]],
+        ]]);
+        $this->assertSame([], $this->creates());
+        $this->assertSame('draft', $this->repo->rows[$id]['status']);
+        $this->assertSame($nonce, $this->repo->rows[$id]['confirm_nonce'], 'карточку в чужом чате не трогаем');
+    }
+
+    public function test_any_group_repeats_and_nonce(): void
+    {
+        $this->bootAnyGroup();
+        $this->post($this->commandIn('-2001'));
+        $this->post($this->commandIn('-2001', ['message_id' => 601]));
+        $this->assertCount(1, $this->repo->rows, 'тот же источник → один черновик');
+        $id = (int) $this->draftIn('-2001')['id'];
+        $this->pressIn('-2001', "fd_acc:{$id}:1");
+        $this->pressIn('-2001', "fd_date:{$id}:20261010");
+        $this->pressIn('-2001', "fd_go:{$id}:0:deadbeef");
+        $this->assertSame([], $this->creates(), 'чужое поколение');
+        $data = "fd_go:{$id}:0:" . $this->repo->rows[$id]['confirm_nonce'];
+        $this->pressIn('-2001', $data);
+        $this->pressIn('-2001', $data);
+        $this->assertCount(6, $this->creates(), 'повтор доставки идемпотентен');
+    }
+
+    public function test_without_flag_unknown_group_is_ignored(): void
+    {
+        $this->boot();
+        $this->post($this->commandIn('-2001'));
+        $this->assertSame([], $this->repo->rows);
+        $cfg = new AiBotConfig([169510539], ['-1']);
+        $this->assertFalse($cfg->anyGroup);
+        $this->assertFalse($cfg->chatAllowed('-2001'));
+        $any = new AiBotConfig([169510539, 555], [], anyGroup: true);
+        $this->assertTrue($any->chatAllowed('-2001'));
+        $this->assertFalse($any->chatAllowed('169510539'), 'личный чат');
+        $this->assertTrue($any->canWrite(169510539));
+        $this->assertFalse($any->canWrite(555), 'в allow-list, но не владелец');
+        $this->assertFalse((new AiBotConfig([], [], anyGroup: true))->canWrite(169510539), 'пустой allow-list — никто');
     }
 }

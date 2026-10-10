@@ -44,6 +44,14 @@ final class AiBotConfig
          * обязательно).
          */
         public readonly int $confirmNotBefore = 0,
+        /**
+         * Режим «любая группа, только владелец» (AIBOT_FINANCE_ANY_GROUP=1): бот
+         * реагирует в любой группе (id чата < 0), но команды и кнопки принимает
+         * ТОЛЬКО от владельца ($duplicateApproverTgId), и только если он же есть в
+         * allow-list. Других авторов из allow-list в этом режиме нет. Без флага —
+         * как раньше: allow-list чатов и пользователей.
+         */
+        public readonly bool $anyGroup = false,
     ) {}
 
     public static function fromConfig(): self
@@ -55,12 +63,17 @@ final class AiBotConfig
             Config::int('AIBOT_MAX_UPDATE_AGE_SEC', 600),
             self::OWNER_TG_ID,
             Config::int('AIBOT_CONFIRM_NOT_BEFORE', 0),
+            Config::get('AIBOT_FINANCE_ANY_GROUP') === '1',
         );
     }
 
     public function canWrite(int $tgUserId): bool
     {
-        return $tgUserId > 0 && in_array($tgUserId, $this->allowedUserIds, true);
+        if ($tgUserId <= 0 || !in_array($tgUserId, $this->allowedUserIds, true)) {
+            return false;
+        }
+        // В режиме любой группы — только владелец, даже если в allow-list есть другие.
+        return !$this->anyGroup || $tgUserId === $this->duplicateApproverTgId;
     }
 
     /** Решение по возможному дублю: только владелец, и он же должен быть в allow-list. */
@@ -71,6 +84,10 @@ final class AiBotConfig
 
     public function chatAllowed(string $chatId): bool
     {
+        if ($this->anyGroup) {
+            // Группы и супергруппы — отрицательные id; личные чаты (> 0) — нет.
+            return (bool) preg_match('/^-\d+$/', $chatId);
+        }
         return $chatId !== '' && in_array($chatId, $this->allowedChatIds, true);
     }
 
