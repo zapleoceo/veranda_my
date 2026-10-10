@@ -244,7 +244,8 @@ final class AiBotFlowTest extends TestCase
         $fail = true;
         $this->boot([], function (array $p) use (&$fail) {
             if ($p['amount_from'] === 3978800 && $fail) {
-                throw new \RuntimeException('Poster 500');
+                // Явный отказ Poster (объект error в ответе) — запись точно не создана.
+                throw new \Exception('Poster API Error: Account is blocked (http=200, method=finance.createTransactions)');
             }
             return 30000 + count($this->creates());
         });
@@ -369,7 +370,7 @@ final class AiBotFlowTest extends TestCase
         $this->assertSame([], $this->creates(), 'свежий executing — второй прогон не запускается');
     }
 
-    public function test_stale_executing_offers_retry_and_resumes(): void
+    public function test_stale_executing_crash_needs_reconciliation(): void
     {
         $this->boot();
         $this->readyDraft();
@@ -387,11 +388,13 @@ final class AiBotFlowTest extends TestCase
         $card = $this->ctlRender();
         $this->assertContains('fd_go:1', array_column(array_merge(...$card['keyboard']), 'callback_data'), 'кнопка «Повторить»');
 
+        // Исход записи в sending неизвестен — повторно не шлём, нужна сверка.
         $this->press('fd_go:1');
-        $this->assertSame('done', $this->repo->rows[1]['status']);
-        $c = $this->creates();
-        $this->assertCount(7, $c, 'дослана только незавершённая запись');
-        $this->assertSame(2436000, $c[6]['params']['amount_from']);
+        $this->assertSame('reconcile', $this->repo->rows[1]['status']);
+        $this->assertCount(6, $this->creates(), 'ничего не дослано');
+        $recs = json_decode($this->repo->rows[1]['poster_tx_ids_json'], true);
+        $this->assertSame('unverified', $recs[5]['status']);
+        $this->assertSame(['done'], array_values(array_unique(array_column(array_slice($recs, 0, 5), 'status'))));
     }
 
     private function ctlRender(): array
@@ -637,7 +640,8 @@ final class AiBotFlowTest extends TestCase
         };
         $this->press('fd_rep:1:0');
         $this->assertCount(1, $this->creates());
-        $this->assertSame('partial', $this->repo->rows[1]['status']);
+        // Таймаут — исход неизвестен: сразу «нужна сверка», не partial.
+        $this->assertSame('reconcile', $this->repo->rows[1]['status']);
         $this->poster->responses['finance.createTransactions'] = $create;
         $this->audit->rows = [];
         $this->press('fd_go:1');
@@ -650,7 +654,8 @@ final class AiBotFlowTest extends TestCase
         // Две строки: одна — возможный дубль, другая упала при отправке.
         $this->bootLedger([self::tx(9001, 1000000, 'Олег')]);
         $create = $this->poster->responses['finance.createTransactions'];
-        $this->poster->responses['finance.createTransactions'] = fn(array $p) => throw new \RuntimeException('Poster down');
+        // Явный отказ Poster — строка Дима failed (rejected), черновик partial.
+        $this->poster->responses['finance.createTransactions'] = fn(array $p) => throw new \Exception('Poster API Error: Access denied (http=200, method=finance.createTransactions)');
         $this->runSingle('Выплаты: Олег 1 000 000, Дима 2 000 000');
         $this->assertSame('partial', $this->repo->rows[1]['status']);
         $this->poster->responses['finance.createTransactions'] = $create;
@@ -748,14 +753,15 @@ final class AiBotFlowTest extends TestCase
         $this->assertUnverified([9002]);
     }
 
-    public function test_failed_send_without_any_candidate_is_resent(): void
+    public function test_proven_rejection_is_resent(): void
     {
-        // В Poster ни своей, ни похожей транзакции нет — повторная отправка безопасна.
+        // Poster явно отказал (error в ответе) — запись не создана, повтор допустим.
         $this->bootLedger([]);
         $create = $this->poster->responses['finance.createTransactions'];
-        $this->poster->responses['finance.createTransactions'] = fn(array $p) => throw new \RuntimeException('Poster down');
+        $this->poster->responses['finance.createTransactions'] = fn(array $p) => throw new \Exception('Poster API Error: Access denied (http=200, method=finance.createTransactions)');
         $this->runSingle('Выплаты: Олег 1 000 000');
         $this->assertSame('partial', $this->repo->rows[1]['status']);
+        $this->assertSame('rejected', json_decode($this->repo->rows[1]['poster_tx_ids_json'], true)[0]['outcome']);
         $this->poster->responses['finance.createTransactions'] = $create;
         $this->audit->rows = [];
         $this->press('fd_go:1');
@@ -796,5 +802,66 @@ final class AiBotFlowTest extends TestCase
         $this->assertFalse($cfg->canDecideDuplicate(555), 'в allow-list, но не владелец');
         $this->assertFalse((new AiBotConfig([555], ['-1']))->canDecideDuplicate(169510539), 'владелец вне allow-list — тоже нет');
     }
-}
 
+    /** Отправка с неизвестным исходом → «нужна сверка», без повторной отправки (кандидатов может не быть). */
+    private function assertReconcileNoResend(int $expectedCreates): void
+    {
+        $recs = json_decode($this->repo->rows[1]['poster_tx_ids_json'], true);
+        $this->assertSame('unverified', $recs[0]['status'], 'не done');
+        $this->assertSame([], $recs[0]['tx_ids'] ?? []);
+        $this->assertSame('reconcile', $this->repo->rows[1]['status']);
+        $this->assertCount($expectedCreates, $this->creates(), 'лишняя запись не создана');
+        $journal = array_values(array_filter($this->tg->callsTo('sendMessage'), fn($c) => str_contains($c['params']['text'], '📒')));
+        $this->assertStringContainsString('результат не определён, нужна сверка', end($journal)['params']['text']);
+        $this->press('fd_go:1');
+        $this->assertCount($expectedCreates, $this->creates(), 'и повторное «Внести» ничего не шлёт');
+    }
+
+    public function test_lost_response_with_empty_read_needs_reconciliation(): void
+    {
+        // create прошёл в Poster, ответ потерян (таймаут), а следующий
+        // getTransactions ещё пустой — это НЕ доказательство, что записи нет.
+        $this->bootLedger([]);
+        $this->poster->responses['finance.createTransactions'] = fn(array $p) => throw new \Exception('CURL Error: Operation timed out after 15000 milliseconds');
+        $this->runSingle('Выплаты: Олег 1 000 000');
+        $this->assertSame('reconcile', $this->repo->rows[1]['status']);
+        $this->assertSame([], $this->ledger, 'чтение пустое');
+        $this->audit->rows = [];
+        $this->assertReconcileNoResend(1);
+        $this->assertSame([], json_decode($this->repo->rows[1]['poster_tx_ids_json'], true)[0]['candidates']);
+    }
+
+    public function test_created_with_fully_changed_comment_needs_reconciliation(): void
+    {
+        // Запись создана, но её комментарий в Poster полностью другой (без имени),
+        // а ответ потерян. Кандидатов по имени/комментарию нет — всё равно сверка.
+        $this->bootLedger([]);
+        $this->poster->responses['finance.createTransactions'] = function (array $p) {
+            $this->ledger[] = ['transaction_id' => 30001, 'account_id' => $p['account_from'], 'category_id' => $p['category'],
+                'type' => 0, 'amount' => (string) (-$p['amount_from'] * 100), 'date' => $p['date'], 'comment' => 'корректировка'];
+            throw new \Exception('Poster API Error: empty response (http=0, method=finance.createTransactions)');
+        };
+        $this->runSingle('Выплаты: Олег 1 000 000');
+        $this->audit->rows = [];
+        $this->assertReconcileNoResend(1);
+        $this->assertCount(1, $this->ledger, 'в Poster ровно одна запись');
+    }
+
+    public function test_failure_classification(): void
+    {
+        $m = new \ReflectionMethod(FinanceDraftService::class, 'isProvenRejection');
+        $wrap = fn(string $msg) => new \RuntimeException('Poster: ' . $msg, 0, new \Exception($msg));
+        // Доказанный отказ — повтор допустим.
+        $this->assertTrue($m->invoke(null, new \InvalidArgumentException('Invalid amount')));
+        $this->assertTrue($m->invoke(null, new \DomainException('Такая же транзакция только что создана')));
+        $this->assertTrue($m->invoke(null, $wrap('CURL Error: Could not resolve host: joinposter.com')));
+        $this->assertTrue($m->invoke(null, $wrap('CURL Error: Failed to connect to joinposter.com port 443')));
+        $this->assertTrue($m->invoke(null, $wrap('Poster API Error: Access denied (http=200, method=finance.createTransactions)')));
+        // Исход неизвестен — только сверка.
+        $this->assertFalse($m->invoke(null, $wrap('CURL Error: Operation timed out after 15000 milliseconds')));
+        $this->assertFalse($m->invoke(null, $wrap('Poster API Error: http=502 method=finance.createTransactions params={} body=')));
+        $this->assertFalse($m->invoke(null, $wrap('Poster API Error: empty response (http=0, method=finance.createTransactions)')));
+        $this->assertFalse($m->invoke(null, $wrap('JSON Decode Error: Syntax error')));
+        $this->assertFalse($m->invoke(null, new \RuntimeException('timeout')));
+    }
+}

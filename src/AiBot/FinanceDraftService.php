@@ -237,10 +237,27 @@ final class FinanceDraftService
                 } catch (\Throwable $e) {
                     $records[$i]['status'] = 'failed';
                     $records[$i]['error'] = mb_substr($e->getMessage(), 0, 200);
+                    // rejected — доказанный отказ (запрос не ушёл / Poster вернул явную ошибку):
+                    // повтор допустим. unknown — исход не установлен: повтор только после сверки.
+                    $records[$i]['outcome'] = self::isProvenRejection($e) ? 'rejected' : 'unknown';
                 }
                 $this->drafts->update($draftId, ['poster_tx_ids_json' => self::enc($records)]);
             }
 
+            // Неизвестный исход — сразу «нужна сверка» (с подсказкой из Poster, если она есть):
+            // кнопка «Повторить незавершённые» такую запись не пошлёт.
+            if (array_filter($records, static fn(array $r) => $r['status'] === 'failed' && ($r['outcome'] ?? 'unknown') !== 'rejected') !== []) {
+                try {
+                    $records = $this->markDuplicates($records, $accountId, $date);
+                } catch (\Throwable) {
+                    foreach ($records as $k => $r) {
+                        if ($r['status'] === 'failed' && ($r['outcome'] ?? 'unknown') !== 'rejected') {
+                            $records[$k]['status'] = 'unverified';
+                            $records[$k]['candidates'] = [];
+                        }
+                    }
+                }
+            }
             $failed = count(array_filter($records, static fn(array $r) => $r['status'] === 'failed'));
             $open = count(array_filter($records, static fn(array $r) => $r['status'] === 'dup'));
             // Возможные дубли не вносятся — ждут явного решения владельца (review).
@@ -491,7 +508,7 @@ final class FinanceDraftService
         $claimed = [];
         foreach ($records as $i => $r) {
             $st = (string) $r['status'];
-            if ($st !== 'sending' && $st !== 'failed') {
+            if ($st !== 'sending' && !($st === 'failed' && ($r['outcome'] ?? 'unknown') !== 'rejected')) {
                 continue;
             }
             // Отправка с неизвестным исходом (sending — упали после вызова, failed —
@@ -500,13 +517,14 @@ final class FinanceDraftService
             // любая транзакция той же суммы и того же получателя (или с тем же
             // комментарием) делает исход неопределённым. Такая запись НЕ становится
             // done и НЕ отправляется повторно — владельцу сообщается «нужна сверка».
-            // Кандидатов нет — Poster запись точно не создал, отправка безопасна.
+            // Исход попытки записи неизвестен (sending, таймаут, обрыв, ошибка без
+            // явного отказа). Пустая выдача чтения ничего не доказывает: запись могла
+            // создаться и ещё не попасть в getTransactions, или её комментарий изменили.
+            // Поэтому — сверка всегда, кандидаты лишь подсказка владельцу.
             $cand = self::uncertainCandidates($pool, (int) $r['amount'], (string) $r['name'], (string) $r['comment']);
-            if ($cand !== []) {
-                $records[$i]['status'] = 'unverified';
-                $records[$i]['candidates'] = array_map(static fn(int $id) => ['id' => $id] + $pool[$id], $cand);
-                $claimed += array_flip($cand);
-            }
+            $records[$i]['status'] = 'unverified';
+            $records[$i]['candidates'] = array_map(static fn(int $id) => ['id' => $id] + $pool[$id], $cand);
+            $claimed += array_flip($cand);
         }
         $pool = array_diff_key($pool, $claimed);
 
@@ -598,6 +616,29 @@ final class FinanceDraftService
         }
         return $out;
     }
+    /**
+     * Доказанный отказ ДО создания записи: запрос не ушёл (валидация до вызова,
+     * не удалось соединиться / разрешить имя) или Poster ответил явной ошибкой
+     * (объект error в ответе). Всё прочее — таймаут, обрыв, пустой/битый ответ,
+     * HTTP 5xx — исход неизвестен.
+     */
+    private static function isProvenRejection(\Throwable $e): bool
+    {
+        if ($e instanceof \InvalidArgumentException || $e instanceof \DomainException) {
+            return true;
+        }
+        $msg = '';
+        for ($x = $e; $x !== null; $x = $x->getPrevious()) {
+            $msg .= ' ' . $x->getMessage();
+        }
+        if (preg_match('/CURL Error: (Could not resolve host|Couldn\'t resolve host|Failed to connect|Couldn\'t connect|curl_init failed)/i', $msg)) {
+            return true;
+        }
+        // PosterAPI: «Poster API Error: <текст ошибки> (http=…)» — Poster вернул error.
+        // «Poster API Error: http=…» (не-2xx) и «empty response» — не доказательство.
+        return (bool) preg_match('/Poster API Error: (?!http=|empty response)\S/u', $msg);
+    }
+
     /** Сравнение комментариев без учёта регистра, HTML-сущностей, пробелов и вида тире. */
     private static function normComment(string $s): string
     {
@@ -797,7 +838,10 @@ final class FinanceDraftService
             'skipped' => '↩️ ' . $head . ' — не внесено (дубль: ' . self::dupLine($r) . ')',
             'failed' => '❌ ' . $head . ' — ' . self::h((string) ($r['error'] ?? 'ошибка')),
             'sending' => '⏳ ' . $head . ' — исход неизвестен, проверится при повторе',
-            'unverified' => '❓ ' . $head . ' — результат не определён, нужна сверка (не внесено повторно). В Poster есть похожие: ' . self::dupLine(['dup_of' => $r['candidates'] ?? []]),
+            'unverified' => '❓ ' . $head . ' — результат не определён, нужна сверка (не внесено повторно). '
+                . (!empty($r['candidates'])
+                    ? 'В Poster есть похожие: ' . self::dupLine(['dup_of' => $r['candidates']])
+                    : 'Похожих в Poster пока не видно — проверьте вручную, запись могла создаться.'),
             default => '• ' . $head,
         };
     }
