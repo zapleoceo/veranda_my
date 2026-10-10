@@ -237,9 +237,20 @@ final class FinanceDraftService
                         'category_id' => AiBotConfig::CATEGORY_ID,
                         'account_from' => $accountId,
                     ], new Actor('tg:' . $actorTgId, 'tgdraft:' . $draftId . ':' . $i));
-                    $records[$i]['status'] = 'done';
-                    $records[$i]['tx_ids'] = array_values(array_filter([self::txId($res['response'] ?? null)]));
-                    unset($records[$i]['error']);
+                    // Успех — только при подтверждении с ID транзакции (Poster отвечает
+                    // {"response": <id>} или [<id>]). Валидный JSON без ID ({}, [],
+                    // {"response":null}) PosterAPI не считает ошибкой — для нас это
+                    // неизвестный исход: сверка, без повторной отправки.
+                    $tid = self::txId($res['response'] ?? null);
+                    if ($tid === null) {
+                        $records[$i]['status'] = 'failed';
+                        $records[$i]['outcome'] = 'unknown';
+                        $records[$i]['error'] = 'Poster ответил без ID транзакции';
+                    } else {
+                        $records[$i]['status'] = 'done';
+                        $records[$i]['tx_ids'] = [$tid];
+                        unset($records[$i]['error']);
+                    }
                 } catch (\Throwable $e) {
                     $records[$i]['status'] = 'failed';
                     $records[$i]['error'] = mb_substr($e->getMessage(), 0, 200);

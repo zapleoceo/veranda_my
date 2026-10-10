@@ -883,4 +883,52 @@ final class AiBotFlowTest extends TestCase
         $this->assertCount(6, $this->creates());
         $this->assertCount($before, $this->poster->callsTo('finance.getTransactions'), 'без лишнего вызова Poster');
     }
+
+    /** @return iterable<string,array{mixed}> что PosterAPI::request вернёт на HTTP 200 без error и без ID */
+    public static function responsesWithoutId(): iterable
+    {
+        yield '{} → []' => [[]];
+        yield '[]' => [[]];
+        yield '{"response":null} → весь объект' => [['response' => null]];
+        yield '{"response":true}' => [true];
+        yield '{"response":0}' => [0];
+        yield '{"response":"ok"}' => ['ok'];
+        yield '{"response":{"status":"ok"}}' => [['status' => 'ok']];
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('responsesWithoutId')]
+    public function test_success_without_transaction_id_is_unknown_outcome(mixed $response): void
+    {
+        // Poster ответил 200 с валидным JSON без ID — успех не подтверждён.
+        $this->bootLedger([]);
+        $this->poster->responses['finance.createTransactions'] = function (array $p) use ($response) {
+            // Запись при этом могла создаться — кладём её в «книгу» Poster.
+            $this->ledger[] = ['transaction_id' => 30001, 'account_id' => $p['account_from'], 'category_id' => $p['category'],
+                'type' => 0, 'amount' => (string) (-$p['amount_from'] * 100), 'date' => $p['date'], 'comment' => $p['comment']];
+            return $response;
+        };
+        $this->runSingle('Выплаты: Олег 1 000 000');
+        $recs = json_decode($this->repo->rows[1]['poster_tx_ids_json'], true);
+        $this->assertSame('unverified', $recs[0]['status'], 'не done');
+        $this->assertSame([], $recs[0]['tx_ids'] ?? []);
+        $this->assertSame([30001], array_column($recs[0]['candidates'], 'id'), 'подсказка из Poster');
+        $this->assertSame('reconcile', $this->repo->rows[1]['status']);
+        $this->assertSame('Poster ответил без ID транзакции', $recs[0]['error']);
+        $this->press('fd_go:1');
+        $this->assertCount(1, $this->creates(), 'повторно не отправлено');
+    }
+
+    public function test_success_with_transaction_id_formats(): void
+    {
+        // Поддерживаемые подтверждения: {"response": <id>} (int или строка) и [<id>].
+        foreach ([31001, '31002', [31003]] as $k => $resp) {
+            $this->bootLedger([]);
+            $this->poster->responses['finance.createTransactions'] = fn(array $p) => $resp;
+            $this->runSingle('Выплаты: Олег 1 000 000');
+            $recs = json_decode($this->repo->rows[1]['poster_tx_ids_json'], true);
+            $this->assertSame('done', $recs[0]['status'], "формат #{$k}");
+            $this->assertSame([31001 + $k], $recs[0]['tx_ids']);
+            $this->assertSame('done', $this->repo->rows[1]['status']);
+        }
+    }
 }
