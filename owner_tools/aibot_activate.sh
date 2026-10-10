@@ -114,6 +114,7 @@ restore_env() {
 # 2) токен бота должен уже быть
 TOKEN=$(env_get ai_tg_bot)
 [ -n "$TOKEN" ] || fail "ai_tg_bot_missing (.env не менялся)" 1
+[[ "$TOKEN" =~ ^[0-9]+:[A-Za-z0-9_-]+$ ]] || { TOKEN=""; fail "ai_tg_bot_invalid_format (.env не менялся)" 1; }
 
 # 3) секрет вебхука: существующий оставляем (должен быть [A-Za-z0-9_-]), иначе генерируем
 SECRET=$(env_get AIBOT_WEBHOOK_SECRET)
