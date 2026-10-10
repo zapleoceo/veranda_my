@@ -99,7 +99,14 @@ final class MysqlFinanceDraftRepository implements FinanceDraftRepositoryInterfa
             // Таблица могла быть создана прошлой версией — догоняем колонки подтверждения.
             $has = $this->db->query("SHOW COLUMNS FROM {$t} LIKE 'confirm_nonce'")->fetch();
             if (!$has) {
-                $this->db->query("ALTER TABLE {$t} ADD COLUMN confirm_nonce VARCHAR(16) NULL, ADD COLUMN confirm_nonce_at INT UNSIGNED NULL");
+                try {
+                    $this->db->query("ALTER TABLE {$t} ADD COLUMN confirm_nonce VARCHAR(16) NULL, ADD COLUMN confirm_nonce_at INT UNSIGNED NULL");
+                } catch (\Throwable $e) {
+                    // Параллельный запрос уже добавил колонки (Duplicate column, 1060) — ок.
+                    if (!$this->db->query("SHOW COLUMNS FROM {$t} LIKE 'confirm_nonce'")->fetch()) {
+                        throw $e;
+                    }
+                }
             }
             self::$tableChecked = true;
         }

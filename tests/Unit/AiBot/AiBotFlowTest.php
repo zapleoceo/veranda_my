@@ -1038,4 +1038,32 @@ final class AiBotFlowTest extends TestCase
         $this->assertSame([], $this->successfulCreates());
         $this->assertSame('review', $this->repo->rows[1]['status']);
     }
+
+    public function test_non_owner_stale_dup_press_does_not_rotate_owner_card(): void
+    {
+        $this->boot([], null, [self::OWNER, self::OTHER], [self::CHAT], self::OWNER);
+        $this->ledger = [self::tx(9001, 1000000, 'Олег')];
+        $this->poster->responses['finance.getTransactions'] = fn(array $q) => $this->ledger;
+        $this->runSingle('Выплаты: Олег 1 000 000');
+        $this->assertSame('review', $this->repo->rows[1]['status']);
+        $nonce = $this->nonce();
+        $this->press('fd_rep:1:0', self::OTHER, 0, true);
+        $this->press('fd_skip:1:0:deadbeef', self::OTHER, 0, true);
+        $this->assertSame($nonce, $this->nonce(), 'карточка владельца не «протухла»');
+        // Кнопка владельца по-прежнему действует.
+        $this->press('fd_rep:1:0:' . $nonce, self::OWNER, 0, true);
+        $this->assertCount(1, $this->decisions());
+    }
+
+    public function test_stale_press_on_finished_draft_says_already_done(): void
+    {
+        $this->boot();
+        $this->readyDraft();
+        $data = 'fd_go:1:0:' . $this->nonce();
+        $this->press($data, self::OWNER, 0, true);
+        $this->press($data, self::OWNER, 0, true);
+        $this->assertCount(6, $this->creates());
+        $answers = $this->tg->callsTo('answerCallbackQuery');
+        $this->assertSame('Черновик уже завершён — ничего не внесено повторно', end($answers)['params']['text']);
+    }
 }

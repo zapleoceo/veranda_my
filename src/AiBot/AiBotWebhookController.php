@@ -224,6 +224,14 @@ final class AiBotWebhookController
             return;
         }
 
+        // Решение по дублю — только владелец; проверяется ДО гейта поколения, чтобы
+        // не-владелец не мог даже обновить (и этим «протухнуть») карточку владельца.
+        if ($isDupDecision && !$this->config->canDecideDuplicate($fromId)) {
+            $this->logger->warning('aibot.callback.dup_not_owner', ['draft' => $draftId, 'from' => $fromId]);
+            $this->bot->answerCallbackQuery($cbId, 'Решение по дублю принимает только владелец', true);
+            return;
+        }
+
         $bot = $this->bot->withChatId($chatId);
         // Всё, что ведёт к записи, — только с кнопки ТЕКУЩЕГО поколения карточки,
         // выданного не раньше отсечки активации. Иначе (нажатие из очереди Telegram,
@@ -233,8 +241,10 @@ final class AiBotWebhookController
             && !FinanceDraftService::confirmIsFresh($draft, (string) ($m[4] ?? ''), $this->config->confirmNotBefore)) {
             $this->logger->info('aibot.callback.stale_confirm', ['draft' => $draftId, 'from' => $fromId, 'action' => $action]);
             $card = $this->drafts->renderFresh($draft);
-            $bot->editMessageText($msgId, "🔄 Кнопка устарела — подтвердите заново.\n\n" . $card['text'], $card['keyboard']);
-            $this->bot->answerCallbackQuery($cbId, 'Кнопка устарела — подтвердите заново', true);
+            $finished = in_array((string) ($draft['status'] ?? ''), ['done', 'cancelled'], true);
+            $note = $finished ? 'Черновик уже завершён — ничего не внесено повторно' : 'Кнопка устарела — подтвердите заново';
+            $bot->editMessageText($msgId, ($finished ? '' : "🔄 {$note}.\n\n") . $card['text'], $card['keyboard']);
+            $this->bot->answerCallbackQuery($cbId, $note, !$finished);
             return;
         }
         if ($isDupDecision) {
@@ -242,11 +252,6 @@ final class AiBotWebhookController
             // повторный callback по уже решённой записи ничего не меняет.
             if ($arg === '') {
                 $this->bot->answerCallbackQuery($cbId, 'Неизвестная кнопка', true);
-                return;
-            }
-            if (!$this->config->canDecideDuplicate($fromId)) {
-                $this->logger->warning('aibot.callback.dup_not_owner', ['draft' => $draftId, 'from' => $fromId]);
-                $this->bot->answerCallbackQuery($cbId, 'Решение по дублю принимает только владелец', true);
                 return;
             }
             [$toast, $accepted] = $this->drafts->decideDuplicate($draftId, (int) $arg, $action, $fromId);
