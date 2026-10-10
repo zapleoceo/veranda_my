@@ -118,10 +118,20 @@ final class FinanceDraftService
     {
         $id = (int) ($draft['id'] ?? 0);
         if ($id > 0) {
-            $this->drafts->update($id, ['confirm_nonce' => bin2hex(random_bytes(4)), 'confirm_nonce_at' => ($this->clock)()]);
-            $draft = (array) $this->drafts->get($id);
+            // Под тем же локом, что execute/decideDuplicate: смена поколения атомарна
+            // относительно проверки подтверждения.
+            $draft = $this->lock->synchronized('aibot_fd_' . $id, 10, function () use ($id) {
+                $this->rotateNonce($id);
+                return (array) $this->drafts->get($id);
+            });
         }
         return $this->render($draft);
+    }
+
+    /** Новое поколение карточки. Вызывать только под локом aibot_fd_<id>. */
+    private function rotateNonce(int $id): void
+    {
+        $this->drafts->update($id, ['confirm_nonce' => bin2hex(random_bytes(4)), 'confirm_nonce_at' => ($this->clock)()]);
     }
 
     /** Нажатие подтверждения — с кнопки текущего поколения, выданного не раньше отсечки. */
@@ -152,7 +162,15 @@ final class FinanceDraftService
     {
         // Тот же лок, что у execute(): выбор/отмена не может проскочить между
         // проверкой статуса и началом внесения.
-        return $this->lock->synchronized('aibot_fd_' . $draftId, 10, fn() => $this->applyChoiceLocked($draftId, $action, $arg));
+        // Изменение реквизитов и смена поколения — одной операцией под локом: старое
+        // «Внести» не может пройти проверку и исполниться уже с новыми реквизитами.
+        return $this->lock->synchronized('aibot_fd_' . $draftId, 10, function () use ($draftId, $action, $arg) {
+            $toast = $this->applyChoiceLocked($draftId, $action, $arg);
+            if ($this->drafts->get($draftId) !== null) {
+                $this->rotateNonce($draftId);
+            }
+            return $toast;
+        });
     }
 
     private function applyChoiceLocked(int $draftId, string $action, string $arg): string
@@ -196,14 +214,24 @@ final class FinanceDraftService
      * Внести черновик в Poster. Идемпотентно: повтор после done ничего не
      * шлёт; после partial досылает только незавершённые записи.
      *
-     * @return array{draft:array<string,mixed>, message:string}
+     * $expectedNonce — поколение карточки с нажатой кнопки: сверяется ПОД локом с
+     * перечитанным черновиком (null — без проверки, только для внутренних вызовов
+     * и тестов). Совпало — поколение сразу погашается (одноразовое подтверждение).
+     *
+     * @return array{draft:array<string,mixed>, message:string, stale?:bool}
      */
-    public function execute(int $draftId, int $actorTgId): array
+    public function execute(int $draftId, int $actorTgId, ?string $expectedNonce = null, int $notBefore = 0): array
     {
-        return $this->lock->synchronized('aibot_fd_' . $draftId, 10, function () use ($draftId, $actorTgId) {
+        return $this->lock->synchronized('aibot_fd_' . $draftId, 10, function () use ($draftId, $actorTgId, $expectedNonce, $notBefore) {
             $draft = $this->drafts->get($draftId);
             if ($draft === null) {
                 return ['draft' => [], 'message' => 'Черновик не найден'];
+            }
+            if ($expectedNonce !== null) {
+                if (!self::confirmIsFresh($draft, $expectedNonce, $notBefore)) {
+                    return ['draft' => $draft, 'message' => 'Кнопка устарела — подтвердите заново', 'stale' => true];
+                }
+                $this->rotateNonce($draftId);
             }
             $status = (string) $draft['status'];
             if ($status === 'done' || $status === 'cancelled') {
@@ -716,12 +744,17 @@ final class FinanceDraftService
      *
      * @return array{0:string,1:bool} [текст, решение принято этим вызовом]
      */
-    public function decideDuplicate(int $draftId, int $index, string $decision, int $actorTgId): array
+    public function decideDuplicate(int $draftId, int $index, string $decision, int $actorTgId, ?string $expectedNonce = null, int $notBefore = 0): array
     {
-        return $this->lock->synchronized('aibot_fd_' . $draftId, 10, function () use ($draftId, $index, $decision, $actorTgId) {
+        return $this->lock->synchronized('aibot_fd_' . $draftId, 10, function () use ($draftId, $index, $decision, $actorTgId, $expectedNonce, $notBefore) {
             $draft = $this->drafts->get($draftId);
             if ($draft === null) {
                 return ['Черновик не найден', false];
+            }
+            // Поколение сверяется под локом; не погашается — следом execute() с тем же
+            // поколением вносит именно эту запись.
+            if ($expectedNonce !== null && !self::confirmIsFresh($draft, $expectedNonce, $notBefore)) {
+                return ['Кнопка устарела — подтвердите заново', false, true];
             }
             if ((string) $draft['status'] !== 'review') {
                 return ['Решение уже не требуется', false];

@@ -21,7 +21,7 @@ use Tests\Unit\AiBot\Fakes\InMemoryDraftRepository;
 use Tests\Unit\AiBot\Fakes\RecordingHttp;
 use Tests\Unit\Payday3\Fakes\FixedSettings;
 use Tests\Unit\Payday3\Fakes\InMemoryAuditLog;
-use Tests\Unit\Payday3\Fakes\PassThroughLock;
+use Tests\Unit\AiBot\Fakes\InterleavingLock;
 use Tests\Unit\Payday3\Fakes\ScriptedPoster;
 
 /**
@@ -41,7 +41,7 @@ final class AiBotFlowTest extends TestCase
     public ScriptedPoster $poster;
     public InMemoryDraftRepository $repo;
     public InMemoryAuditLog $audit;
-    public PassThroughLock $lock;
+    public InterleavingLock $lock;
     public AiBotWebhookController $ctl;
     /** @var list<array{level:string,message:string}> */
     public array $logs = [];
@@ -58,7 +58,7 @@ final class AiBotFlowTest extends TestCase
         ]);
         $this->repo = new InMemoryDraftRepository();
         $this->audit = new InMemoryAuditLog();
-        $this->lock = new PassThroughLock();
+        $this->lock = new InterleavingLock();
         $settings = FixedSettings::defaults();
         $lookup = new class implements PosterLookupServiceInterface {
             public function employees(): array { return []; }
@@ -1065,5 +1065,73 @@ final class AiBotFlowTest extends TestCase
         $this->assertCount(6, $this->creates());
         $answers = $this->tg->callsTo('answerCallbackQuery');
         $this->assertSame('Черновик уже завершён — ничего не внесено повторно', end($answers)['params']['text']);
+    }
+
+    // ─── гонка: проверка поколения и запись — под одним локом ───────────────
+
+    private function service(): FinanceDraftService
+    {
+        return (new \ReflectionProperty($this->ctl, 'drafts'))->getValue($this->ctl);
+    }
+
+    public function test_old_go_interleaved_with_account_change_does_not_write(): void
+    {
+        $this->boot();
+        $this->readyDraft();
+        // Нажали «Внести» на актуальной карточке (проверка вне лока проходит), но
+        // пока callback ждал лок, другой callback сменил счёт (и поколение).
+        $this->lock->on = 'aibot_fd_1';
+        $this->lock->before = fn() => $this->service()->applyChoice(1, 'acc', '2');
+        $this->press('fd_go:1');
+        $this->assertSame([], $this->creates(), 'по изменённым реквизитам записи нет');
+        $this->assertSame(2, (int) $this->repo->rows[1]['account_id']);
+        $this->assertSame('draft', $this->repo->rows[1]['status']);
+        $this->assertContains('aibot.callback.stale_confirm', array_column($this->logs, 'message'));
+        // Новое явное подтверждение — уже по новому счёту.
+        $this->press('fd_go:1');
+        $this->assertCount(6, $this->creates());
+        $this->assertSame(2, $this->creates()[0]['params']['account_from']);
+    }
+
+    public function test_old_go_interleaved_with_date_change_does_not_write(): void
+    {
+        $this->boot();
+        $this->readyDraft();
+        $this->lock->on = 'aibot_fd_1';
+        $this->lock->before = fn() => $this->service()->applyChoice(1, 'date', '20261009');
+        $this->press('fd_go:1');
+        $this->assertSame([], $this->creates());
+        $this->assertSame('2026-10-09', $this->repo->rows[1]['tx_date']);
+    }
+
+    public function test_old_rep_interleaved_with_generation_change_does_not_apply(): void
+    {
+        $this->bootLedger([self::tx(9001, 1000000, 'Олег')]);
+        $this->runSingle('Выплаты: Олег 1 000 000');
+        $this->assertSame('review', $this->repo->rows[1]['status']);
+        // «Повторить» проходит проверку вне лока, но карточку успели обновить.
+        $this->lock->on = 'aibot_fd_1';
+        $this->lock->before = fn() => $this->service()->renderFresh($this->repo->rows[1]);
+        $this->press('fd_rep:1:0');
+        $this->assertSame([], $this->decisions());
+        $this->assertSame([], $this->successfulCreates());
+        $this->assertSame('review', $this->repo->rows[1]['status']);
+        // Свежая кнопка — решение принимается.
+        $this->press('fd_rep:1:0');
+        $this->assertCount(1, $this->decisions());
+        $this->assertCount(1, $this->successfulCreates());
+    }
+
+    public function test_confirm_generation_is_single_use_under_lock(): void
+    {
+        // Два одинаковых «Внести» в очереди: второй ждёт лок, первый погашает поколение.
+        $this->boot();
+        $this->readyDraft();
+        $n = $this->repo->rows[1]['confirm_nonce'];
+        $r1 = $this->service()->execute(1, self::OWNER, $n, 0);
+        $r2 = $this->service()->execute(1, self::OWNER, $n, 0);
+        $this->assertSame('done', $r1['draft']['status'] ?? $this->repo->rows[1]['status']);
+        $this->assertTrue($r2['stale'] ?? false);
+        $this->assertCount(6, $this->creates());
     }
 }

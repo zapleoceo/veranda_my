@@ -233,6 +233,7 @@ final class AiBotWebhookController
         }
 
         $bot = $this->bot->withChatId($chatId);
+        $nonce = (string) ($m[4] ?? '');
         // Всё, что ведёт к записи, — только с кнопки ТЕКУЩЕГО поколения карточки,
         // выданного не раньше отсечки активации. Иначе (нажатие из очереди Telegram,
         // со старой карточки, повторная доставка) — записи нет, черновик цел,
@@ -254,21 +255,30 @@ final class AiBotWebhookController
                 $this->bot->answerCallbackQuery($cbId, 'Неизвестная кнопка', true);
                 return;
             }
-            [$toast, $accepted] = $this->drafts->decideDuplicate($draftId, (int) $arg, $action, $fromId);
+            $dec = $this->drafts->decideDuplicate($draftId, (int) $arg, $action, $fromId, $nonce, $this->config->confirmNotBefore);
+            [$toast, $accepted] = $dec;
             $draft = (array) $this->drafts->get($draftId);
             // Вносим только если именно ЭТО нажатие разрешило повтор.
             if ($action === 'skip' || !$accepted) {
                 $card = $this->drafts->renderFresh($draft);
-                $bot->editMessageText($msgId, $card['text'], $card['keyboard']);
-                $this->bot->answerCallbackQuery($cbId, $toast);
+                $prefix = !empty($dec[2]) ? "🔄 {$toast}.\n\n" : '';
+                $bot->editMessageText($msgId, $prefix . $card['text'], $card['keyboard']);
+                $this->bot->answerCallbackQuery($cbId, $toast, !empty($dec[2]));
                 return;
             }
             // Повтор разрешён — вносим только эту запись (остальные уже решены).
         }
         if ($action === 'go' || $action === 'rep') {
-            $res = $this->drafts->execute($draftId, $fromId);
+            $res = $this->drafts->execute($draftId, $fromId, $nonce, $this->config->confirmNotBefore);
             $after = $res['draft'] !== [] ? $res['draft'] : $draft;
             $card = $this->drafts->renderFresh($after);
+            if (!empty($res['stale'])) {
+                // Поколение сменилось между проверкой вне лока и захватом лока.
+                $this->logger->info('aibot.callback.stale_confirm', ['draft' => $draftId, 'from' => $fromId, 'action' => $action, 'under_lock' => true]);
+                $bot->editMessageText($msgId, "🔄 {$res['message']}.\n\n" . $card['text'], $card['keyboard']);
+                $this->bot->answerCallbackQuery($cbId, $res['message'], true);
+                return;
+            }
             $bot->editMessageText($msgId, $card['text'], $card['keyboard']);
             $this->bot->answerCallbackQuery($cbId, $res['message'], !in_array((string) ($after['status'] ?? ''), ['done', 'partial', 'review', 'reconcile'], true));
             if ((string) ($draft['status'] ?? '') !== (string) ($after['status'] ?? '') || (string) ($draft['poster_tx_ids_json'] ?? '') !== (string) ($after['poster_tx_ids_json'] ?? '')) {
