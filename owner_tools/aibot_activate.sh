@@ -2,7 +2,7 @@
 # Активация @Veranda_aibot (финансовые черновики «Инвесторы»).
 #
 # ЗАПУСКАЕТ ТОЛЬКО ВЛАДЕЛЕЦ, на прод-сервере, пользователем veranda_my_usr.
-# Деплой кладёт файл ВНЕ веб-корня: ~/veranda_ops/aibot_activate.sh
+# Деплой кладёт файл ВНЕ веб-корня: ~/veranda_owner_tools/aibot_activate.sh
 #
 # Гарантии:
 #   - секреты (токен бота, секрет вебхука) не печатаются, не попадают в argv
@@ -146,13 +146,13 @@ PENDING=""
 [[ "$INFO" =~ \"pending_update_count\":([0-9]+) ]] && PENDING="${BASH_REMATCH[1]}"
 echo "pending_update_count: ${PENDING:-unknown}"
 [[ "$INFO" == *'"last_error_message"'* ]] && echo "last_error: present (текст не выводится)" || echo "last_error: none"
-[ "$CHECK_OK" = 1 ] || { echo "verify: FAIL — откат: см. ops/aibot_deactivate.sh"; exit 3; }
+[ "$CHECK_OK" = 1 ] || { echo "verify: FAIL — откат: см. owner_tools/aibot_deactivate.sh"; exit 3; }
 
 CODE=$(curl -s -o /dev/null -w '%{http_code}' --max-time 15 -X POST -H 'Content-Type: application/json' -d '{}' "$WEBHOOK_URL" 2>/dev/null) || CODE=000
 if [ "$CODE" = 403 ]; then
   echo "POST без секрета: 403 OK"
 else
-  echo "POST без секрета: $CODE (ожидалось 403) — откат: см. ops/aibot_deactivate.sh"
+  echo "POST без секрета: $CODE (ожидалось 403) — откат: см. owner_tools/aibot_deactivate.sh"
   exit 4
 fi
 echo "DONE"

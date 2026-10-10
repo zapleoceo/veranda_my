@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Тесты ops/aibot_activate.sh / aibot_deactivate.sh на заглушках — без сети и
+# Тесты owner_tools/aibot_activate.sh / aibot_deactivate.sh на заглушках — без сети и
 # без настоящих секретов. Каждый внешний процесс, который запускают скрипты,
 # идёт через «шим», записывающий свой argv в лог; затем проверяется, что ни
 # токен, ни секрет не попали ни в один argv и ни в вывод.
@@ -57,7 +57,7 @@ setup() { # $1 = содержимое .env (printf-формат), далее а�
 }
 run() { # $1 = скрипт
   HOME="$WORK/home" AIBOT_APP_DIR="$WORK/app" PATH="$SHIMS:$STUBS:$REAL_PATH" \
-    bash "$ROOT/ops/$1" "${@:2}" > "$WORK/out.txt" 2>&1
+    bash "$ROOT/owner_tools/$1" "${@:2}" > "$WORK/out.txt" 2>&1
   echo $?
 }
 no_leak() { # $1 = имя кейса
