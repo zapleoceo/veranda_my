@@ -16,7 +16,8 @@
 #      через DoH 1.1.1.1 (локальный резолвер хостинга его не резолвит);
 #   6) печатает только безопасную проверку.
 #
-# Откат: см. scripts/aibot_deactivate.txt (или ответ в чате).
+# Откат: deleteWebhook (без сброса очереди) и восстановление .env из бэкапа
+#   ~/.aibot_env_backups/.env.bak.<ts> — команды в описании задачи / чате.
 set -euo pipefail
 umask 077
 
@@ -45,10 +46,13 @@ env_set() {
 }
 
 # 1) бэкап
+# Бэкап — ВНЕ веб-корня (в нём все секреты), права 600.
 TS=$(date +%s)
-cp -p "$ENV" "$ENV.bak.$TS"
-chmod 600 "$ENV.bak.$TS"
-echo "backup: $ENV.bak.$TS"
+BAKDIR="${HOME:-/var/www/veranda_my_usr/data}/.aibot_env_backups"
+mkdir -p "$BAKDIR" && chmod 700 "$BAKDIR"
+case "$BAKDIR" in "$APP"/*) echo "ERR: каталог бэкапа внутри веб-корня"; exit 1;; esac
+install -m 600 "$ENV" "$BAKDIR/.env.bak.$TS"
+echo "backup: $BAKDIR/.env.bak.$TS"
 
 # 3) токен бота должен уже быть
 TOKEN=$(env_get ai_tg_bot)
@@ -61,10 +65,13 @@ if [ -z "$SECRET" ]; then
   env_set AIBOT_WEBHOOK_SECRET "$SECRET"
   echo "AIBOT_WEBHOOK_SECRET: создан"
 else
+  case "$SECRET" in *[!A-Za-z0-9_-]*) echo "ERR: существующий AIBOT_WEBHOOK_SECRET содержит недопустимые символы — исправьте вручную"; exit 1;; esac
   echo "AIBOT_WEBHOOK_SECRET: уже был, оставлен"
 fi
 
-# 4) владелец, режим любой группы, отсечка старых подтверждений
+# 4) владелец, режим любой группы, отсечка старых подтверждений.
+#    Повторный запуск сдвигает отсечку: кнопки карточек, выданных раньше,
+#    перестанут подтверждать (карточка обновится с просьбой подтвердить заново).
 env_set AIBOT_FINANCE_ALLOWED_TG_IDS "$OWNER_ID"
 env_set AIBOT_FINANCE_ANY_GROUP 1
 env_set AIBOT_CONFIRM_NOT_BEFORE "$TS"
