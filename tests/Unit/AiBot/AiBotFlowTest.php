@@ -210,9 +210,10 @@ final class AiBotFlowTest extends TestCase
     public function test_already_in_poster_nothing_sent(): void
     {
         $existing = [];
-        foreach ([11895 => 5000000, 11896 => 378800, 11897 => 3693200, 11898 => 3978800, 11899 => 4057200, 11900 => 2436000] as $id => $vnd) {
+        // Как в реальном Poster: комментарий — имя получателя.
+        foreach ([11895 => [5000000, 'Олег'], 11896 => [378800, 'Олег'], 11897 => [3693200, 'Дима'], 11898 => [3978800, 'Ли'], 11899 => [4057200, 'Игорь'], 11900 => [2436000, 'Стас']] as $id => [$vnd, $who]) {
             $existing[] = ['transaction_id' => $id, 'account_id' => 1, 'category_id' => 22, 'type' => 0,
-                'amount' => (string) (-$vnd * 100), 'date' => '2026-10-09 15:00:00'];
+                'amount' => (string) (-$vnd * 100), 'date' => '2026-10-09 15:00:00', 'comment' => $who];
         }
         foreach (['parts', 'person'] as $mode) {
             $this->boot($existing);
@@ -226,13 +227,15 @@ final class AiBotFlowTest extends TestCase
             $this->assertSame([], $this->creates(), "режим {$mode}: всё уже внесено");
             $recs = json_decode($this->repo->rows[1]['poster_tx_ids_json'], true);
             $this->assertSame(['dup'], array_values(array_unique(array_column($recs, 'status'))));
-            $ids = array_merge(...array_column($recs, 'tx_ids'));
+            $this->assertSame('review', $this->repo->rows[1]['status']);
+            $ids = array_column(array_merge(...array_column($recs, 'dup_of')), 'id');
             sort($ids);
             $this->assertSame([11895, 11896, 11897, 11898, 11899, 11900], $ids);
             $q = $this->poster->callsTo('finance.getTransactions')[0]['params'];
             $this->assertSame(['20261007', '20261013', 1], [$q['dateFrom'], $q['dateTo'], $q['account_id']]);
             $edit = $this->tg->callsTo('editMessageText');
-            $this->assertStringContainsString('уже внесено (#11895', end($edit)['params']['text']);
+            $this->assertStringContainsString('возможный дубль: #1189', end($edit)['params']['text']);
+            $this->assertStringContainsString('Повторить?', end($edit)['params']['text']);
         }
     }
 
@@ -460,5 +463,150 @@ final class AiBotFlowTest extends TestCase
         $this->press('fd_go:1');
         $this->assertSame([], $this->creates());
         $this->assertSame('draft', $this->repo->rows[1]['status']);
+    }
+
+    // ─── возможные дубли: сумма + имя + счёт + кат. 22 ± 3 дня ───────────────
+
+    /** @var list<array<string,mixed>> живая «книга» Poster: создания попадают сюда */
+    private array $ledger = [];
+
+    private function bootLedger(array $existing): void
+    {
+        $this->ledger = $existing;
+        $this->boot([], function (array $p) {
+            $id = ++$this->nextTx;
+            $this->ledger[] = ['transaction_id' => $id, 'account_id' => $p['account_from'], 'category_id' => $p['category'],
+                'type' => 0, 'amount' => (string) (-$p['amount_from'] * 100), 'date' => $p['date'], 'comment' => $p['comment']];
+            return $id;
+        });
+        $this->poster->responses['finance.getTransactions'] = fn(array $q) => $this->ledger;
+    }
+
+    private static function tx(int $id, int $vnd, string $comment, int $acc = 1, int $cat = 22): array
+    {
+        return ['transaction_id' => $id, 'account_id' => $acc, 'category_id' => $cat, 'type' => 0,
+            'amount' => (string) (-$vnd * 100), 'date' => '2026-10-09 15:00:00', 'comment' => $comment];
+    }
+
+    private function runSingle(string $source): void
+    {
+        $this->post(self::command([], $source));
+        $this->press('fd_acc:1:1');
+        $this->press('fd_date:1:20261010');
+        $this->press('fd_go:1');
+    }
+
+    private function decisions(): array
+    {
+        return array_values(array_filter($this->audit->rows, fn($r) => $r['action'] === 'aibot.finance_draft.duplicate_decision'));
+    }
+
+    public function test_equal_payout_same_person_asks_and_repeats_on_confirm(): void
+    {
+        $this->bootLedger([self::tx(9001, 1000000, 'Олег')]);
+        $this->runSingle('Выплаты: Олег 1 000 000');
+        $this->assertSame([], $this->creates(), 'возможный дубль по умолчанию не вносится');
+        $this->assertSame('review', $this->repo->rows[1]['status']);
+        $journal = array_values(array_filter($this->tg->callsTo('sendMessage'), fn($c) => str_contains($c['params']['text'], '📒')));
+        $this->assertCount(1, $journal, 'бот пишет владельцу о дубле');
+        $this->assertStringContainsString('возможный дубль: #9001 от 09.10.2026, 1 000 000, «Олег». Повторить?', $journal[0]['params']['text']);
+        $card = $this->ctlRender();
+        $this->assertSame(['fd_rep:1:0', 'fd_skip:1:0'], array_column($card['keyboard'][0], 'callback_data'));
+
+        $this->audit->rows = [];
+        $this->press('fd_rep:1:0');
+        $c = $this->creates();
+        $this->assertCount(1, $c, 'явное разрешение → ровно один повтор');
+        $this->assertSame(1000000, $c[0]['params']['amount_from']);
+        $this->assertSame('done', $this->repo->rows[1]['status']);
+        $d = $this->decisions();
+        $this->assertCount(1, $d);
+        $this->assertSame('repeat', $d[0]['payload']['decision']);
+        $this->assertSame('tg:' . self::OWNER, $d[0]['email']);
+        $this->assertSame(9001, $d[0]['payload']['dup_of'][0]['id']);
+
+        // Повтор callback, повторное «Внести», повторный триггер — новых записей нет.
+        $this->press('fd_rep:1:0');
+        $this->press('fd_go:1');
+        $this->post(self::command(['message_id' => 601], 'Выплаты: Олег 1 000 000'));
+        $this->assertCount(1, $this->creates());
+        $this->assertCount(1, $this->decisions(), 'повторный callback не пишет второе решение');
+    }
+
+    public function test_equal_payout_same_person_declined_is_not_entered(): void
+    {
+        $this->bootLedger([self::tx(9001, 1000000, 'Дивиденды август — Олег')]);
+        $this->runSingle('Выплаты: Олег 1 000 000');
+        $this->press('fd_skip:1:0');
+        $this->assertSame([], $this->creates());
+        $this->assertSame('done', $this->repo->rows[1]['status']);
+        $recs = json_decode($this->repo->rows[1]['poster_tx_ids_json'], true);
+        $this->assertSame('skipped', $recs[0]['status']);
+        $d = $this->decisions();
+        $this->assertCount(1, $d);
+        $this->assertSame('skip', $d[0]['payload']['decision']);
+        // Передумать после отказа нельзя: решение уже принято.
+        $this->press('fd_rep:1:0');
+        $this->press('fd_go:1');
+        $this->assertSame([], $this->creates());
+    }
+
+    public function test_equal_amount_other_person_is_not_a_duplicate(): void
+    {
+        $this->bootLedger([self::tx(9001, 1000000, 'Олег')]);
+        $this->runSingle('Выплаты: Дима 1 000 000');
+        $this->assertCount(1, $this->creates());
+        $this->assertSame('done', $this->repo->rows[1]['status']);
+    }
+
+    public function test_name_must_match_as_a_whole_word(): void
+    {
+        // «Ли» не совпадает с «Ливия».
+        $this->bootLedger([self::tx(9001, 1000000, 'Ливия, оплата')]);
+        $this->runSingle('Выплаты: Ли 1 000 000');
+        $this->assertCount(1, $this->creates());
+    }
+
+    public function test_other_account_or_category_is_not_a_duplicate(): void
+    {
+        $this->bootLedger([self::tx(9001, 1000000, 'Олег', 2), self::tx(9002, 1000000, 'Олег', 1, 5)]);
+        $this->runSingle('Выплаты: Олег 1 000 000');
+        $this->assertCount(1, $this->creates());
+        $this->assertSame('done', $this->repo->rows[1]['status']);
+    }
+
+    public function test_approved_repeat_crash_retry_does_not_double(): void
+    {
+        $this->bootLedger([self::tx(9001, 1000000, 'Олег')]);
+        $this->runSingle('Выплаты: Олег 1 000 000');
+        $this->press('fd_rep:1:0');
+        $this->assertCount(1, $this->creates());
+        // Процесс «умер» сразу после отправки: запись в sending, исход неизвестен,
+        // но в Poster транзакция уже есть (ledger).
+        $recs = json_decode($this->repo->rows[1]['poster_tx_ids_json'], true);
+        $recs[0]['status'] = 'sending';
+        $recs[0]['tx_ids'] = [];
+        $this->repo->update(1, ['status' => 'executing', 'heartbeat_at' => self::NOW - 300,
+            'poster_tx_ids_json' => json_encode($recs, JSON_UNESCAPED_UNICODE)]);
+        $this->audit->rows = [];
+        $this->press('fd_go:1');
+        $this->assertCount(1, $this->creates(), 'повтор после краша нашёл свою же транзакцию');
+        $recs = json_decode($this->repo->rows[1]['poster_tx_ids_json'], true);
+        $this->assertSame('done', $recs[0]['status']);
+        $this->assertSame([20001], $recs[0]['tx_ids']);
+        $this->assertSame('done', $this->repo->rows[1]['status']);
+    }
+
+    public function test_duplicate_decision_by_other_user_is_denied(): void
+    {
+        $this->bootLedger([self::tx(9001, 1000000, 'Олег')]);
+        $this->runSingle('Выплаты: Олег 1 000 000');
+        $this->press('fd_rep:1:0', self::OTHER);
+        $this->press('fd_skip:1:0', self::OTHER);
+        $this->assertSame([], $this->creates());
+        $this->assertSame('review', $this->repo->rows[1]['status']);
+        $recs = json_decode($this->repo->rows[1]['poster_tx_ids_json'], true);
+        $this->assertSame('dup', $recs[0]['status']);
+        $this->assertSame([], $this->decisions());
     }
 }

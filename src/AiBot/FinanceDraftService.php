@@ -22,7 +22,10 @@ use App\Payday3\Domain\Actor;
  *   - у каждой записи свой статус и Poster tx id; при повторе записи в
  *     статусе done/dup не отправляются заново;
  *   - перед записью — сверка с Poster (тот же счёт, категория 22, ±3 дня,
- *     та же сумма): совпавшее помечается «уже внесено (#id)» и пропускается.
+ *     та же сумма и имя получателя словом в комментарии): совпавшее — «возможный
+ *     дубль» с данными исходной транзакции, по умолчанию НЕ вносится; черновик
+ *     ждёт решения (review). Повтор вносится только по явной кнопке владельца,
+ *     решение пишется в аудит; повторный callback ничего не меняет.
  */
 final class FinanceDraftService
 {
@@ -35,6 +38,9 @@ final class FinanceDraftService
     private const DATE_PICK_DAYS = 6;
     private const EXEC_STALE_SEC = 120;
     public const MAX_PEOPLE = 30;
+
+    /** Записи, которые execute() не трогает: внесены, ждут решения по дублю, пропущены владельцем. */
+    private const SETTLED = ['done', 'dup', 'skipped'];
 
     /** @var array<int,string>|null */
     private ?array $accountNames = null;
@@ -206,7 +212,7 @@ final class FinanceDraftService
 
             $datetime = $this->txDateTime($date);
             foreach ($records as $i => $rec) {
-                if (in_array($rec['status'], ['done', 'dup'], true)) {
+                if (in_array($rec['status'], self::SETTLED, true)) {
                     continue;
                 }
                 // «sending» фиксируется ДО вызова: если процесс умрёт посреди, при
@@ -234,7 +240,9 @@ final class FinanceDraftService
             }
 
             $failed = count(array_filter($records, static fn(array $r) => $r['status'] === 'failed'));
-            $final = $failed > 0 ? 'partial' : 'done';
+            $open = count(array_filter($records, static fn(array $r) => $r['status'] === 'dup'));
+            // Возможные дубли не вносятся — ждут явного решения владельца (review).
+            $final = $failed > 0 ? 'partial' : ($open > 0 ? 'review' : 'done');
             $this->drafts->update($draftId, ['status' => $final, 'poster_tx_ids_json' => self::enc($records)]);
 
             try {
@@ -254,7 +262,11 @@ final class FinanceDraftService
 
             return [
                 'draft' => (array) $this->drafts->get($draftId),
-                'message' => $final === 'done' ? 'Готово' : 'Часть записей не внесена — можно повторить',
+                'message' => match ($final) {
+                    'done' => 'Готово',
+                    'review' => 'Есть возможные дубли — решите, повторять ли',
+                    default => 'Часть записей не внесена — можно повторить',
+                },
             ];
         });
     }
@@ -421,7 +433,7 @@ final class FinanceDraftService
      */
     private function markDuplicates(array $records, int $accountId, string $date): array
     {
-        $pending = array_filter($records, static fn(array $r) => !in_array($r['status'], ['done', 'dup'], true));
+        $pending = array_filter($records, static fn(array $r) => !in_array($r['status'], self::SETTLED, true));
         if ($pending === []) {
             return $records;
         }
@@ -445,7 +457,7 @@ final class FinanceDraftService
                 $own[(int) $tid] = true;
             }
         }
-        $pool = []; // tx_id → сумма VND
+        $pool = []; // tx_id → {amount VND, comment, date}
         foreach ($rows as $t) {
             if (!is_array($t)) {
                 continue;
@@ -458,42 +470,140 @@ final class FinanceDraftService
             if ($acc !== $accountId) {
                 continue;
             }
-            // finance.getTransactions отдаёт сумму в копейках (×100), расход — со знаком «−».
-            $pool[$tid] = (int) round(abs((float) ($t['amount'] ?? 0)) / 100);
+            $pool[$tid] = [
+                // finance.getTransactions отдаёт сумму в копейках (×100), расход — со знаком «−».
+                'amount' => (int) round(abs((float) ($t['amount'] ?? 0)) / 100),
+                'comment' => trim((string) ($t['comment'] ?? '')),
+                'date' => (string) ($t['date'] ?? ''),
+            ];
         }
 
         foreach ($records as $i => $r) {
-            if (in_array($r['status'], ['done', 'dup'], true)) {
+            $st = (string) $r['status'];
+            if (in_array($st, self::SETTLED, true)) {
                 continue;
             }
-            $hit = array_search((int) $r['amount'], $pool, true);
-            if ($hit !== false) {
-                unset($pool[$hit]);
-                $records[$i]['status'] = 'dup';
-                $records[$i]['tx_ids'] = [(int) $hit];
+            $approved = !empty($r['repeat_ok']);
+            if ($approved) {
+                // Владелец разрешил повтор: исходную транзакцию (dup_of) больше не
+                // сравниваем. Совпадение с ДРУГОЙ транзакцией возможно только если
+                // наш собственный повтор уже дошёл до Poster (упали после отправки) —
+                // тогда это и есть наша запись, второй раз не шлём.
+                if ($st !== 'sending') {
+                    continue;
+                }
+                $skip = array_flip(array_map('intval', array_column((array) ($r['dup_of'] ?? []), 'id')));
+                $hit = self::findMatch($pool, (int) $r['amount'], (string) $r['name'], $skip);
+                if ($hit !== null) {
+                    unset($pool[$hit]);
+                    $records[$i]['status'] = 'done';
+                    $records[$i]['tx_ids'] = [$hit];
+                }
                 continue;
             }
-            $parts = (array) ($r['parts'] ?? []);
-            if (count($parts) > 1) {
-                $try = $pool;
-                $ids = [];
-                foreach ($parts as $amt) {
-                    $h = array_search((int) $amt, $try, true);
-                    if ($h === false) {
-                        $ids = [];
-                        break;
+            $ids = [];
+            $hit = self::findMatch($pool, (int) $r['amount'], (string) $r['name']);
+            if ($hit !== null) {
+                $ids = [$hit];
+            } else {
+                $parts = (array) ($r['parts'] ?? []);
+                if (count($parts) > 1) {
+                    $try = $pool;
+                    foreach ($parts as $amt) {
+                        $h = self::findMatch($try, (int) $amt, (string) $r['name']);
+                        if ($h === null) {
+                            $ids = [];
+                            break;
+                        }
+                        unset($try[$h]);
+                        $ids[] = $h;
                     }
-                    unset($try[$h]);
-                    $ids[] = (int) $h;
                 }
-                if ($ids !== []) {
-                    $pool = $try;
-                    $records[$i]['status'] = 'dup';
-                    $records[$i]['tx_ids'] = $ids;
-                }
+            }
+            if ($ids === []) {
+                continue;
+            }
+            $records[$i]['status'] = 'dup';
+            $records[$i]['tx_ids'] = [];
+            $records[$i]['dup_of'] = array_map(static fn(int $id) => ['id' => $id] + $pool[$id], $ids);
+            foreach ($ids as $id) {
+                unset($pool[$id]);
             }
         }
         return $records;
+    }
+
+    /**
+     * Транзакция Poster той же суммы, в комментарии которой есть имя получателя.
+     *
+     * @param array<int,array{amount:int,comment:string,date:string}> $pool
+     * @param array<int,mixed> $skip tx_id, которые не рассматривать
+     */
+    private static function findMatch(array $pool, int $amount, string $name, array $skip = []): ?int
+    {
+        $name = trim($name);
+        if ($name === '') {
+            return null;
+        }
+        foreach ($pool as $tid => $t) {
+            if (isset($skip[$tid]) || $t['amount'] !== $amount) {
+                continue;
+            }
+            if (preg_match('/(?<!\p{L})' . preg_quote($name, '/') . '(?!\p{L})/iu', $t['comment'])) {
+                return (int) $tid;
+            }
+        }
+        return null;
+    }
+
+    // ─── возможные дубли: решение владельца ────────────────────────────────
+
+    /**
+     * Решение по записи-«возможному дублю»: 'rep' — внести повтор, 'skip' — не
+     * вносить. Только для статуса dup; повторный callback ничего не меняет.
+     * Повтор не отправляется здесь — после 'rep' вызывающий запускает execute().
+     */
+    public function decideDuplicate(int $draftId, int $index, string $decision, int $actorTgId): string
+    {
+        return $this->lock->synchronized('aibot_fd_' . $draftId, 10, function () use ($draftId, $index, $decision, $actorTgId) {
+            $draft = $this->drafts->get($draftId);
+            if ($draft === null) {
+                return 'Черновик не найден';
+            }
+            if ((string) $draft['status'] !== 'review') {
+                return 'Решение уже не требуется';
+            }
+            $records = self::dec($draft['poster_tx_ids_json'] ?? null);
+            if (!isset($records[$index]) || (string) $records[$index]['status'] !== 'dup') {
+                return 'По этой записи решение уже принято';
+            }
+            if ($decision === 'rep') {
+                $records[$index]['status'] = 'pending';
+                $records[$index]['repeat_ok'] = true;
+                $toast = 'Повтор разрешён — вношу';
+            } else {
+                $records[$index]['status'] = 'skipped';
+                $toast = 'Не вношу';
+            }
+            $open = count(array_filter($records, static fn(array $r) => $r['status'] === 'dup'));
+            $pending = count(array_filter($records, static fn(array $r) => in_array($r['status'], ['pending', 'failed', 'sending'], true)));
+            $status = $pending > 0 ? 'partial' : ($open > 0 ? 'review' : 'done');
+            $this->drafts->update($draftId, ['status' => $status, 'poster_tx_ids_json' => self::enc($records)]);
+            try {
+                $this->audit->record('tg:' . $actorTgId, 'aibot.finance_draft.duplicate_decision', [
+                    'draft_id' => $draftId,
+                    'chat_id' => $draft['chat_id'],
+                    'record' => $index,
+                    'decision' => $decision === 'rep' ? 'repeat' : 'skip',
+                    'amount' => (int) $records[$index]['amount'],
+                    'comment' => (string) $records[$index]['comment'],
+                    'dup_of' => $records[$index]['dup_of'] ?? [],
+                ]);
+            } catch (\Throwable $e) {
+                error_log('[aibot.finance] audit write failed: ' . $e->getMessage());
+            }
+            return $toast;
+        });
     }
 
     /** «executing» без движения дольше EXEC_STALE_SEC — процесс умер посреди внесения. */
@@ -507,6 +617,20 @@ final class FinanceDraftService
     {
         $id = (int) $draft['id'];
         $status = (string) $draft['status'];
+        if ($status === 'review') {
+            $kb = [];
+            foreach (self::dec($draft['poster_tx_ids_json'] ?? null) as $i => $r) {
+                if ((string) $r['status'] !== 'dup') {
+                    continue;
+                }
+                $label = mb_substr((string) $r['name'], 0, 20) . ' ' . PayoutParser::fmt((int) $r['amount']);
+                $kb[] = [
+                    ['text' => '🔁 Повторить: ' . $label, 'callback_data' => 'fd_rep:' . $id . ':' . $i],
+                    ['text' => '✖️ Не вносить', 'callback_data' => 'fd_skip:' . $id . ':' . $i],
+                ];
+            }
+            return $kb;
+        }
         if ($status === 'partial' || ($status === 'executing' && $this->isStale($draft))) {
             return [[['text' => '🔁 Повторить незавершённые', 'callback_data' => 'fd_go:' . $id]]];
         }
@@ -610,11 +734,26 @@ final class FinanceDraftService
         $ids = implode(', ', array_map(static fn($t) => '#' . (int) $t, (array) ($r['tx_ids'] ?? [])));
         return match ((string) $r['status']) {
             'done' => '✅ ' . $head . ($ids !== '' ? ' → ' . $ids : ''),
-            'dup' => '↩️ ' . $head . ' — уже внесено (' . $ids . ')',
+            'dup' => '⚠️ ' . $head . ' — возможный дубль: ' . self::dupLine($r) . '. Повторить?',
+            'skipped' => '↩️ ' . $head . ' — не внесено (дубль: ' . self::dupLine($r) . ')',
             'failed' => '❌ ' . $head . ' — ' . self::h((string) ($r['error'] ?? 'ошибка')),
             'sending' => '⏳ ' . $head . ' — исход неизвестен, проверится при повторе',
             default => '• ' . $head,
         };
+    }
+
+    /** «#id от дд.мм.гггг, сумма, «комментарий»» исходных транзакций Poster. */
+    private static function dupLine(array $r): string
+    {
+        $out = [];
+        foreach ((array) ($r['dup_of'] ?? []) as $t) {
+            $d = (string) ($t['date'] ?? '');
+            $out[] = '#' . (int) ($t['id'] ?? 0)
+                . ($d !== '' ? ' от ' . self::dm(substr($d, 0, 10), true) : '')
+                . ', ' . PayoutParser::fmt((int) ($t['amount'] ?? 0))
+                . ', «' . self::h(mb_substr((string) ($t['comment'] ?? ''), 0, 80)) . '»';
+        }
+        return $out === [] ? '—' : implode('; ', $out);
     }
 
     private static function statusLabel(string $s): string
@@ -624,6 +763,7 @@ final class FinanceDraftService
             'executing' => 'вносится',
             'done' => 'внесён',
             'partial' => 'внесён частично',
+            'review' => 'ждёт решения по дублям',
             'cancelled' => 'отменён',
             default => $s,
         };

@@ -25,7 +25,7 @@ final class AiBotWebhookController
 {
     private const TRIGGER_RE = '/^\s*(?:@\w+[\s,:]*)?(?:внеси|занеси|запиши|проведи)(?![\p{L}])/iu';
     private const INTENT_RE = '/инвестор|дивиденд/iu';
-    private const CALLBACK_RE = '/^fd_(acc|date|split|go|cancel):(\d+)(?::(\d+))?$/';
+    private const CALLBACK_RE = '/^fd_(acc|date|split|go|cancel|rep|skip):(\d+)(?::(\d+))?$/';
 
     /** @var \Closure(): int */
     private \Closure $clock;
@@ -222,14 +222,27 @@ final class AiBotWebhookController
         }
 
         $bot = $this->bot->withChatId($chatId);
-        if ($action === 'go') {
+        if ($action === 'rep' || $action === 'skip') {
+            // Решение по «возможному дублю» — только по явной кнопке владельца;
+            // повторный callback по уже решённой записи ничего не меняет.
+            $toast = $this->drafts->decideDuplicate($draftId, (int) $arg, $action, $fromId);
+            $draft = (array) $this->drafts->get($draftId);
+            if ($action === 'skip' || (string) ($draft['status'] ?? '') !== 'partial') {
+                $card = $this->drafts->render($draft);
+                $bot->editMessageText($msgId, $card['text'], $card['keyboard']);
+                $this->bot->answerCallbackQuery($cbId, $toast);
+                return;
+            }
+            // Повтор разрешён — вносим только эту запись (остальные уже решены).
+        }
+        if ($action === 'go' || $action === 'rep') {
             $res = $this->drafts->execute($draftId, $fromId);
             $after = $res['draft'] !== [] ? $res['draft'] : $draft;
             $card = $this->drafts->render($after);
             $bot->editMessageText($msgId, $card['text'], $card['keyboard']);
-            $this->bot->answerCallbackQuery($cbId, $res['message'], !in_array((string) ($after['status'] ?? ''), ['done', 'partial'], true));
+            $this->bot->answerCallbackQuery($cbId, $res['message'], !in_array((string) ($after['status'] ?? ''), ['done', 'partial', 'review'], true));
             if ((string) ($draft['status'] ?? '') !== (string) ($after['status'] ?? '') || (string) ($draft['poster_tx_ids_json'] ?? '') !== (string) ($after['poster_tx_ids_json'] ?? '')) {
-                if (in_array((string) ($after['status'] ?? ''), ['done', 'partial'], true)) {
+                if (in_array((string) ($after['status'] ?? ''), ['done', 'partial', 'review'], true)) {
                     $bot->sendMessageWithKeyboard($this->drafts->journal($after), [], null, $msgId);
                 }
             }
