@@ -11,7 +11,7 @@ final class MysqlOfficeTaskRepository implements OfficeTaskRepositoryInterface
 {
     private const TASK_COLUMNS = [
         'task_key', 'chat_id', 'thread_id', 'origin_message_id', 'origin_user_id', 'update_id', 'text',
-        'context_json', 'status', 'revision', 'last_question_id', 'last_question_msg_id', 'result_delivered_at',
+        'context_json', 'media_json', 'media_status', 'status', 'revision', 'last_question_id', 'last_question_msg_id', 'result_delivered_at',
     ];
     private const OUTBOX_COLUMNS = [
         'idempotency_key', 'task_key', 'kind', 'payload_json', 'status', 'attempts', 'next_attempt_at', 'last_error',
@@ -33,6 +33,8 @@ final class MysqlOfficeTaskRepository implements OfficeTaskRepositoryInterface
             update_id BIGINT NOT NULL,
             text TEXT NOT NULL,
             context_json LONGTEXT NULL,
+            media_json LONGTEXT NULL,
+            media_status VARCHAR(16) NOT NULL DEFAULT 'none',
             status VARCHAR(24) NOT NULL DEFAULT 'queued_local',
             revision INT NOT NULL DEFAULT 1,
             last_question_id VARCHAR(64) NULL,

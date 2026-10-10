@@ -116,6 +116,34 @@ final class AdminAccessGateTest extends TestCase
         }
     }
 
+    public function test_aibot_office_is_separate_explicit_checkbox(): void
+    {
+        $_SESSION['user_permissions'] = ['admin' => true];
+        $_SESSION['admin_access_csrf'] = 'tok';
+        $statement = $this->createMock(\PDOStatement::class);
+        $statement->method('fetchAll')->willReturn([]);
+        $saved = null;
+        $db = $this->createMock(Database::class);
+        $db->method('t')->willReturn('users');
+        $db->method('query')->willReturnCallback(function ($sql, $params = []) use ($statement, &$saved) {
+            if (str_starts_with($sql, 'UPDATE')) $saved = [$sql, $params];
+            return $statement;
+        });
+        $body = ['save_user_permissions' => '1', 'perm_email' => 'owner@example.com', 'csrf' => 'tok',
+            'perm_aibot_office' => '1', 'perm_tg_user_id' => '169510539'];
+        $request = (new ServerRequestFactory())->createServerRequest('POST', '/admin/access')->withParsedBody($body);
+        $response = (new AccessController($db))->index($request, new Response());
+        self::assertSame(200, $response->getStatusCode());
+        $perms = json_decode($saved[1][0], true);
+        self::assertSame(1, $perms['aibot_office']);
+        self::assertSame(0, $perms['aibot_finance'], 'office не включает finance');
+        $html = (string) $response->getBody();
+        self::assertStringContainsString('name="perm_aibot_office"', $html);
+        self::assertStringContainsString('Бот: задачи в офис (Telegram)', $html);
+        $c = new \ReflectionClassConstant(\App\Services\UserPermissionsService::class, 'DEFAULTS');
+        self::assertFalse($c->getValue()['aibot_office']);
+    }
+
     public function test_aibot_finance_is_explicit_checkbox_and_tg_id_is_saved(): void
     {
         $_SESSION['user_permissions'] = ['admin' => true];

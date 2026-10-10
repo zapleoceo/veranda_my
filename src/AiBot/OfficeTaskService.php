@@ -77,6 +77,10 @@ final class OfficeTaskService
                 return false; // обычная переписка
             }
         } elseif ($taskText === null) {
+            if ($text === '' && self::extractMedia($msg) !== []) {
+                // Голос/фото без подписи нельзя адресовать @упоминанием.
+                $this->logger->info('aibot.office.skip.media_no_caption', ['chat' => $chatId, 'msg' => $msg['message_id'] ?? null]);
+            }
             return false;
         }
 
@@ -160,9 +164,10 @@ final class OfficeTaskService
         $threadId = !empty($msg['is_topic_message']) ? (int) ($msg['message_thread_id'] ?? 0) : null;
         $taskKey = 'vb-' . $chatId . '-' . $messageId;
         $context = $this->replyContext($msg);
+        $media = self::extractMedia($msg);
 
         $this->lock->synchronized('aibot_office_msg_' . $chatId . '_' . $messageId, self::LOCK_TIMEOUT,
-            function () use ($chatId, $messageId, $fromId, $threadId, $taskKey, $taskText, $updateId, $context): void {
+            function () use ($chatId, $messageId, $fromId, $threadId, $taskKey, $taskText, $updateId, $context, $media): void {
                 $existing = $this->repo->findTaskByOrigin($chatId, $messageId);
                 $created = $existing === null;
                 if ($created) {
@@ -175,6 +180,8 @@ final class OfficeTaskService
                         'update_id' => $updateId,
                         'text' => $taskText,
                         'context_json' => $context !== null ? self::enc($context) : null,
+                        'media_json' => $media !== [] ? self::enc($media) : null,
+                        'media_status' => $media !== [] ? 'pending' : 'none',
                         'status' => self::STATUS_QUEUED,
                         'revision' => 1,
                     ]);
@@ -195,6 +202,7 @@ final class OfficeTaskService
                             'update_id' => $updateId,
                             'text' => $taskText,
                             'context' => $context,
+                            'media' => $media,
                             'revision' => 1,
                         ]),
                         'status' => 'pending',
@@ -206,7 +214,8 @@ final class OfficeTaskService
                     return;
                 }
                 $this->bot->withChatId($chatId)->sendMessageWithKeyboard(
-                    '🗂 Задача #' . $this->shortId($existing, $taskKey) . ' принята, ждёт отправки в офис',
+                    '🗂 Задача #' . $this->shortId($existing, $taskKey) . ' принята'
+                    . ($media !== [] ? ' (вложений: ' . count($media) . ')' : '') . ', ждёт отправки в офис',
                     [], $threadId, $messageId
                 );
             });
@@ -280,6 +289,7 @@ final class OfficeTaskService
                 'is_bot' => !empty($r['from']['is_bot']),
                 'date' => (int) ($r['date'] ?? 0),
                 'text' => mb_substr((string) ($r['text'] ?? $r['caption'] ?? ''), 0, self::CONTEXT_TEXT_MAX),
+                'media' => self::extractMedia($r),
             ],
         ];
     }
@@ -288,6 +298,37 @@ final class OfficeTaskService
     private function shortId(?array $task, string $fallback): string
     {
         return isset($task['id']) ? (string) $task['id'] : $fallback;
+    }
+
+    /**
+     * Идентификаторы вложений (только данные Telegram, файлы не скачиваются).
+     *
+     * @param array<string,mixed> $msg
+     * @return list<array<string,mixed>>
+     */
+    public static function extractMedia(array $msg): array
+    {
+        $out = [];
+        $add = static function (string $type, mixed $f) use (&$out): void {
+            if (!is_array($f) || ($f['file_id'] ?? '') === '') {
+                return;
+            }
+            $item = ['type' => $type, 'file_id' => (string) $f['file_id'], 'file_unique_id' => (string) ($f['file_unique_id'] ?? '')];
+            foreach (['mime_type' => 's', 'file_size' => 'i', 'duration' => 'i', 'width' => 'i', 'height' => 'i'] as $k => $t) {
+                if (isset($f[$k])) {
+                    $item[$k] = $t === 'i' ? (int) $f[$k] : (string) $f[$k];
+                }
+            }
+            $out[] = $item;
+        };
+        $add('voice', $msg['voice'] ?? null);
+        $add('audio', $msg['audio'] ?? null);
+        $add('video_note', $msg['video_note'] ?? null);
+        $add('document', $msg['document'] ?? null);
+        if (is_array($msg['photo'] ?? null) && $msg['photo'] !== []) {
+            $add('photo', end($msg['photo'])); // самый крупный размер
+        }
+        return $out;
     }
 
     /** @param array<string,mixed> $data */
