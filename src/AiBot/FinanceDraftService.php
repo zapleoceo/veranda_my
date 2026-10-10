@@ -197,7 +197,13 @@ final class FinanceDraftService
             if ($records === []) {
                 $records = $this->buildRecords($draft);
             } elseif (array_filter($records, static fn(array $r) => !in_array($r['status'], self::SETTLED, true)) === []) {
-                return ['draft' => $draft, 'message' => 'Отправлять нечего — ' . self::statusLabel((string) $draft['status'])];
+                // Отправлять нечего: без вызова Poster только фиксируем итоговый статус
+                // (например, процесс умер после последней записи, черновик застрял в executing).
+                $final = self::finalStatus($records);
+                if ($final !== (string) $draft['status']) {
+                    $this->drafts->update($draftId, ['status' => $final]);
+                }
+                return ['draft' => (array) $this->drafts->get($draftId), 'message' => 'Отправлять нечего — ' . self::statusLabel($final)];
             }
             $accountId = (int) $draft['account_id'];
             $date = (string) $draft['tx_date'];
@@ -261,8 +267,7 @@ final class FinanceDraftService
             $failed = count(array_filter($records, static fn(array $r) => $r['status'] === 'failed'));
             $open = count(array_filter($records, static fn(array $r) => $r['status'] === 'dup'));
             // Возможные дубли не вносятся — ждут явного решения владельца (review).
-            $unknown = count(array_filter($records, static fn(array $r) => $r['status'] === 'unverified'));
-            $final = $failed > 0 ? 'partial' : ($open > 0 ? 'review' : ($unknown > 0 ? 'reconcile' : 'done'));
+            $final = self::finalStatus($records);
             $this->drafts->update($draftId, ['status' => $final, 'poster_tx_ids_json' => self::enc($records)]);
 
             try {
@@ -616,6 +621,13 @@ final class FinanceDraftService
         }
         return $out;
     }
+    /** Итог по записям: есть failed → partial; ждут решения по дублю → review; исход не определён → reconcile; иначе done. */
+    private static function finalStatus(array $records): string
+    {
+        $has = static fn(string $st): bool => array_filter($records, static fn(array $r) => $r['status'] === $st) !== [];
+        return $has('failed') ? 'partial' : ($has('dup') ? 'review' : ($has('unverified') ? 'reconcile' : 'done'));
+    }
+
     /**
      * Доказанный отказ ДО создания записи: запрос не ушёл (валидация до вызова,
      * не удалось соединиться / разрешить имя) или Poster ответил явной ошибкой
@@ -624,19 +636,30 @@ final class FinanceDraftService
      */
     private static function isProvenRejection(\Throwable $e): bool
     {
-        if ($e instanceof \InvalidArgumentException || $e instanceof \DomainException) {
+        // Валидация до вызова Poster — запрос не уходил.
+        if ($e instanceof \InvalidArgumentException) {
             return true;
         }
-        $msg = '';
+        // DomainException: доказательство только «лок занят» (тоже до вызова). Отказ
+        // «Такая же транзакция только что создана» означает, что предыдущая попытка
+        // как раз УСПЕЛА создать запись, — это не отказ, а неизвестный исход.
+        if ($e instanceof \DomainException) {
+            return str_starts_with($e->getMessage(), 'Операция уже выполняется');
+        }
+        // Каждое сообщение цепочки проверяется с начала строки: в params= внутри
+        // текста ошибки может оказаться комментарий пользователя.
         for ($x = $e; $x !== null; $x = $x->getPrevious()) {
-            $msg .= ' ' . $x->getMessage();
+            $m = preg_replace('/^Poster: /u', '', $x->getMessage()) ?? '';
+            if (preg_match('/^CURL Error: (Could not resolve host|Couldn\'t resolve host|Failed to connect|Couldn\'t connect|curl_init failed)/i', $m)) {
+                return true;
+            }
+            // PosterAPI: «Poster API Error: <текст ошибки> (http=…)» — Poster вернул error.
+            // «Poster API Error: http=…» (не-2xx) и «empty response» — не доказательство.
+            if (preg_match('/^Poster API Error: (?!http=|empty response)\S/u', $m)) {
+                return true;
+            }
         }
-        if (preg_match('/CURL Error: (Could not resolve host|Couldn\'t resolve host|Failed to connect|Couldn\'t connect|curl_init failed)/i', $msg)) {
-            return true;
-        }
-        // PosterAPI: «Poster API Error: <текст ошибки> (http=…)» — Poster вернул error.
-        // «Poster API Error: http=…» (не-2xx) и «empty response» — не доказательство.
-        return (bool) preg_match('/Poster API Error: (?!http=|empty response)\S/u', $msg);
+        return false;
     }
 
     /** Сравнение комментариев без учёта регистра, HTML-сущностей, пробелов и вида тире. */

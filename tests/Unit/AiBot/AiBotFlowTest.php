@@ -853,7 +853,11 @@ final class AiBotFlowTest extends TestCase
         $wrap = fn(string $msg) => new \RuntimeException('Poster: ' . $msg, 0, new \Exception($msg));
         // Доказанный отказ — повтор допустим.
         $this->assertTrue($m->invoke(null, new \InvalidArgumentException('Invalid amount')));
-        $this->assertTrue($m->invoke(null, new \DomainException('Такая же транзакция только что создана')));
+        $this->assertTrue($m->invoke(null, new \DomainException('Операция уже выполняется в другой вкладке — повторите через несколько секунд.')));
+        // «Только что создана» — предыдущая попытка успела создать: исход неизвестен.
+        $this->assertFalse($m->invoke(null, new \DomainException('Такая же транзакция только что создана — повтор отклонён.')));
+        // Подделка в тексте (комментарий внутри params=) не делает таймаут «отказом».
+        $this->assertFalse($m->invoke(null, $wrap('Poster API Error: http=502 method=finance.createTransactions params={"comment":"CURL Error: Failed to connect"} body=')));
         $this->assertTrue($m->invoke(null, $wrap('CURL Error: Could not resolve host: joinposter.com')));
         $this->assertTrue($m->invoke(null, $wrap('CURL Error: Failed to connect to joinposter.com port 443')));
         $this->assertTrue($m->invoke(null, $wrap('Poster API Error: Access denied (http=200, method=finance.createTransactions)')));
@@ -863,5 +867,20 @@ final class AiBotFlowTest extends TestCase
         $this->assertFalse($m->invoke(null, $wrap('Poster API Error: empty response (http=0, method=finance.createTransactions)')));
         $this->assertFalse($m->invoke(null, $wrap('JSON Decode Error: Syntax error')));
         $this->assertFalse($m->invoke(null, new \RuntimeException('timeout')));
+    }
+
+    public function test_stale_executing_with_everything_settled_advances_status(): void
+    {
+        // Процесс умер после последней записи (все done), итог не записан.
+        $this->boot();
+        $this->readyDraft();
+        $this->press('fd_go:1');
+        $this->assertCount(6, $this->creates());
+        $this->repo->update(1, ['status' => 'executing', 'heartbeat_at' => self::NOW - 300]);
+        $before = count($this->poster->callsTo('finance.getTransactions'));
+        $this->press('fd_go:1');
+        $this->assertSame('done', $this->repo->rows[1]['status']);
+        $this->assertCount(6, $this->creates());
+        $this->assertCount($before, $this->poster->callsTo('finance.getTransactions'), 'без лишнего вызова Poster');
     }
 }
