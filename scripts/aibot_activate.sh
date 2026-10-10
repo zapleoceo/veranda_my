@@ -49,8 +49,8 @@ env_set() {
 # Бэкап — ВНЕ веб-корня (в нём все секреты), права 600.
 TS=$(date +%s)
 BAKDIR="${HOME:-/var/www/veranda_my_usr/data}/.aibot_env_backups"
-mkdir -p "$BAKDIR" && chmod 700 "$BAKDIR"
 case "$BAKDIR" in "$APP"/*) echo "ERR: каталог бэкапа внутри веб-корня"; exit 1;; esac
+mkdir -p "$BAKDIR" && chmod 700 "$BAKDIR"
 install -m 600 "$ENV" "$BAKDIR/.env.bak.$TS"
 echo "backup: $BAKDIR/.env.bak.$TS"
 
