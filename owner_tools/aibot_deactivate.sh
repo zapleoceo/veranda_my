@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Откат активации @Veranda_aibot. ЗАПУСКАЕТ ТОЛЬКО ВЛАДЕЛЕЦ на прод-сервере
-# (пользователь veranda_my_usr): bash ~/veranda_owner_tools/aibot_deactivate.sh [<ts бэкапа>]
+# (пользователь veranda_my_usr): bash ~/veranda_ops/aibot_deactivate.sh [<ts бэкапа>]
 #   1) deleteWebhook БЕЗ сброса очереди (drop_pending_updates=false);
 #   2) возвращает .env из бэкапа ~/.aibot_env_backups/.env.bak.<ts>
 #      (без аргумента — самый свежий бэкап).
