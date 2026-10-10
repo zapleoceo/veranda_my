@@ -492,6 +492,12 @@ final class FinanceDraftService
             // сумма и ровно наш комментарий. Нашли — запись внесена, второй раз не шлём.
             if ($st === 'sending' || $st === 'failed') {
                 $mine = self::findOwn($pool, (int) $r['amount'], (string) $r['comment']);
+                if ($mine === null && !empty($r['repeat_ok'])) {
+                    // Одобренный повтор: Poster мог изменить комментарий — тогда своя
+                    // транзакция узнаётся по сумме+имени (исходная dup_of уже исключена
+                    // через $own). Ошибка здесь в безопасную сторону: не пошлём лишнего.
+                    $mine = self::findMatch($pool, (int) $r['amount'], (string) $r['name']);
+                }
                 if ($mine !== null) {
                     unset($pool[$mine]);
                     $records[$i]['status'] = 'done';
@@ -562,13 +568,22 @@ final class FinanceDraftService
     /** Своя транзакция: та же сумма и точно тот же комментарий, что мы отправляли. */
     private static function findOwn(array $pool, int $amount, string $comment): ?int
     {
-        $comment = trim($comment);
+        $comment = self::normComment($comment);
         foreach ($pool as $tid => $t) {
-            if ($t['amount'] === $amount && $comment !== '' && $t['comment'] === $comment) {
+            if ($t['amount'] === $amount && $comment !== '' && self::normComment($t['comment']) === $comment) {
                 return (int) $tid;
             }
         }
         return null;
+    }
+
+    /** Сравнение комментариев без учёта регистра, HTML-сущностей, пробелов и вида тире. */
+    private static function normComment(string $s): string
+    {
+        $s = html_entity_decode($s, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        $s = preg_replace('/[\x{2010}-\x{2015}\x{2212}-]+/u', '-', $s) ?? $s;
+        $s = preg_replace('/\s+/u', ' ', $s) ?? $s;
+        return mb_strtolower(trim($s), 'UTF-8');
     }
 
     // ─── возможные дубли: решение владельца ────────────────────────────────
@@ -596,6 +611,8 @@ final class FinanceDraftService
                 return ['По этой записи решение уже принято', false];
             }
             // Аудит ДО изменения: не записали решение — не применяем (fail closed).
+            // Если затем упадёт update, в аудите останется неприменённое решение, а
+            // повторное нажатие запишет второе — это осознанный выбор в пользу fail closed.
             try {
                 $this->audit->record('tg:' . $actorTgId, 'aibot.finance_draft.duplicate_decision', [
                     'draft_id' => $draftId,

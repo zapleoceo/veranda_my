@@ -688,4 +688,25 @@ final class AiBotFlowTest extends TestCase
         $this->assertSame([], $this->successfulCreates());
         $this->assertSame([], $this->decisions());
     }
+
+    public function test_approved_repeat_found_even_if_poster_altered_comment(): void
+    {
+        // Повтор одобрен, Poster создал транзакцию, но вернул ошибку и сохранил
+        // комментарий изменённым (регистр/тире/пробелы) — второй раз не шлём.
+        $this->bootLedger([self::tx(9001, 1000000, 'Олег')]);
+        $this->runSingle('Выплаты: Олег 1 000 000');
+        $create = $this->poster->responses['finance.createTransactions'];
+        $this->poster->responses['finance.createTransactions'] = function (array $p) use ($create) {
+            $create($p);
+            $last = array_key_last($this->ledger);
+            $this->ledger[$last]['comment'] = 'ДИВИДЕНДЫ  -  ОЛЕГ (edited)';
+            throw new \RuntimeException('timeout');
+        };
+        $this->press('fd_rep:1:0');
+        $this->poster->responses['finance.createTransactions'] = $create;
+        $this->audit->rows = [];
+        $this->press('fd_go:1');
+        $this->assertCount(1, $this->successfulCreates());
+        $this->assertSame('done', $this->repo->rows[1]['status']);
+    }
 }
