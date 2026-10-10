@@ -61,7 +61,8 @@ class AccessController
         // с того же сайта. Без валидного токена — 403 и ничего не меняется.
         $mutating = isset($body['save_user_permissions']) || isset($body['add_email']) || isset($query['delete']);
         if ($mutating) {
-            $candidate = (string) ($body['csrf'] ?? $query['csrf'] ?? '');
+            $candidate = $body['csrf'] ?? $query['csrf'] ?? '';
+            $candidate = is_string($candidate) ? $candidate : '';
             if (!SessionCsrf::verify(self::CSRF_KEY, $candidate)) {
                 $response->getBody()->write('Forbidden: устаревшая форма — обновите страницу и повторите.');
                 return $response->withStatus(403)->withHeader('Content-Type', 'text/plain; charset=utf-8');
