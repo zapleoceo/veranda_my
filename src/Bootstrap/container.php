@@ -176,7 +176,20 @@ return [
         new \App\AiBot\PayoutParser(),
         new \App\AiBot\LlmPayoutExtractor(\App\Infrastructure\AiBrokerClient::fromConfig()),
         $c->get(LoggerInterface::class),
+        null,
+        null,
+        $c->get(\App\AiBot\OfficeTaskService::class),
     ),
+    // Приём задач в офис: право aibot_office (отдельное от aibot_finance). Отправителя в офис пока нет.
+    \App\AiBot\OfficeTaskService::class => fn($c) => new \App\AiBot\OfficeTaskService(
+        \App\AiBot\AiBotConfig::fromConfig($c->get(\App\AiBot\FinanceAuthorizerInterface::class)),
+        new \App\AiBot\MysqlOfficeTaskRepository($c->get(Database::class)),
+        new TelegramBotClient(token: Config::require('ai_tg_bot'), http: new HttpClient(timeoutSeconds: 15)),
+        new \App\AiBot\TelegramPermissionAuthorizer($c->get(\App\Infrastructure\TelegramUserDirectory::class), 'aibot_office'),
+        $c->get(\App\Payday3\Contracts\NamedLockInterface::class),
+        $c->get(LoggerInterface::class),
+    ),
+    \App\AiBot\OfficeOutboxSenderInterface::class => fn() => new \App\AiBot\NullOfficeOutboxSender(),
 
     // ─── Payday3 ──────────────────────────────────────────────
     SepayRepositoryInterface::class  => fn($c) => new SepayRepository($c->get(Database::class)),

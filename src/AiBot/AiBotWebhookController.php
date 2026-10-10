@@ -41,6 +41,7 @@ final class AiBotWebhookController
         private readonly LoggerInterface $logger,
         ?\Closure $clock = null,
         ?\Closure $defer = null,
+        private readonly ?OfficeTaskService $office = null,
     ) {
         $this->clock = $clock ?? static fn(): int => time();
         // ИИ-фолбэк медленный — выполняем после ответа Telegram (как афиша),
@@ -63,7 +64,7 @@ final class AiBotWebhookController
         $update = is_array($update) ? $update : [];
         try {
             if (is_array($update['message'] ?? null)) {
-                $this->onMessage($update['message']);
+                $this->onMessage($update['message'], (int) ($update['update_id'] ?? 0));
             } elseif (is_array($update['callback_query'] ?? null)) {
                 $this->onCallback($update['callback_query']);
             }
@@ -75,7 +76,7 @@ final class AiBotWebhookController
         return $response;
     }
 
-    private function onMessage(array $msg): void
+    private function onMessage(array $msg, int $updateId = 0): void
     {
         $chatId = (string) ($msg['chat']['id'] ?? '');
         $fromId = (int) ($msg['from']['id'] ?? 0);
@@ -84,6 +85,13 @@ final class AiBotWebhookController
 
         if (!$this->config->chatAllowed($chatId)) {
             $this->logger->info('aibot.skip.chat', ['chat' => $chatId]);
+            return;
+        }
+        // Финансовая команда («внеси…» ответом на сообщение) всегда в приоритете.
+        // Всё остальное — приём задач в офис (@бот + текст / ответ на вопрос бота).
+        $isFinanceCommand = $reply !== null && $this->isTrigger($text)
+            && (preg_match(self::TRIGGER_RE, $text) || preg_match(self::INTENT_RE, $text));
+        if ($this->office !== null && !$isFinanceCommand && $this->office->handleMessage($msg, $updateId)) {
             return;
         }
         if ($reply === null || !$this->isTrigger($text)) {
@@ -305,7 +313,7 @@ final class AiBotWebhookController
         $this->bot->answerCallbackQuery($cbId, $toast);
     }
 
-    private static function isRelayed(array $msg): bool
+    public static function isRelayed(array $msg): bool
     {
         foreach (['forward_origin', 'forward_from', 'forward_from_chat', 'forward_date', 'forward_sender_name', 'quote', 'sender_chat', 'via_bot'] as $k) {
             if (!empty($msg[$k])) {

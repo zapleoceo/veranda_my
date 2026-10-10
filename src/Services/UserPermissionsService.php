@@ -29,6 +29,7 @@ class UserPermissionsService
         'neworder'       => false,
         // Явная галочка; в admin-bypass НЕ входит — админам не выдаётся автоматически.
         'aibot_finance'  => false,
+        'aibot_office'   => false,
     ];
 
     private const TTL = 30;

@@ -33,6 +33,7 @@ class AccessController
         'exclude_toggle' => 'Игнор + ✅ Принято',
         'telegram_ack'   => '✅ Принято (Telegram)',
         'aibot_finance'  => 'Бот: финансы (Telegram)',
+        'aibot_office'   => 'Бот: задачи в офис (Telegram)',
     ];
 
     private const CSRF_KEY = 'admin_access_csrf';

@@ -9,7 +9,6 @@ namespace App\AiBot;
  * право `aibot_finance` пользователя сайта (раздел «Доступ» в админке), связанного
  * с числовым Telegram id. Без кэша: отзыв права действует на следующем же действии.
  */
-interface FinanceAuthorizerInterface
+interface FinanceAuthorizerInterface extends PermissionAuthorizerInterface
 {
-    public function allows(int $telegramUserId): bool;
 }
