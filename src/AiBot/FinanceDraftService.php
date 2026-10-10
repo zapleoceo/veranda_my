@@ -456,6 +456,10 @@ final class FinanceDraftService
             foreach ((array) ($r['tx_ids'] ?? []) as $tid) {
                 $own[(int) $tid] = true;
             }
+            // Исходная транзакция уже показанного/решённого дубля закрывает только свою запись.
+            foreach ((array) ($r['dup_of'] ?? []) as $t) {
+                $own[(int) ($t['id'] ?? 0)] = true;
+            }
         }
         $pool = []; // tx_id → {amount VND, comment, date}
         foreach ($rows as $t) {
@@ -483,22 +487,21 @@ final class FinanceDraftService
             if (in_array($st, self::SETTLED, true)) {
                 continue;
             }
-            $approved = !empty($r['repeat_ok']);
-            if ($approved) {
-                // Владелец разрешил повтор: исходную транзакцию (dup_of) больше не
-                // сравниваем. Совпадение с ДРУГОЙ транзакцией возможно только если
-                // наш собственный повтор уже дошёл до Poster (упали после отправки) —
-                // тогда это и есть наша запись, второй раз не шлём.
-                if ($st !== 'sending') {
+            // Отправка с неизвестным исходом (sending — упали после вызова, failed —
+            // ошибка/таймаут, но Poster мог создать): ищем СВОЮ транзакцию — та же
+            // сумма и ровно наш комментарий. Нашли — запись внесена, второй раз не шлём.
+            if ($st === 'sending' || $st === 'failed') {
+                $mine = self::findOwn($pool, (int) $r['amount'], (string) $r['comment']);
+                if ($mine !== null) {
+                    unset($pool[$mine]);
+                    $records[$i]['status'] = 'done';
+                    $records[$i]['tx_ids'] = [$mine];
+                    unset($records[$i]['error']);
                     continue;
                 }
-                $skip = array_flip(array_map('intval', array_column((array) ($r['dup_of'] ?? []), 'id')));
-                $hit = self::findMatch($pool, (int) $r['amount'], (string) $r['name'], $skip);
-                if ($hit !== null) {
-                    unset($pool[$hit]);
-                    $records[$i]['status'] = 'done';
-                    $records[$i]['tx_ids'] = [$hit];
-                }
+            }
+            // Владелец разрешил повтор: исходную транзакцию (dup_of) больше не сравниваем.
+            if (!empty($r['repeat_ok'])) {
                 continue;
             }
             $ids = [];
@@ -556,26 +559,56 @@ final class FinanceDraftService
         return null;
     }
 
+    /** Своя транзакция: та же сумма и точно тот же комментарий, что мы отправляли. */
+    private static function findOwn(array $pool, int $amount, string $comment): ?int
+    {
+        $comment = trim($comment);
+        foreach ($pool as $tid => $t) {
+            if ($t['amount'] === $amount && $comment !== '' && $t['comment'] === $comment) {
+                return (int) $tid;
+            }
+        }
+        return null;
+    }
+
     // ─── возможные дубли: решение владельца ────────────────────────────────
 
     /**
      * Решение по записи-«возможному дублю»: 'rep' — внести повтор, 'skip' — не
      * вносить. Только для статуса dup; повторный callback ничего не меняет.
-     * Повтор не отправляется здесь — после 'rep' вызывающий запускает execute().
+     * Повтор не отправляется здесь — после принятого 'rep' вызывающий запускает
+     * execute(). Решение пишется в аудит ДО изменения (не записалось — не применяем).
+     *
+     * @return array{0:string,1:bool} [текст, решение принято этим вызовом]
      */
-    public function decideDuplicate(int $draftId, int $index, string $decision, int $actorTgId): string
+    public function decideDuplicate(int $draftId, int $index, string $decision, int $actorTgId): array
     {
         return $this->lock->synchronized('aibot_fd_' . $draftId, 10, function () use ($draftId, $index, $decision, $actorTgId) {
             $draft = $this->drafts->get($draftId);
             if ($draft === null) {
-                return 'Черновик не найден';
+                return ['Черновик не найден', false];
             }
             if ((string) $draft['status'] !== 'review') {
-                return 'Решение уже не требуется';
+                return ['Решение уже не требуется', false];
             }
             $records = self::dec($draft['poster_tx_ids_json'] ?? null);
             if (!isset($records[$index]) || (string) $records[$index]['status'] !== 'dup') {
-                return 'По этой записи решение уже принято';
+                return ['По этой записи решение уже принято', false];
+            }
+            // Аудит ДО изменения: не записали решение — не применяем (fail closed).
+            try {
+                $this->audit->record('tg:' . $actorTgId, 'aibot.finance_draft.duplicate_decision', [
+                    'draft_id' => $draftId,
+                    'chat_id' => $draft['chat_id'],
+                    'record' => $index,
+                    'decision' => $decision === 'rep' ? 'repeat' : 'skip',
+                    'amount' => (int) $records[$index]['amount'],
+                    'comment' => (string) $records[$index]['comment'],
+                    'dup_of' => $records[$index]['dup_of'] ?? [],
+                ]);
+            } catch (\Throwable $e) {
+                error_log('[aibot.finance] audit write failed: ' . $e->getMessage());
+                return ['Не удалось записать решение в аудит — ничего не изменено', false];
             }
             if ($decision === 'rep') {
                 $records[$index]['status'] = 'pending';
@@ -589,20 +622,7 @@ final class FinanceDraftService
             $pending = count(array_filter($records, static fn(array $r) => in_array($r['status'], ['pending', 'failed', 'sending'], true)));
             $status = $pending > 0 ? 'partial' : ($open > 0 ? 'review' : 'done');
             $this->drafts->update($draftId, ['status' => $status, 'poster_tx_ids_json' => self::enc($records)]);
-            try {
-                $this->audit->record('tg:' . $actorTgId, 'aibot.finance_draft.duplicate_decision', [
-                    'draft_id' => $draftId,
-                    'chat_id' => $draft['chat_id'],
-                    'record' => $index,
-                    'decision' => $decision === 'rep' ? 'repeat' : 'skip',
-                    'amount' => (int) $records[$index]['amount'],
-                    'comment' => (string) $records[$index]['comment'],
-                    'dup_of' => $records[$index]['dup_of'] ?? [],
-                ]);
-            } catch (\Throwable $e) {
-                error_log('[aibot.finance] audit write failed: ' . $e->getMessage());
-            }
-            return $toast;
+            return [$toast, true];
         });
     }
 

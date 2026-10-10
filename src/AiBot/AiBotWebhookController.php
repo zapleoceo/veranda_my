@@ -225,9 +225,14 @@ final class AiBotWebhookController
         if ($action === 'rep' || $action === 'skip') {
             // Решение по «возможному дублю» — только по явной кнопке владельца;
             // повторный callback по уже решённой записи ничего не меняет.
-            $toast = $this->drafts->decideDuplicate($draftId, (int) $arg, $action, $fromId);
+            if ($arg === '') {
+                $this->bot->answerCallbackQuery($cbId, 'Неизвестная кнопка', true);
+                return;
+            }
+            [$toast, $accepted] = $this->drafts->decideDuplicate($draftId, (int) $arg, $action, $fromId);
             $draft = (array) $this->drafts->get($draftId);
-            if ($action === 'skip' || (string) ($draft['status'] ?? '') !== 'partial') {
+            // Вносим только если именно ЭТО нажатие разрешило повтор.
+            if ($action === 'skip' || !$accepted) {
                 $card = $this->drafts->render($draft);
                 $bot->editMessageText($msgId, $card['text'], $card['keyboard']);
                 $this->bot->answerCallbackQuery($cbId, $toast);

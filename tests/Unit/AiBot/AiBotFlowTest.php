@@ -609,4 +609,83 @@ final class AiBotFlowTest extends TestCase
         $this->assertSame('dup', $recs[0]['status']);
         $this->assertSame([], $this->decisions());
     }
+
+    public function test_own_record_after_crash_is_done_not_a_duplicate(): void
+    {
+        // Обычная (не дубль) запись: Poster создал транзакцию, а мы упали до записи
+        // статуса. При повторе это наша же транзакция → done, без вопроса «повторить?».
+        $this->bootLedger([]);
+        $this->runSingle('Выплаты: Олег 1 000 000');
+        $this->assertCount(1, $this->creates());
+        $recs = json_decode($this->repo->rows[1]['poster_tx_ids_json'], true);
+        $recs[0]['status'] = 'sending';
+        $recs[0]['tx_ids'] = [];
+        $this->repo->update(1, ['status' => 'executing', 'heartbeat_at' => self::NOW - 300,
+            'poster_tx_ids_json' => json_encode($recs, JSON_UNESCAPED_UNICODE)]);
+        $this->audit->rows = [];
+        $this->press('fd_go:1');
+        $this->assertCount(1, $this->creates());
+        $this->assertSame('done', $this->repo->rows[1]['status']);
+        $this->assertSame([20001], json_decode($this->repo->rows[1]['poster_tx_ids_json'], true)[0]['tx_ids']);
+    }
+
+    public function test_approved_repeat_failed_but_created_is_not_resent(): void
+    {
+        // Повтор одобрен, Poster транзакцию создал, но ответ — ошибка (таймаут).
+        $this->bootLedger([self::tx(9001, 1000000, 'Олег')]);
+        $this->runSingle('Выплаты: Олег 1 000 000');
+        $create = $this->poster->responses['finance.createTransactions'];
+        $this->poster->responses['finance.createTransactions'] = function (array $p) use ($create) {
+            $create($p);
+            throw new \RuntimeException('timeout');
+        };
+        $this->press('fd_rep:1:0');
+        $this->assertCount(1, $this->creates());
+        $this->assertSame('partial', $this->repo->rows[1]['status']);
+        $this->poster->responses['finance.createTransactions'] = $create;
+        $this->audit->rows = [];
+        $this->press('fd_go:1');
+        $this->assertCount(1, $this->creates(), 'своя транзакция найдена — второй раз не шлём');
+        $this->assertSame('done', $this->repo->rows[1]['status']);
+    }
+
+    public function test_stale_repeat_callback_does_not_resend_failed_records(): void
+    {
+        // Две строки: одна — возможный дубль, другая упала при отправке.
+        $this->bootLedger([self::tx(9001, 1000000, 'Олег')]);
+        $create = $this->poster->responses['finance.createTransactions'];
+        $this->poster->responses['finance.createTransactions'] = fn(array $p) => throw new \RuntimeException('Poster down');
+        $this->runSingle('Выплаты: Олег 1 000 000, Дима 2 000 000');
+        $this->assertSame('partial', $this->repo->rows[1]['status']);
+        $this->poster->responses['finance.createTransactions'] = $create;
+        // Запоздавшее нажатие «Повторить» по дублю при partial — решение не принято, ничего не шлём.
+        $this->press('fd_rep:1:0');
+        $this->assertSame([], $this->successfulCreates());
+        $this->assertSame('partial', $this->repo->rows[1]['status']);
+        $this->assertSame([], $this->decisions());
+    }
+
+    private function successfulCreates(): array
+    {
+        return array_values(array_filter($this->ledger, fn($t) => (int) $t['transaction_id'] > 20000));
+    }
+
+    public function test_audit_failure_blocks_repeat(): void
+    {
+        $this->bootLedger([self::tx(9001, 1000000, 'Олег')]);
+        $this->runSingle('Выплаты: Олег 1 000 000');
+        $this->audit->failOn = 'aibot.finance_draft.duplicate_decision';
+        $this->press('fd_rep:1:0');
+        $this->assertSame([], $this->successfulCreates());
+        $this->assertSame('review', $this->repo->rows[1]['status']);
+    }
+
+    public function test_repeat_button_without_index_is_rejected(): void
+    {
+        $this->bootLedger([self::tx(9001, 1000000, 'Олег')]);
+        $this->runSingle('Выплаты: Олег 1 000 000');
+        $this->press('fd_rep:1');
+        $this->assertSame([], $this->successfulCreates());
+        $this->assertSame([], $this->decisions());
+    }
 }
