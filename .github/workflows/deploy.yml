@@ -66,6 +66,9 @@ jobs:
       - name: JS unit tests (payday3)
         run: node --test "tests/js/**/*.test.mjs"
 
+      - name: Shell tests (ops scripts)
+        run: bash tests/sh/aibot_activate_test.sh
+
   deploy:
     needs: test          # ← прод раскатывается только на зелёных тестах
     runs-on: ubuntu-latest
@@ -122,6 +125,7 @@ jobs:
               --exclude "logs/" \
               --exclude ".git/" \
               --exclude ".github/" \
+              --exclude "ops/" \
               --exclude "wa_listener/auth/" \
               --exclude "wa_listener/qr_state.json" \
               --exclude "wa_listener/node_modules/" \
@@ -129,6 +133,16 @@ jobs:
               ./ "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:${{ secrets.DEPLOY_PATH }}/" && break
             sleep $((i * 3))
           done
+
+      - name: Deploy ops scripts outside webroot
+        shell: bash
+        run: |
+          set -euo pipefail
+          # ops/ — служебные скрипты владельца (активация бота и т.п.). Кладутся в
+          # ~/veranda_ops ВНЕ веб-корня: nginx отдаёт статику в обход .htaccess.
+          SSH_OPTS="-p ${{ secrets.SSH_PORT }} -i ~/.ssh/id_ed25519 -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=10"
+          ssh ${SSH_OPTS} "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" 'mkdir -p ~/veranda_ops && chmod 700 ~/veranda_ops'
+          rsync -az --delete -e "ssh ${SSH_OPTS}" ops/ "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:veranda_ops/"
 
       - name: Link static assets into public/
         shell: bash

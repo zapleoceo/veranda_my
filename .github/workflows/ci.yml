@@ -76,3 +76,6 @@ jobs:
 
       - name: JS unit tests (payday3)
         run: node --test "tests/js/**/*.test.mjs"
+
+      - name: Shell tests (ops scripts)
+        run: bash tests/sh/aibot_activate_test.sh
