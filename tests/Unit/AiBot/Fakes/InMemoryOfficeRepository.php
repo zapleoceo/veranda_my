@@ -14,14 +14,24 @@ final class InMemoryOfficeRepository implements OfficeTaskRepositoryInterface
     /** @var array<string,array<string,mixed>> по idempotency_key */
     public array $outbox = [];
     private int $nextId = 1;
+    public int $calls = 0;
+    public bool $failLookup = false;
+    public bool $swallowInsert = false;
+
+    public function transactional(callable $fn): mixed
+    {
+        return $fn();
+    }
 
     public function findTaskByKey(string $taskKey): ?array
     {
+        $this->calls++;
         return $this->tasks[$taskKey] ?? null;
     }
 
     public function findTaskByOrigin(string $chatId, int $originMessageId): ?array
     {
+        $this->calls++;
         foreach ($this->tasks as $t) {
             if ($t['chat_id'] === $chatId && (int) $t['origin_message_id'] === $originMessageId) {
                 return $t;
@@ -32,6 +42,10 @@ final class InMemoryOfficeRepository implements OfficeTaskRepositoryInterface
 
     public function findWaitingByQuestionMsg(string $chatId, int $questionMsgId): ?array
     {
+        $this->calls++;
+        if ($this->failLookup) {
+            throw new \RuntimeException('db down');
+        }
         foreach ($this->tasks as $t) {
             if ($t['chat_id'] === $chatId && $t['last_question_msg_id'] !== null
                 && (int) $t['last_question_msg_id'] === $questionMsgId && $t['status'] === 'waiting_owner') {
@@ -43,6 +57,9 @@ final class InMemoryOfficeRepository implements OfficeTaskRepositoryInterface
 
     public function insertTask(array $row): int
     {
+        if ($this->swallowInsert) {
+            return 0;
+        }
         $ex = $this->tasks[$row['task_key']] ?? $this->findTaskByOrigin((string) $row['chat_id'], (int) $row['origin_message_id']);
         foreach ($this->tasks as $t) {
             if ((int) $t['update_id'] === (int) $row['update_id']) {

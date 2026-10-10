@@ -168,11 +168,12 @@ return [
     ),
     \App\Infrastructure\TelegramUserDirectory::class => fn($c) => new \App\Infrastructure\TelegramUserDirectory($c->get(Database::class)),
     \App\AiBot\FinanceAuthorizerInterface::class => fn($c) => new \App\AiBot\UserFinanceAuthorizer($c->get(\App\Infrastructure\TelegramUserDirectory::class)),
+    'aibot.telegram' => fn() => new TelegramBotClient(token: Config::require('ai_tg_bot'), http: new HttpClient(timeoutSeconds: 15)),
     \App\AiBot\AiBotWebhookController::class => fn($c) => new \App\AiBot\AiBotWebhookController(
         \App\AiBot\AiBotConfig::fromConfig($c->get(\App\AiBot\FinanceAuthorizerInterface::class)),
         $c->get(\App\AiBot\FinanceDraftService::class),
         // Отдельный бот: токен ai_tg_bot, не основной @VerandamyBot.
-        new TelegramBotClient(token: Config::require('ai_tg_bot'), http: new HttpClient(timeoutSeconds: 15)),
+        $c->get('aibot.telegram'),
         new \App\AiBot\PayoutParser(),
         new \App\AiBot\LlmPayoutExtractor(\App\Infrastructure\AiBrokerClient::fromConfig()),
         $c->get(LoggerInterface::class),
@@ -184,7 +185,7 @@ return [
     \App\AiBot\OfficeTaskService::class => fn($c) => new \App\AiBot\OfficeTaskService(
         \App\AiBot\AiBotConfig::fromConfig($c->get(\App\AiBot\FinanceAuthorizerInterface::class)),
         new \App\AiBot\MysqlOfficeTaskRepository($c->get(Database::class)),
-        new TelegramBotClient(token: Config::require('ai_tg_bot'), http: new HttpClient(timeoutSeconds: 15)),
+        $c->get('aibot.telegram'),
         new \App\AiBot\TelegramPermissionAuthorizer($c->get(\App\Infrastructure\TelegramUserDirectory::class), 'aibot_office'),
         $c->get(\App\Payday3\Contracts\NamedLockInterface::class),
         $c->get(LoggerInterface::class),

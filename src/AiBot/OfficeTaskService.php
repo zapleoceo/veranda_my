@@ -63,35 +63,42 @@ final class OfficeTaskService
      * @return bool true — сообщение относится к office-сценарию (принято или осознанно отклонено),
      *              остальным обработчикам дальше делать нечего
      */
-    public function handleMessage(array $msg, int $updateId): bool
+    public function handleMessage(array $msg, int $updateId, bool $financeCommand = false): bool
     {
         $text = trim((string) ($msg['text'] ?? $msg['caption'] ?? ''));
         $reply = is_array($msg['reply_to_message'] ?? null) ? $msg['reply_to_message'] : null;
         $chatId = (string) ($msg['chat']['id'] ?? '');
-        $taskText = $this->extractTaskText($text);
+        // Финансовая команда не может стать новой задачей; ответом на вопрос — может.
+        $taskText = $financeCommand ? null : $this->extractTaskText($text);
+        $canAnswer = $reply !== null && $text !== '';
 
-        $question = null;
-        if ($taskText === null && $reply !== null && $text !== '') {
-            $question = $this->repo->findWaitingByQuestionMsg($chatId, (int) ($reply['message_id'] ?? 0));
-            if ($question === null) {
-                return false; // обычная переписка
-            }
-        } elseif ($taskText === null) {
+        if ($taskText === null && !$canAnswer) {
             if ($text === '' && self::extractMedia($msg) !== []) {
                 // Голос/фото без подписи нельзя адресовать @упоминанием.
                 $this->logger->info('aibot.office.skip.media_no_caption', ['chat' => $chatId, 'msg' => $msg['message_id'] ?? null]);
             }
             return false;
         }
-
+        // Дешёвые проверки — до любого обращения к БД.
         if (!$this->admissible($msg, $chatId)) {
-            return true;
+            return $taskText !== null; // адресованное нам — гасим; чужая переписка идёт дальше
         }
-        if ($question !== null) {
-            $this->recordAnswer($question, $msg, $text, $updateId);
-        } else {
-            $this->intake($msg, (string) $taskText, $updateId);
+        if ($canAnswer) {
+            try {
+                $question = $this->repo->findWaitingByQuestionMsg($chatId, (int) ($reply['message_id'] ?? 0));
+            } catch (\Throwable $e) {
+                $this->logger->error('aibot.office.lookup_failed', ['err' => $e->getMessage()]);
+                return false; // сбой БД не должен ломать финансовый сценарий
+            }
+            if ($question !== null) {
+                $this->recordAnswer($question, $msg, $text, $updateId);
+                return true;
+            }
         }
+        if ($taskText === null) {
+            return false;
+        }
+        $this->intake($msg, $taskText, $updateId);
         return true;
     }
 
@@ -168,9 +175,16 @@ final class OfficeTaskService
 
         $this->lock->synchronized('aibot_office_msg_' . $chatId . '_' . $messageId, self::LOCK_TIMEOUT,
             function () use ($chatId, $messageId, $fromId, $threadId, $taskKey, $taskText, $updateId, $context, $media): void {
+                if (!$this->authorizer->allows($fromId)) {
+                    $this->logger->warning('aibot.office.skip.user_under_lock', ['task' => $taskKey, 'from' => $fromId]);
+                    return;
+                }
                 $existing = $this->repo->findTaskByOrigin($chatId, $messageId);
                 $created = $existing === null;
                 if ($created) {
+                    $outboxRow = $this->createOutboxRow($taskKey, $chatId, $threadId, $messageId, $fromId, $updateId, $taskText, $context, $media);
+                    try {
+                    $this->repo->transactional(function () use ($taskKey, $chatId, $threadId, $messageId, $fromId, $updateId, $taskText, $context, $media, $outboxRow): void {
                     $this->repo->insertTask([
                         'task_key' => $taskKey,
                         'chat_id' => $chatId,
@@ -185,29 +199,20 @@ final class OfficeTaskService
                         'status' => self::STATUS_QUEUED,
                         'revision' => 1,
                     ]);
+                    if ($this->repo->findTaskByKey($taskKey) === null) {
+                        throw new \RuntimeException('office task not visible after insert');
+                    }
+                    $this->repo->insertOutbox($outboxRow);
+                    });
+                    } catch (\Throwable $e) {
+                        $this->logger->error('aibot.office.insert_failed', ['task' => $taskKey, 'err' => $e->getMessage()]);
+                        return; // ни подтверждения, ни outbox
+                    }
                     $existing = $this->repo->findTaskByKey($taskKey);
                 }
                 // Повторно безопасно: если прошлый запрос упал между задачей и outbox — догоняем.
                 if ($this->repo->findOutboxByKey($taskKey) === null) {
-                    $this->repo->insertOutbox([
-                        'idempotency_key' => $taskKey,
-                        'task_key' => $taskKey,
-                        'kind' => 'create',
-                        'payload_json' => self::enc([
-                            'task_key' => $taskKey,
-                            'chat_id' => $chatId,
-                            'thread_id' => $threadId,
-                            'origin_message_id' => $messageId,
-                            'origin_user_id' => $fromId,
-                            'update_id' => $updateId,
-                            'text' => $taskText,
-                            'context' => $context,
-                            'media' => $media,
-                            'revision' => 1,
-                        ]),
-                        'status' => 'pending',
-                        'attempts' => 0,
-                    ]);
+                    $this->repo->insertOutbox($this->createOutboxRow($taskKey, $chatId, $threadId, $messageId, $fromId, $updateId, $taskText, $context, $media));
                 }
                 if (!$created) {
                     $this->logger->info('aibot.office.duplicate', ['task' => $taskKey, 'update' => $updateId]);
@@ -219,6 +224,34 @@ final class OfficeTaskService
                     [], $threadId, $messageId
                 );
             });
+    }
+
+    /**
+     * @param array<string,mixed>|null $context
+     * @param list<array<string,mixed>> $media
+     * @return array<string,mixed>
+     */
+    private function createOutboxRow(string $taskKey, string $chatId, ?int $threadId, int $messageId, int $fromId, int $updateId, string $taskText, ?array $context, array $media): array
+    {
+        return [
+            'idempotency_key' => $taskKey,
+            'task_key' => $taskKey,
+            'kind' => 'create',
+            'payload_json' => self::enc([
+                'task_key' => $taskKey,
+                'chat_id' => $chatId,
+                'thread_id' => $threadId,
+                'origin_message_id' => $messageId,
+                'origin_user_id' => $fromId,
+                'update_id' => $updateId,
+                'text' => $taskText,
+                'context' => $context,
+                'media' => $media,
+                'revision' => 1,
+            ]),
+            'status' => 'pending',
+            'attempts' => 0,
+        ];
     }
 
     /**
@@ -237,6 +270,10 @@ final class OfficeTaskService
         $this->lock->synchronized('aibot_office_task_' . $taskKey, self::LOCK_TIMEOUT,
             function () use ($taskKey, $questionMsgId, $key, $chatId, $messageId, $fromId, $text, $updateId): void {
                 // Перечитываем под локом: статус/вопрос могли измениться.
+                if (!$this->authorizer->allows($fromId)) {
+                    $this->logger->warning('aibot.office.skip.user_under_lock', ['task' => $taskKey, 'from' => $fromId]);
+                    return;
+                }
                 $task = $this->repo->findTaskByKey($taskKey);
                 if ($task === null || (string) $task['status'] !== self::STATUS_WAITING_OWNER
                     || (int) ($task['last_question_msg_id'] ?? 0) !== $questionMsgId) {

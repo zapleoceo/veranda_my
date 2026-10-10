@@ -400,4 +400,75 @@ final class OfficeIntakeTest extends TestCase
     {
         $this->assertFalse((new NullOfficeOutboxSender())->send(['id' => 1]));
     }
+
+    // ─── ревью: отзыв под локом, приоритеты, порядок проверок ─
+
+    public function test_revocation_between_outer_check_and_lock_blocks_intake(): void
+    {
+        $this->lock->on = 'aibot_office_msg_' . self::CHAT . '_600';
+        $this->lock->before = fn() => $this->grants->setPerm(self::USER, 'aibot_office', false);
+        $this->post($this->msg());
+        $this->assertSame([], $this->repo->tasks);
+        $this->assertSame([], $this->repo->outbox);
+        $this->assertSame([], $this->sent());
+    }
+
+    public function test_revocation_between_outer_check_and_lock_blocks_answer(): void
+    {
+        [$key, $qid] = $this->waitingTask();
+        $this->lock->on = 'aibot_office_task_' . $key;
+        $this->lock->before = fn() => $this->grants->setPerm(self::USER, 'aibot_office', false);
+        $this->answer($qid);
+        $this->assertCount(1, $this->repo->outbox);
+        $this->assertSame(1, $this->repo->tasks[$key]['revision']);
+    }
+
+    public function test_finance_word_mid_text_in_reply_is_an_office_task(): void
+    {
+        $this->grants->setPerm(self::USER, 'aibot_finance', true);
+        $this->post($this->msg(['text' => '@Veranda_aibot узнай у бухгалтера про дивиденды', 'reply_to_message' => [
+            'message_id' => 590, 'date' => self::NOW - 99, 'from' => ['id' => 333], 'text' => 'Игорь 1 000 000',
+        ]]));
+        $this->assertCount(1, $this->repo->tasks);
+    }
+
+    public function test_answer_starting_with_finance_verb_is_recorded_as_answer(): void
+    {
+        [$key, $qid] = $this->waitingTask();
+        $this->grants->setPerm(self::USER, 'aibot_finance', true);
+        $this->answer($qid, ['text' => 'внеси 10 кг льда']);
+        $this->assertSame('внеси 10 кг льда', json_decode($this->repo->outbox['vb-ans-' . self::CHAT . '-620']['payload_json'], true)['text']);
+        $this->assertCount(1, $this->repo->tasks, 'новая задача не создана');
+    }
+
+    public function test_answer_starting_with_mention_is_still_an_answer(): void
+    {
+        [$key, $qid] = $this->waitingTask();
+        $this->answer($qid, ['text' => '@Veranda_aibot 10 кг']);
+        $this->assertCount(1, $this->repo->tasks);
+        $this->assertArrayHasKey('vb-ans-' . self::CHAT . '-620', $this->repo->outbox);
+        $this->assertSame(2, $this->repo->tasks[$key]['revision']);
+    }
+
+    public function test_unauthorized_reply_does_no_repository_calls(): void
+    {
+        $this->post($this->msg(['from' => ['id' => 404], 'text' => 'просто ответ', 'reply_to_message' => ['message_id' => 5, 'from' => ['id' => 1]]]));
+        $this->post($this->msg(['message_id' => 601, 'from' => ['id' => 404], 'text' => '@Veranda_aibot x'], 2));
+        $this->assertSame(0, $this->repo->calls);
+    }
+
+    public function test_lookup_db_error_falls_through(): void
+    {
+        $this->repo->failLookup = true;
+        $this->post($this->msg(['text' => 'ответ', 'reply_to_message' => ['message_id' => 5, 'from' => ['id' => 1]]]));
+        $this->assertSame([], $this->repo->tasks);
+    }
+
+    public function test_task_not_visible_after_insert_sends_nothing(): void
+    {
+        $this->repo->swallowInsert = true;
+        $this->post($this->msg());
+        $this->assertSame([], $this->repo->outbox);
+        $this->assertSame([], $this->sent());
+    }
 }

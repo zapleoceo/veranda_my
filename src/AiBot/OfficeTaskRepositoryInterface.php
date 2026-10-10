@@ -11,6 +11,9 @@ namespace App\AiBot;
  */
 interface OfficeTaskRepositoryInterface
 {
+    /** Атомарно выполнить $fn (задача + outbox — всё или ничего). */
+    public function transactional(callable $fn): mixed;
+
     /** @return array<string,mixed>|null */
     public function findTaskByKey(string $taskKey): ?array;
 

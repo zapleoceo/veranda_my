@@ -21,6 +21,8 @@ final class MysqlOfficeTaskRepository implements OfficeTaskRepositoryInterface
 
     public function __construct(private readonly Database $db) {}
 
+    // CREATE TABLE IF NOT EXISTS НЕ добавляет колонки в уже существующую таблицу:
+    // любое изменение схемы потребует отдельного ALTER TABLE (как confirm_nonce в MysqlFinanceDraftRepository).
     public static function tasksDdl(string $table): string
     {
         return "CREATE TABLE IF NOT EXISTS {$table} (
@@ -66,6 +68,12 @@ final class MysqlOfficeTaskRepository implements OfficeTaskRepositoryInterface
             UNIQUE KEY uq_too_key (idempotency_key),
             KEY idx_too_status (status, next_attempt_at)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4";
+    }
+
+    public function transactional(callable $fn): mixed
+    {
+        $this->ensureTables(); // DDL делает неявный commit - только до транзакции
+        return $this->db->transaction($fn);
     }
 
     public function findTaskByKey(string $taskKey): ?array
