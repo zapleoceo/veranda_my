@@ -39,8 +39,8 @@ final class FinanceDraftService
     private const EXEC_STALE_SEC = 120;
     public const MAX_PEOPLE = 30;
 
-    /** Записи, которые execute() не трогает: внесены, ждут решения по дублю, пропущены владельцем. */
-    private const SETTLED = ['done', 'dup', 'skipped'];
+    /** Записи, которые execute() не трогает: внесены, ждут решения по дублю, пропущены владельцем, исход не определён (нужна сверка). */
+    private const SETTLED = ['done', 'dup', 'skipped', 'unverified'];
 
     /** @var array<int,string>|null */
     private ?array $accountNames = null;
@@ -242,7 +242,8 @@ final class FinanceDraftService
             $failed = count(array_filter($records, static fn(array $r) => $r['status'] === 'failed'));
             $open = count(array_filter($records, static fn(array $r) => $r['status'] === 'dup'));
             // Возможные дубли не вносятся — ждут явного решения владельца (review).
-            $final = $failed > 0 ? 'partial' : ($open > 0 ? 'review' : 'done');
+            $unknown = count(array_filter($records, static fn(array $r) => $r['status'] === 'unverified'));
+            $final = $failed > 0 ? 'partial' : ($open > 0 ? 'review' : ($unknown > 0 ? 'reconcile' : 'done'));
             $this->drafts->update($draftId, ['status' => $final, 'poster_tx_ids_json' => self::enc($records)]);
 
             try {
@@ -265,6 +266,7 @@ final class FinanceDraftService
                 'message' => match ($final) {
                     'done' => 'Готово',
                     'review' => 'Есть возможные дубли — решите, повторять ли',
+                    'reconcile' => 'Результат части записей не определён — нужна сверка с Poster',
                     default => 'Часть записей не внесена — можно повторить',
                 },
             ];
@@ -488,21 +490,17 @@ final class FinanceDraftService
                 continue;
             }
             // Отправка с неизвестным исходом (sending — упали после вызова, failed —
-            // ошибка/таймаут, но Poster мог создать): ищем СВОЮ транзакцию — та же
-            // сумма и ровно наш комментарий. Нашли — запись внесена, второй раз не шлём.
+            // ошибка/таймаут, но Poster мог создать). Уникального признака операции в
+            // комментарии нет, поэтому «свою» транзакцию однозначно узнать нельзя:
+            // любая транзакция той же суммы и того же получателя (или с тем же
+            // комментарием) делает исход неопределённым. Такая запись НЕ становится
+            // done и НЕ отправляется повторно — владельцу сообщается «нужна сверка».
+            // Кандидатов нет — Poster запись точно не создал, отправка безопасна.
             if ($st === 'sending' || $st === 'failed') {
-                $mine = self::findOwn($pool, (int) $r['amount'], (string) $r['comment']);
-                if ($mine === null && !empty($r['repeat_ok'])) {
-                    // Одобренный повтор: Poster мог изменить комментарий — тогда своя
-                    // транзакция узнаётся по сумме+имени (исходная dup_of уже исключена
-                    // через $own). Ошибка здесь в безопасную сторону: не пошлём лишнего.
-                    $mine = self::findMatch($pool, (int) $r['amount'], (string) $r['name']);
-                }
-                if ($mine !== null) {
-                    unset($pool[$mine]);
-                    $records[$i]['status'] = 'done';
-                    $records[$i]['tx_ids'] = [$mine];
-                    unset($records[$i]['error']);
+                $cand = self::uncertainCandidates($pool, (int) $r['amount'], (string) $r['name'], (string) $r['comment']);
+                if ($cand !== []) {
+                    $records[$i]['status'] = 'unverified';
+                    $records[$i]['candidates'] = array_map(static fn(int $id) => ['id' => $id] + $pool[$id], $cand);
                     continue;
                 }
             }
@@ -565,18 +563,29 @@ final class FinanceDraftService
         return null;
     }
 
-    /** Своя транзакция: та же сумма и точно тот же комментарий, что мы отправляли. */
-    private static function findOwn(array $pool, int $amount, string $comment): ?int
+    /**
+     * Транзакции, которые могли быть результатом нашей неудачной/оборванной
+     * отправки: та же сумма и (тот же комментарий после нормализации ИЛИ имя
+     * получателя словом в комментарии). Уже занятые ($own) в $pool не попадают.
+     *
+     * @param array<int,array{amount:int,comment:string,date:string}> $pool
+     * @return list<int>
+     */
+    private static function uncertainCandidates(array $pool, int $amount, string $name, string $comment): array
     {
-        $comment = self::normComment($comment);
+        $norm = self::normComment($comment);
+        $out = [];
         foreach ($pool as $tid => $t) {
-            if ($t['amount'] === $amount && $comment !== '' && self::normComment($t['comment']) === $comment) {
-                return (int) $tid;
+            if ($t['amount'] !== $amount) {
+                continue;
+            }
+            if (($norm !== '' && self::normComment($t['comment']) === $norm)
+                || self::findMatch([$tid => $t], $amount, $name) !== null) {
+                $out[] = (int) $tid;
             }
         }
-        return null;
+        return $out;
     }
-
     /** Сравнение комментариев без учёта регистра, HTML-сущностей, пробелов и вида тире. */
     private static function normComment(string $s): string
     {
@@ -637,7 +646,8 @@ final class FinanceDraftService
             }
             $open = count(array_filter($records, static fn(array $r) => $r['status'] === 'dup'));
             $pending = count(array_filter($records, static fn(array $r) => in_array($r['status'], ['pending', 'failed', 'sending'], true)));
-            $status = $pending > 0 ? 'partial' : ($open > 0 ? 'review' : 'done');
+            $unknown = count(array_filter($records, static fn(array $r) => $r['status'] === 'unverified'));
+            $status = $pending > 0 ? 'partial' : ($open > 0 ? 'review' : ($unknown > 0 ? 'reconcile' : 'done'));
             $this->drafts->update($draftId, ['status' => $status, 'poster_tx_ids_json' => self::enc($records)]);
             return [$toast, true];
         });
@@ -775,6 +785,7 @@ final class FinanceDraftService
             'skipped' => '↩️ ' . $head . ' — не внесено (дубль: ' . self::dupLine($r) . ')',
             'failed' => '❌ ' . $head . ' — ' . self::h((string) ($r['error'] ?? 'ошибка')),
             'sending' => '⏳ ' . $head . ' — исход неизвестен, проверится при повторе',
+            'unverified' => '❓ ' . $head . ' — результат не определён, нужна сверка (не внесено повторно). В Poster есть похожие: ' . self::dupLine(['dup_of' => $r['candidates'] ?? []]),
             default => '• ' . $head,
         };
     }
@@ -801,6 +812,7 @@ final class FinanceDraftService
             'done' => 'внесён',
             'partial' => 'внесён частично',
             'review' => 'ждёт решения по дублям',
+            'reconcile' => 'нужна сверка',
             'cancelled' => 'отменён',
             default => $s,
         };

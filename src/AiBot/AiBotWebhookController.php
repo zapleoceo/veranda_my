@@ -229,6 +229,11 @@ final class AiBotWebhookController
                 $this->bot->answerCallbackQuery($cbId, 'Неизвестная кнопка', true);
                 return;
             }
+            if (!$this->config->canDecideDuplicate($fromId)) {
+                $this->logger->warning('aibot.callback.dup_not_owner', ['draft' => $draftId, 'from' => $fromId]);
+                $this->bot->answerCallbackQuery($cbId, 'Решение по дублю принимает только владелец', true);
+                return;
+            }
             [$toast, $accepted] = $this->drafts->decideDuplicate($draftId, (int) $arg, $action, $fromId);
             $draft = (array) $this->drafts->get($draftId);
             // Вносим только если именно ЭТО нажатие разрешило повтор.
@@ -245,9 +250,9 @@ final class AiBotWebhookController
             $after = $res['draft'] !== [] ? $res['draft'] : $draft;
             $card = $this->drafts->render($after);
             $bot->editMessageText($msgId, $card['text'], $card['keyboard']);
-            $this->bot->answerCallbackQuery($cbId, $res['message'], !in_array((string) ($after['status'] ?? ''), ['done', 'partial', 'review'], true));
+            $this->bot->answerCallbackQuery($cbId, $res['message'], !in_array((string) ($after['status'] ?? ''), ['done', 'partial', 'review', 'reconcile'], true));
             if ((string) ($draft['status'] ?? '') !== (string) ($after['status'] ?? '') || (string) ($draft['poster_tx_ids_json'] ?? '') !== (string) ($after['poster_tx_ids_json'] ?? '')) {
-                if (in_array((string) ($after['status'] ?? ''), ['done', 'partial', 'review'], true)) {
+                if (in_array((string) ($after['status'] ?? ''), ['done', 'partial', 'review', 'reconcile'], true)) {
                     $bot->sendMessageWithKeyboard($this->drafts->journal($after), [], null, $msgId);
                 }
             }

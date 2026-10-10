@@ -49,7 +49,7 @@ final class AiBotFlowTest extends TestCase
     private int $nextTx = 20000;
 
     /** @param list<array<string,mixed>> $existing ответ finance.getTransactions */
-    public function boot(array $existing = [], ?\Closure $create = null, array $owners = [self::OWNER], array $chats = [self::CHAT]): void
+    public function boot(array $existing = [], ?\Closure $create = null, array $owners = [self::OWNER], array $chats = [self::CHAT], int $approver = self::OWNER): void
     {
         $this->tg = new RecordingHttp();
         $this->poster = new ScriptedPoster([
@@ -72,7 +72,7 @@ final class AiBotFlowTest extends TestCase
             $this->poster, $settings, $lookup, $this->audit, $this->lock, $clock,
         );
         $this->ctl = new AiBotWebhookController(
-            new AiBotConfig($owners, $chats),
+            new AiBotConfig($owners, $chats, duplicateApproverTgId: $approver),
             $svc,
             new TelegramBotClient('test-token', $this->tg),
             new PayoutParser(),
@@ -590,11 +590,8 @@ final class AiBotFlowTest extends TestCase
             'poster_tx_ids_json' => json_encode($recs, JSON_UNESCAPED_UNICODE)]);
         $this->audit->rows = [];
         $this->press('fd_go:1');
-        $this->assertCount(1, $this->creates(), 'повтор после краша нашёл свою же транзакцию');
-        $recs = json_decode($this->repo->rows[1]['poster_tx_ids_json'], true);
-        $this->assertSame('done', $recs[0]['status']);
-        $this->assertSame([20001], $recs[0]['tx_ids']);
-        $this->assertSame('done', $this->repo->rows[1]['status']);
+        $this->assertCount(1, $this->creates(), 'после краша повторно не отправлено');
+        $this->assertUnverified([20001]);
     }
 
     public function test_duplicate_decision_by_other_user_is_denied(): void
@@ -610,10 +607,10 @@ final class AiBotFlowTest extends TestCase
         $this->assertSame([], $this->decisions());
     }
 
-    public function test_own_record_after_crash_is_done_not_a_duplicate(): void
+    public function test_crash_after_send_needs_reconciliation_not_resend(): void
     {
         // Обычная (не дубль) запись: Poster создал транзакцию, а мы упали до записи
-        // статуса. При повторе это наша же транзакция → done, без вопроса «повторить?».
+        // статуса. Однозначно «своей» её не назвать — нужна сверка, повтора нет.
         $this->bootLedger([]);
         $this->runSingle('Выплаты: Олег 1 000 000');
         $this->assertCount(1, $this->creates());
@@ -625,8 +622,7 @@ final class AiBotFlowTest extends TestCase
         $this->audit->rows = [];
         $this->press('fd_go:1');
         $this->assertCount(1, $this->creates());
-        $this->assertSame('done', $this->repo->rows[1]['status']);
-        $this->assertSame([20001], json_decode($this->repo->rows[1]['poster_tx_ids_json'], true)[0]['tx_ids']);
+        $this->assertUnverified([20001]);
     }
 
     public function test_approved_repeat_failed_but_created_is_not_resent(): void
@@ -645,8 +641,8 @@ final class AiBotFlowTest extends TestCase
         $this->poster->responses['finance.createTransactions'] = $create;
         $this->audit->rows = [];
         $this->press('fd_go:1');
-        $this->assertCount(1, $this->creates(), 'своя транзакция найдена — второй раз не шлём');
-        $this->assertSame('done', $this->repo->rows[1]['status']);
+        $this->assertCount(1, $this->creates(), 'исход не определён — второй раз не шлём');
+        $this->assertUnverified([20001]);
     }
 
     public function test_stale_repeat_callback_does_not_resend_failed_records(): void
@@ -689,10 +685,10 @@ final class AiBotFlowTest extends TestCase
         $this->assertSame([], $this->decisions());
     }
 
-    public function test_approved_repeat_found_even_if_poster_altered_comment(): void
+    public function test_approved_repeat_with_altered_comment_needs_reconciliation(): void
     {
         // Повтор одобрен, Poster создал транзакцию, но вернул ошибку и сохранил
-        // комментарий изменённым (регистр/тире/пробелы) — второй раз не шлём.
+        // комментарий изменённым — второй раз не шлём, просим сверку.
         $this->bootLedger([self::tx(9001, 1000000, 'Олег')]);
         $this->runSingle('Выплаты: Олег 1 000 000');
         $create = $this->poster->responses['finance.createTransactions'];
@@ -707,6 +703,92 @@ final class AiBotFlowTest extends TestCase
         $this->audit->rows = [];
         $this->press('fd_go:1');
         $this->assertCount(1, $this->successfulCreates());
+        $this->assertUnverified([20001]);
+    }
+
+    /** Запись «нужна сверка»: не done, не отправлена, кандидаты показаны, черновик reconcile. */
+    private function assertUnverified(array $candidateIds): void
+    {
+        $recs = json_decode($this->repo->rows[1]['poster_tx_ids_json'], true);
+        $this->assertSame('unverified', $recs[0]['status']);
+        $this->assertSame([], $recs[0]['tx_ids'] ?? []);
+        $this->assertSame($candidateIds, array_column($recs[0]['candidates'], 'id'));
+        $this->assertSame('reconcile', $this->repo->rows[1]['status']);
+        $journal = array_values(array_filter($this->tg->callsTo('sendMessage'), fn($c) => str_contains($c['params']['text'], '📒')));
+        $this->assertStringContainsString('нужна сверка', end($journal)['params']['text']);
+        $this->assertSame([], $this->ctlRender()['keyboard'], 'кнопки повторной отправки нет');
+        // Ещё одно «Внести» тоже ничего не шлёт.
+        $before = count($this->creates());
+        $this->press('fd_go:1');
+        $this->assertCount($before, $this->creates());
+    }
+
+    public function test_failed_repeat_with_other_equal_payout_is_not_taken_as_own(): void
+    {
+        // Повтор одобрен (исходная #9001), отправка упала и в Poster НЕ дошла.
+        // Но в Poster есть другая равная выплата тому же получателю (#9002) вне dup_of.
+        $this->bootLedger([self::tx(9001, 1000000, 'Олег'), self::tx(9002, 1000000, 'Олег')]);
+        $this->post(self::command([], 'Выплаты: Олег 1 000 000'));
+        $this->press('fd_acc:1:1');
+        $this->press('fd_date:1:20261010');
+        $this->press('fd_go:1');
+        $recs = json_decode($this->repo->rows[1]['poster_tx_ids_json'], true);
+        $this->assertSame('dup', $recs[0]['status']);
+        $this->assertSame([9001], array_column($recs[0]['dup_of'], 'id'));
+
+        $create = $this->poster->responses['finance.createTransactions'];
+        $this->poster->responses['finance.createTransactions'] = fn(array $p) => throw new \RuntimeException('timeout');
+        $this->press('fd_rep:1:0');
+        $this->assertSame([], $this->successfulCreates(), 'в Poster своей записи нет');
+        $this->poster->responses['finance.createTransactions'] = $create;
+        $this->audit->rows = [];
+
+        $this->press('fd_go:1');
+        $this->assertSame([], $this->successfulCreates(), 'не отправлено');
+        $this->assertUnverified([9002]);
+    }
+
+    public function test_failed_send_without_any_candidate_is_resent(): void
+    {
+        // В Poster ни своей, ни похожей транзакции нет — повторная отправка безопасна.
+        $this->bootLedger([]);
+        $create = $this->poster->responses['finance.createTransactions'];
+        $this->poster->responses['finance.createTransactions'] = fn(array $p) => throw new \RuntimeException('Poster down');
+        $this->runSingle('Выплаты: Олег 1 000 000');
+        $this->assertSame('partial', $this->repo->rows[1]['status']);
+        $this->poster->responses['finance.createTransactions'] = $create;
+        $this->audit->rows = [];
+        $this->press('fd_go:1');
+        $this->assertCount(1, $this->successfulCreates());
         $this->assertSame('done', $this->repo->rows[1]['status']);
     }
+
+    public function test_duplicate_decision_only_by_owner_even_if_in_allow_list(): void
+    {
+        // В allow-list двое, команду дал второй; решать по дублю может только владелец.
+        $this->boot([], null, [self::OWNER, self::OTHER], [self::CHAT], self::OWNER);
+        $this->ledger = [self::tx(9001, 1000000, 'Олег')];
+        $this->poster->responses['finance.getTransactions'] = fn(array $q) => $this->ledger;
+        $this->post(self::command(['from' => ['id' => self::OTHER, 'username' => 'x']], 'Выплаты: Олег 1 000 000'));
+        $this->press('fd_acc:1:1', self::OTHER);
+        $this->press('fd_date:1:20261010', self::OTHER);
+        $this->press('fd_go:1', self::OTHER);
+        $this->assertSame('review', $this->repo->rows[1]['status']);
+        $this->press('fd_rep:1:0', self::OTHER);
+        $this->press('fd_skip:1:0', self::OTHER);
+        $this->assertSame([], $this->creates());
+        $this->assertSame([], $this->decisions());
+        $this->assertSame('dup', json_decode($this->repo->rows[1]['poster_tx_ids_json'], true)[0]['status']);
+        $this->assertContains('aibot.callback.dup_not_owner', array_column($this->logs, 'message'));
+    }
+
+    public function test_default_duplicate_approver_is_the_owner_id(): void
+    {
+        $cfg = new AiBotConfig([169510539, 555], ['-1']);
+        $this->assertSame(169510539, AiBotConfig::OWNER_TG_ID);
+        $this->assertTrue($cfg->canDecideDuplicate(169510539));
+        $this->assertFalse($cfg->canDecideDuplicate(555), 'в allow-list, но не владелец');
+        $this->assertFalse((new AiBotConfig([555], ['-1']))->canDecideDuplicate(169510539), 'владелец вне allow-list — тоже нет');
+    }
 }
+
