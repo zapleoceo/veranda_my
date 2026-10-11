@@ -12,12 +12,14 @@ final class MysqlOfficeTaskRepository implements OfficeTaskRepositoryInterface
     private const TASK_COLUMNS = [
         'task_key', 'chat_id', 'thread_id', 'origin_message_id', 'origin_user_id', 'update_id', 'text',
         'context_json', 'media_json', 'media_status', 'status', 'revision', 'last_question_id', 'last_question_msg_id', 'result_delivered_at',
+        'office_task_id', 'office_revision', 'office_delivered_revision', 'lease_live',
     ];
     private const OUTBOX_COLUMNS = [
         'idempotency_key', 'task_key', 'kind', 'payload_json', 'status', 'attempts', 'next_attempt_at', 'last_error',
     ];
 
     private static bool $tablesChecked = false;
+    private static bool $officeColumnsChecked = false;
 
     public function __construct(private readonly Database $db) {}
 
@@ -42,11 +44,16 @@ final class MysqlOfficeTaskRepository implements OfficeTaskRepositoryInterface
             last_question_id VARCHAR(64) NULL,
             last_question_msg_id BIGINT NULL,
             result_delivered_at DATETIME NULL,
+            office_task_id VARCHAR(128) NULL,
+            office_revision BIGINT NULL,
+            office_delivered_revision BIGINT NULL,
+            lease_live TINYINT NULL,
             created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
             updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             UNIQUE KEY uq_tot_key (task_key),
             UNIQUE KEY uq_tot_update (update_id),
             UNIQUE KEY uq_tot_origin (chat_id, origin_message_id),
+            UNIQUE KEY uq_tot_office (office_task_id),
             KEY idx_tot_question (chat_id, last_question_msg_id)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4";
     }
@@ -117,6 +124,82 @@ final class MysqlOfficeTaskRepository implements OfficeTaskRepositoryInterface
     public function insertOutbox(array $row): int
     {
         return $this->insert($this->outbox(), array_intersect_key($row, array_flip(self::OUTBOX_COLUMNS)));
+    }
+
+    public function ensureOfficeColumns(): void
+    {
+        if (self::$officeColumnsChecked) {
+            return;
+        }
+        $this->ensureTables();
+        $table = $this->tasks();
+        $want = ['office_task_id' => 'VARCHAR(128) NULL', 'office_revision' => 'BIGINT NULL',
+            'office_delivered_revision' => 'BIGINT NULL', 'lease_live' => 'TINYINT NULL'];
+        foreach ($want as $col => $def) {
+            if ($this->db->query("SHOW COLUMNS FROM {$table} LIKE '{$col}'")->fetch() === false) {
+                $this->tolerant("ALTER TABLE {$table} ADD COLUMN {$col} {$def}"); // гонка: 1060 duplicate column
+            }
+        }
+        if ($this->db->query("SHOW INDEX FROM {$table} WHERE Key_name = 'uq_tot_office'")->fetch() === false) {
+            $this->tolerant("ALTER TABLE {$table} ADD UNIQUE KEY uq_tot_office (office_task_id)"); // 1061 duplicate key
+        }
+        $this->db->query("CREATE TABLE IF NOT EXISTS {$this->db->t('tg_office_state')} (
+            k VARCHAR(64) NOT NULL PRIMARY KEY,
+            v TEXT NOT NULL,
+            updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+        self::$officeColumnsChecked = true;
+    }
+
+    public function dueOutbox(int $limit, string $now): array
+    {
+        $stmt = $this->db->query(
+            "SELECT * FROM {$this->outbox()} WHERE status = 'pending' AND (next_attempt_at IS NULL OR next_attempt_at <= ?)
+             ORDER BY id LIMIT " . max(1, $limit),
+            [$now]
+        );
+        return array_values($stmt->fetchAll());
+    }
+
+    public function updateOutbox(string $idempotencyKey, array $fields): void
+    {
+        $fields = array_intersect_key($fields, array_flip(['status', 'attempts', 'next_attempt_at', 'last_error']));
+        if ($fields === []) {
+            return;
+        }
+        $set = implode(', ', array_map(static fn(string $c) => "{$c} = ?", array_keys($fields)));
+        $this->db->query("UPDATE {$this->outbox()} SET {$set} WHERE idempotency_key = ?", [...array_values($fields), $idempotencyKey]);
+    }
+
+    public function findTaskByOfficeId(string $officeTaskId): ?array
+    {
+        return $this->one("SELECT * FROM {$this->tasks()} WHERE office_task_id = ? LIMIT 1", [$officeTaskId]);
+    }
+
+    public function getState(string $key): ?string
+    {
+        $row = $this->one("SELECT v FROM {$this->db->t('tg_office_state')} WHERE k = ? LIMIT 1", [$key]);
+        return $row === null ? null : (string) $row['v'];
+    }
+
+    public function setState(string $key, string $value): void
+    {
+        $this->db->query(
+            "INSERT INTO {$this->db->t('tg_office_state')} (k, v) VALUES (?, ?) ON DUPLICATE KEY UPDATE v = VALUES(v)",
+            [$key, $value]
+        );
+    }
+
+    private function tolerant(string $ddl): void
+    {
+        try {
+            $this->db->query($ddl);
+        } catch (\PDOException $e) {
+            // Параллельный процесс успел первым: дубликат колонки/ключа не ошибка.
+            if (!in_array((int) ($e->errorInfo[1] ?? 0), [1060, 1061], true)) {
+                throw $e;
+            }
+        }
     }
 
     /** @param array<string,mixed> $row */

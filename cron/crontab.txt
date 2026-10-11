@@ -19,3 +19,6 @@
 0 * * * * /opt/php82/bin/php /var/www/veranda_my_usr/data/www/veranda.my/scripts/menu/cron.php >> /var/www/veranda_my_usr/data/www/veranda.my/menu_sync.log 2>&1
 0 3 * * * /opt/php82/bin/php /var/www/veranda_my_usr/data/www/veranda.my/daily_summary.php >> /var/www/veranda_my_usr/data/www/veranda.my/daily_summary.log 2>&1
 0 3 * * * /opt/php82/bin/php /var/www/veranda_my_usr/data/www/veranda.my/scripts/reservations/daily_booking_reminder.php >> /var/www/veranda_my_usr/data/www/veranda.my/reservations_daily_reminder.log 2>&1
+
+# Office sender (@Veranda_aibot -> Vera). НЕ ВКЛЮЧЕНО: нужны OFFICE_API_URL + OFFICE_SERVICE_TOKEN в .env и решение владельца.
+#* * * * * /opt/php82/bin/php /var/www/veranda_my_usr/data/www/veranda.my/cron/office_poll.php >> /var/www/veranda_my_usr/data/www/veranda.my/office_poll.log 2>&1

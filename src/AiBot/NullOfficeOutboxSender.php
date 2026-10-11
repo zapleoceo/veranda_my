@@ -11,4 +11,9 @@ final class NullOfficeOutboxSender implements OfficeOutboxSenderInterface
     {
         return false;
     }
+
+    public function isHalted(): bool
+    {
+        return false;
+    }
 }

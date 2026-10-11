@@ -70,7 +70,8 @@ final class InMemoryOfficeRepository implements OfficeTaskRepositoryInterface
             return (int) $ex['id'];
         }
         $row += ['thread_id' => null, 'context_json' => null, 'media_json' => null, 'media_status' => 'none',
-            'last_question_id' => null, 'last_question_msg_id' => null, 'result_delivered_at' => null];
+            'last_question_id' => null, 'last_question_msg_id' => null, 'result_delivered_at' => null,
+            'office_task_id' => null, 'office_revision' => null, 'office_delivered_revision' => null, 'lease_live' => null];
         $row['id'] = $this->nextId++;
         $this->tasks[$row['task_key']] = $row;
         return $row['id'];
@@ -84,6 +85,52 @@ final class InMemoryOfficeRepository implements OfficeTaskRepositoryInterface
     public function findOutboxByKey(string $idempotencyKey): ?array
     {
         return $this->outbox[$idempotencyKey] ?? null;
+    }
+
+    public int $ensureCalls = 0;
+    /** @var array<string,string> */
+    public array $state = [];
+
+    public function ensureOfficeColumns(): void
+    {
+        $this->ensureCalls++;
+    }
+
+    public function dueOutbox(int $limit, string $now): array
+    {
+        $out = [];
+        foreach ($this->outbox as $r) {
+            if (($r['status'] ?? 'pending') === 'pending' && (($r['next_attempt_at'] ?? null) === null || $r['next_attempt_at'] <= $now)) {
+                $out[] = $r;
+            }
+        }
+        usort($out, static fn($a, $b) => $a['id'] <=> $b['id']);
+        return array_slice($out, 0, $limit);
+    }
+
+    public function updateOutbox(string $idempotencyKey, array $fields): void
+    {
+        $this->outbox[$idempotencyKey] = $fields + $this->outbox[$idempotencyKey];
+    }
+
+    public function findTaskByOfficeId(string $officeTaskId): ?array
+    {
+        foreach ($this->tasks as $t) {
+            if (($t['office_task_id'] ?? null) === $officeTaskId) {
+                return $t;
+            }
+        }
+        return null;
+    }
+
+    public function getState(string $key): ?string
+    {
+        return $this->state[$key] ?? null;
+    }
+
+    public function setState(string $key, string $value): void
+    {
+        $this->state[$key] = $value;
     }
 
     public function insertOutbox(array $row): int

@@ -184,13 +184,33 @@ return [
     // Приём задач в офис: право aibot_office (отдельное от aibot_finance). Отправителя в офис пока нет.
     \App\AiBot\OfficeTaskService::class => fn($c) => new \App\AiBot\OfficeTaskService(
         \App\AiBot\AiBotConfig::fromConfig($c->get(\App\AiBot\FinanceAuthorizerInterface::class)),
-        new \App\AiBot\MysqlOfficeTaskRepository($c->get(Database::class)),
+        $c->get(\App\AiBot\OfficeTaskRepositoryInterface::class),
         $c->get('aibot.telegram'),
         new \App\AiBot\TelegramPermissionAuthorizer($c->get(\App\Infrastructure\TelegramUserDirectory::class), 'aibot_office'),
         $c->get(\App\Payday3\Contracts\NamedLockInterface::class),
         $c->get(LoggerInterface::class),
     ),
-    \App\AiBot\OfficeOutboxSenderInterface::class => fn() => new \App\AiBot\NullOfficeOutboxSender(),
+    \App\AiBot\OfficeTaskRepositoryInterface::class => fn($c) => new \App\AiBot\MysqlOfficeTaskRepository($c->get(Database::class)),
+    // Отправка в офис: реальная только при непустых OFFICE_API_URL и OFFICE_SERVICE_TOKEN, иначе заглушки (БД/сеть не трогаются).
+    \App\AiBot\OfficeApiClient::class => fn() => \App\AiBot\OfficeWiring::client(\App\AiBot\OfficeWiring::config()),
+    \App\AiBot\OfficeOutboxSenderInterface::class => fn($c) => $c->get(\App\AiBot\OfficeApiClient::class) === null
+        ? new \App\AiBot\NullOfficeOutboxSender() // не настроено: ни БД, ни токен Telegram не нужны
+        : \App\AiBot\OfficeWiring::sender(
+        $c->get(\App\AiBot\OfficeApiClient::class),
+        $c->get(\App\AiBot\OfficeTaskRepositoryInterface::class),
+        $c->get(LoggerInterface::class),
+        $c->get('aibot.telegram'),
+    ),
+    \App\AiBot\OfficePollerInterface::class => fn($c) => $c->get(\App\AiBot\OfficeApiClient::class) === null
+        ? new \App\AiBot\NullOfficePoller()
+        : \App\AiBot\OfficeWiring::poller(
+        $c->get(\App\AiBot\OfficeApiClient::class),
+        $c->get(\App\AiBot\OfficeTaskRepositoryInterface::class),
+        $c->get(\App\AiBot\OfficeOutboxSenderInterface::class),
+        $c->get(\App\AiBot\OfficeTaskService::class),
+        $c->get('aibot.telegram'),
+        $c->get(LoggerInterface::class),
+    ),
 
     // ─── Payday3 ──────────────────────────────────────────────
     SepayRepositoryInterface::class  => fn($c) => new SepayRepository($c->get(Database::class)),

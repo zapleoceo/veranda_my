@@ -34,4 +34,20 @@ interface OfficeTaskRepositoryInterface
 
     /** @param array<string,mixed> $row */
     public function insertOutbox(array $row): int;
+
+    /** Добавить office_*-колонки в уже существующую таблицу. Зовёт ТОЛЬКО реальный отправитель/поллер. */
+    public function ensureOfficeColumns(): void;
+
+    /** pending-строки outbox, у которых пришло время (next_attempt_at пуст или <= $now, 'Y-m-d H:i:s'). @return list<array<string,mixed>> */
+    public function dueOutbox(int $limit, string $now): array;
+
+    /** @param array<string,mixed> $fields status, attempts, next_attempt_at, last_error */
+    public function updateOutbox(string $idempotencyKey, array $fields): void;
+
+    /** @return array<string,mixed>|null */
+    public function findTaskByOfficeId(string $officeTaskId): ?array;
+
+    public function getState(string $key): ?string;
+
+    public function setState(string $key, string $value): void;
 }

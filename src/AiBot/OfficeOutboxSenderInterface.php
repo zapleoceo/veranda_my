@@ -7,8 +7,7 @@ namespace App\AiBot;
 /**
  * Доставка строки tg_office_outbox в офис.
  *
- * TODO: реальная реализация (HTTP-клиент, cron-потребитель, статусы sent/failed,
- * attempts/next_attempt_at) — отдельной задачей; здесь граница намеренно оборвана.
+ * Реализации: NullOfficeOutboxSender (не настроено) и HttpOfficeOutboxSender (OFFICE_API_URL + токен).
  */
 interface OfficeOutboxSenderInterface
 {
@@ -17,4 +16,7 @@ interface OfficeOutboxSenderInterface
      * @return bool true — доставлено, false — оставить в очереди
      */
     public function send(array $outboxRow): bool;
+
+    /** true — сервер отверг учётные данные (401/403): остальной пакет отправлять бессмысленно. */
+    public function isHalted(): bool;
 }
