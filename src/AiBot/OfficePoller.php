@@ -49,10 +49,17 @@ final class OfficePoller implements OfficePollerInterface
         if ($this->lock === null) {
             return $this->doRun();
         }
+        $entered = false;
         try {
             // Защита от наложения cron-запусков (дополнительно к flock в cron/office_poll.php).
-            return $this->lock->synchronized('aibot_office_poll', 0, fn(): array => $this->doRun());
-        } catch (\DomainException) {
+            return $this->lock->synchronized('aibot_office_poll', 0, function () use (&$entered): array {
+                $entered = true;
+                return $this->doRun();
+            });
+        } catch (\DomainException $e) {
+            if ($entered) {
+                throw $e; // настоящая ошибка внутри прохода, а не "лок занят"
+            }
             $this->logger->info('aibot.office.poll.busy');
             return ['sent' => 0, 'polled' => 0, 'questions' => 0, 'results' => 0, 'delivered' => 0, 'errors' => 0];
         }

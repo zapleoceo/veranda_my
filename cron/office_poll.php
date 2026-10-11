@@ -22,9 +22,14 @@ Logger::init(Config::get('LOG_LEVEL', 'info'));
 $lockFile = Config::privateDir('locks') . '/office_poll.lock';
 $lockFh = @fopen($lockFile, 'c');
 if ($lockFh === false) {
-    $lockFh = fopen(sys_get_temp_dir() . '/veranda_office_poll.lock', 'c');
+    $lockFh = @fopen(sys_get_temp_dir() . '/veranda_office_poll.lock', 'c');
 }
-if ($lockFh === false || !flock($lockFh, LOCK_EX | LOCK_NB)) {
+if ($lockFh === false) {
+    Logger::get()->warning('office_poll.no_lock_file', ['file' => $lockFile]);
+    exit(0); // fail closed: без блокировки не запускаемся
+}
+if (!flock($lockFh, LOCK_EX | LOCK_NB)) {
+    Logger::get()->info('office_poll.busy');
     exit(0);
 }
 

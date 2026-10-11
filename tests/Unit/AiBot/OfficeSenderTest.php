@@ -641,4 +641,22 @@ final class OfficeSenderTest extends TestCase
         $this->assertNull($this->repo->getState('park_item_vb-abc'));
         $this->assertStringContainsString('aibot.office.poll.dropped', implode("\n", $this->logLines));
     }
+
+    public function testDomainExceptionInsideRunIsNotReportedAsBusy(): void
+    {
+        $lock = new class implements \App\Payday3\Contracts\NamedLockInterface {
+            public function synchronized(string $name, int $timeoutSeconds, callable $fn): mixed
+            {
+                return $fn();
+            }
+        };
+        $sender = new class implements \App\AiBot\OfficeOutboxSenderInterface {
+            public function send(array $outboxRow): bool { return false; }
+            public function isHalted(): bool { throw new \DomainException('real failure'); }
+        };
+        $p = new OfficePoller($this->repo, $sender, $this->api, $this->service, $this->bot, $this->log, null, $lock);
+        $this->expectException(\DomainException::class);
+        $this->expectExceptionMessage('real failure');
+        $p->run();
+    }
 }
