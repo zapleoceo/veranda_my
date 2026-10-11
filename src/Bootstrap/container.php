@@ -210,6 +210,7 @@ return [
         $c->get(\App\AiBot\OfficeTaskService::class),
         $c->get('aibot.telegram'),
         $c->get(LoggerInterface::class),
+        $c->get(\App\Payday3\Contracts\NamedLockInterface::class),
     ),
 
     // ─── Payday3 ──────────────────────────────────────────────

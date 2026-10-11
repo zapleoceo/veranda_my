@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\AiBot;
 
 use App\Infrastructure\TelegramBotClient;
+use App\Payday3\Contracts\NamedLockInterface;
 use Psr\Log\LoggerInterface;
 
 /**
@@ -38,11 +39,27 @@ final class OfficePoller implements OfficePollerInterface
         private readonly TelegramBotClient $bot,
         private readonly LoggerInterface $logger,
         ?\Closure $clock = null,
+        private readonly ?NamedLockInterface $lock = null,
     ) {
         $this->clock = $clock ?? static fn(): int => time();
     }
 
     public function run(): array
+    {
+        if ($this->lock === null) {
+            return $this->doRun();
+        }
+        try {
+            // Защита от наложения cron-запусков (дополнительно к flock в cron/office_poll.php).
+            return $this->lock->synchronized('aibot_office_poll', 0, fn(): array => $this->doRun());
+        } catch (\DomainException) {
+            $this->logger->info('aibot.office.poll.busy');
+            return ['sent' => 0, 'polled' => 0, 'questions' => 0, 'results' => 0, 'delivered' => 0, 'errors' => 0];
+        }
+    }
+
+    /** @return array<string,int> */
+    private function doRun(): array
     {
         $st = ['sent' => 0, 'polled' => 0, 'questions' => 0, 'results' => 0, 'delivered' => 0, 'errors' => 0];
         $this->repo->ensureOfficeColumns();
@@ -141,7 +158,7 @@ final class OfficePoller implements OfficePollerInterface
         }
         $set = $this->parkedSet();
         if (isset($set[$officeId])) {
-            $this->repo->setState(self::ITEM_PREFIX . $officeId, (string) json_encode($item, JSON_UNESCAPED_UNICODE));
+            $this->repo->setState(self::ITEM_PREFIX . $officeId, self::snapshot($item));
             $parked[$officeId] = true;
             return true; // уже запаркована: обработает retryParked
         }
@@ -155,7 +172,7 @@ final class OfficePoller implements OfficePollerInterface
         }
         $set[$officeId] = $first;
         $this->saveSet($set);
-        $this->repo->setState(self::ITEM_PREFIX . $officeId, (string) json_encode($item, JSON_UNESCAPED_UNICODE));
+        $this->repo->setState(self::ITEM_PREFIX . $officeId, self::snapshot($item));
         $this->repo->deleteState($k);
         $parked[$officeId] = true;
         $this->logger->error('aibot.office.poll.give_up', ['task' => $officeId, 'attempts' => $n]);
@@ -219,10 +236,15 @@ final class OfficePoller implements OfficePollerInterface
                 $this->unpark($id);
                 continue;
             }
+            if (($this->clock)() - $firstTs > 2 * self::PARK_TTL) {
+                $this->logger->error('aibot.office.poll.dropped', ['task' => $id]); // уведомление так и не ушло
+                $this->unpark($id);
+                continue;
+            }
             if (($this->clock)() - $firstTs > self::PARK_TTL) {
                 $local = $this->repo->findTaskByOfficeId($id);
                 $this->logger->error('aibot.office.poll.abandoned', ['task' => $id]);
-                if ($local === null || $this->say($local, '⚠️ Не удалось доставить результат задачи #' . ($local['id'] ?? $local['task_key']) . ' - откройте офис')) {
+                if ($local === null || $this->say($local, '⚠️ Не удалось доставить обновление задачи #' . ($local['id'] ?? $local['task_key']) . ' - откройте офис')) {
                     $this->unpark($id); // уведомление ушло ровно один раз: задача снята с учёта
                 }
             }
@@ -361,6 +383,19 @@ final class OfficePoller implements OfficePollerInterface
         $id = $this->bot->withChatId((string) $local['chat_id'])
             ->sendMessageWithKeyboard($text, [], $thread, (int) $local['origin_message_id']);
         return (bool) $id;
+    }
+
+    /**
+     * Снимок для повторов: результат режем до того, что реально отправляем (+1 символ, чтобы сохранить пометку «обрезано»).
+     *
+     * @param array<string,mixed> $item
+     */
+    private static function snapshot(array $item): string
+    {
+        if (is_string($item['result'] ?? null)) {
+            $item['result'] = mb_substr($item['result'], 0, self::RESULT_MAX + 1);
+        }
+        return (string) json_encode($item, JSON_UNESCAPED_UNICODE | JSON_PARTIAL_OUTPUT_ON_ERROR);
     }
 
     private static function esc(string $s): string

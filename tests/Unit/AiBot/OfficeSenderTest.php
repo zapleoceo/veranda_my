@@ -564,13 +564,13 @@ final class OfficeSenderTest extends TestCase
         $this->listWith([]);
         $this->poller()->run();
         $texts = array_map(static fn($c) => $c['params']['text'], $this->tg->callsTo('sendMessage'));
-        $notices = array_values(array_filter($texts, static fn($t) => str_contains($t, 'Не удалось доставить результат')));
+        $notices = array_values(array_filter($texts, static fn($t) => str_contains($t, 'Не удалось доставить обновление')));
         $this->assertCount(1, $notices);
         $this->assertStringContainsString('error aibot.office.poll.abandoned', implode("\n", $this->logLines));
         $this->listWith([]);
         $this->poller()->run();
         $texts = array_map(static fn($c) => $c['params']['text'], $this->tg->callsTo('sendMessage'));
-        $this->assertCount(1, array_filter($texts, static fn($t) => str_contains($t, 'Не удалось доставить результат')));
+        $this->assertCount(1, array_filter($texts, static fn($t) => str_contains($t, 'Не удалось доставить обновление')));
     }
 
     public function testBlockedStatusSetOnlyAfterNoticeSent(): void
@@ -594,9 +594,51 @@ final class OfficeSenderTest extends TestCase
         $this->seedTask();
         $this->seedAnswer();
         $row = $this->repo->findOutboxByKey('vb-ans--1001-650');
-        $row['created_at'] = date('Y-m-d H:i:s', self::NOW - 90000);
+        $row['created_ts'] = self::NOW - 90000;
         $this->sender->send($row);
         $this->assertSame('failed', $this->repo->findOutboxByKey('vb-ans--1001-650')['status']);
         $this->assertCount(1, $this->notes);
+    }
+
+    public function testConcurrentPollRunDoesNothing(): void
+    {
+        $lock = new class implements \App\Payday3\Contracts\NamedLockInterface {
+            public int $held = 1;
+            public function synchronized(string $name, int $timeoutSeconds, callable $fn): mixed
+            {
+                if ($this->held > 0) {
+                    throw new \DomainException('busy');
+                }
+                return $fn();
+            }
+        };
+        $p = new OfficePoller($this->repo, $this->sender, $this->api, $this->service, $this->bot, $this->log, null, $lock);
+        $this->seedTask();
+        $this->seedCreate();
+        $st = $p->run();
+        $this->assertSame(0, $st['sent']);
+        $this->assertSame([], $this->http->calls);
+        $this->assertSame(0, $this->repo->ensureCalls);
+        $lock->held = 0;
+        $this->http->push(201, ['task_id' => 'vb-abc', 'revision' => 1])->push(200, ['tasks' => [], 'next_cursor' => null]);
+        $this->assertSame(1, $p->run()['sent']);
+    }
+
+    public function testParkedDroppedAfter48hWhenNoticeCannotBeSent(): void
+    {
+        $this->seedTask(['office_task_id' => 'vb-abc', 'office_revision' => 40, 'status' => 'waiting_executor']);
+        $this->tg->failAll = true;
+        for ($i = 1; $i <= 5; $i++) {
+            $this->listWith([$this->item(['status' => 'done', 'result' => str_repeat('я', 9000), 'revision' => 70])]);
+            $this->poller()->run();
+        }
+        $snap = json_decode((string) $this->repo->getState('park_item_vb-abc'), true);
+        $this->assertSame(3801, mb_strlen($snap['result']));
+        $this->now += 172801;
+        $this->listWith([]);
+        $this->poller()->run();
+        $this->assertSame('[]', (string) $this->repo->getState('parked_ids'));
+        $this->assertNull($this->repo->getState('park_item_vb-abc'));
+        $this->assertStringContainsString('aibot.office.poll.dropped', implode("\n", $this->logLines));
     }
 }

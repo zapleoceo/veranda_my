@@ -253,8 +253,8 @@ final class HttpOfficeOutboxSender implements OfficeOutboxSenderInterface
     /** Отложить строку без траты попытки. @param array<string,mixed> $row */
     private function defer(array $row, int $seconds, string $reason): void
     {
-        $created = isset($row['created_at']) ? strtotime((string) $row['created_at']) : false;
-        if ($created !== false && ($this->clock)() - $created > self::DEFER_MAX_AGE) {
+        // created_ts = UNIX_TIMESTAMP(created_at) из SQL: без сдвига часовых поясов PHP/MySQL
+        if (isset($row['created_ts']) && ($this->clock)() - (int) $row['created_ts'] > self::DEFER_MAX_AGE) {
             $this->fail($row, $this->repo->findTaskByKey((string) $row['task_key']), $reason . ':deferred_too_long', 'не удалось отправить в офис (слишком долго в очереди)');
             return;
         }

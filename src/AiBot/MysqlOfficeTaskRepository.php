@@ -145,16 +145,20 @@ final class MysqlOfficeTaskRepository implements OfficeTaskRepositoryInterface
         }
         $this->db->query("CREATE TABLE IF NOT EXISTS {$this->db->t('tg_office_state')} (
             k VARCHAR(64) NOT NULL PRIMARY KEY,
-            v TEXT NOT NULL,
+            v MEDIUMTEXT NOT NULL,
             updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+        $v = $this->db->query("SHOW COLUMNS FROM {$this->db->t('tg_office_state')} LIKE 'v'")->fetch();
+        if (is_array($v) && strtolower((string) ($v['Type'] ?? '')) === 'text') {
+            $this->db->query("ALTER TABLE {$this->db->t('tg_office_state')} MODIFY v MEDIUMTEXT NOT NULL");
+        }
         self::$officeColumnsChecked = true;
     }
 
     public function dueOutbox(int $limit, string $now): array
     {
         $stmt = $this->db->query(
-            "SELECT * FROM {$this->outbox()} WHERE status = 'pending' AND (next_attempt_at IS NULL OR next_attempt_at <= ?)
+            "SELECT *, UNIX_TIMESTAMP(created_at) AS created_ts FROM {$this->outbox()} WHERE status = 'pending' AND (next_attempt_at IS NULL OR next_attempt_at <= ?)
              ORDER BY id LIMIT " . max(1, $limit),
             [$now]
         );

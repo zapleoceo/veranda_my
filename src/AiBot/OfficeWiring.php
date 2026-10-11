@@ -6,6 +6,7 @@ namespace App\AiBot;
 
 use App\Infrastructure\Config;
 use App\Infrastructure\TelegramBotClient;
+use App\Payday3\Contracts\NamedLockInterface;
 use Psr\Log\LoggerInterface;
 
 /** Выбор реального/пустого отправителя по OFFICE_API_URL + OFFICE_SERVICE_TOKEN (оба непусты). */
@@ -45,7 +46,8 @@ final class OfficeWiring
         OfficeTaskService $service,
         TelegramBotClient $bot,
         LoggerInterface $logger,
+        ?NamedLockInterface $lock = null,
     ): OfficePollerInterface {
-        return $client === null ? new NullOfficePoller() : new OfficePoller($repo, $sender, $client, $service, $bot, $logger);
+        return $client === null ? new NullOfficePoller() : new OfficePoller($repo, $sender, $client, $service, $bot, $logger, null, $lock);
     }
 }
