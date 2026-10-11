@@ -19,6 +19,7 @@ final class HttpOfficeOutboxSender implements OfficeOutboxSenderInterface
     private const BACKOFF_BASE = 30;
     private const BACKOFF_MAX = 3600;
     private const REFRESH_PAGES = 3;
+    private const DEFER_MAX_AGE = 86400;
 
     private bool $halted = false;
     /** @var \Closure(): int */
@@ -252,6 +253,11 @@ final class HttpOfficeOutboxSender implements OfficeOutboxSenderInterface
     /** Отложить строку без траты попытки. @param array<string,mixed> $row */
     private function defer(array $row, int $seconds, string $reason): void
     {
+        $created = isset($row['created_at']) ? strtotime((string) $row['created_at']) : false;
+        if ($created !== false && ($this->clock)() - $created > self::DEFER_MAX_AGE) {
+            $this->fail($row, $this->repo->findTaskByKey((string) $row['task_key']), $reason . ':deferred_too_long', 'не удалось отправить в офис (слишком долго в очереди)');
+            return;
+        }
         $this->repo->updateOutbox((string) $row['idempotency_key'], [
             'next_attempt_at' => date('Y-m-d H:i:s', ($this->clock)() + $seconds), 'last_error' => $reason,
         ]);

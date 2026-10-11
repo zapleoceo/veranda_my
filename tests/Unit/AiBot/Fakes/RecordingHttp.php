@@ -12,12 +12,21 @@ final class RecordingHttp extends HttpClient
     /** @var list<array{method:string, params:array}> */
     public array $calls = [];
     private int $nextId = 900;
+    public bool $failAll = false;
+    public int $failNext = 0;
 
     public function __construct() {}
 
     public function postJson(string $url, array $params = []): array|null
     {
         $this->calls[] = ['method' => (string) substr($url, strrpos($url, '/') + 1), 'params' => $params];
+        if ($this->failNext > 0) {
+            $this->failNext--;
+            return ['ok' => false];
+        }
+        if ($this->failAll) {
+            return ['ok' => false];
+        }
         return ['ok' => true, 'result' => ['message_id' => ++$this->nextId]];
     }
 

@@ -190,6 +190,11 @@ final class MysqlOfficeTaskRepository implements OfficeTaskRepositoryInterface
         );
     }
 
+    public function deleteState(string $key): void
+    {
+        $this->db->query("DELETE FROM {$this->db->t('tg_office_state')} WHERE k = ?", [$key]);
+    }
+
     private function tolerant(string $ddl): void
     {
         try {

@@ -44,6 +44,7 @@ final class OfficeSenderTest extends TestCase
     private OfficeApiClient $api;
     private OfficeTaskService $service;
     private TelegramBotClient $bot;
+    private int $now = self::NOW;
 
     protected function setUp(): void
     {
@@ -280,7 +281,7 @@ final class OfficeSenderTest extends TestCase
 
     private function poller(): OfficePoller
     {
-        return new OfficePoller($this->repo, $this->sender, $this->api, $this->service, $this->bot, $this->log, static fn(): int => self::NOW);
+        return new OfficePoller($this->repo, $this->sender, $this->api, $this->service, $this->bot, $this->log, fn(): int => $this->now);
     }
 
     /** @param array<string,mixed> $over */
@@ -517,5 +518,85 @@ final class OfficeSenderTest extends TestCase
         $row = $this->seedAnswer();
         $this->sender->send($row);
         $this->assertSame(date('Y-m-d H:i:s', self::NOW + 30), $this->repo->findOutboxByKey('vb-ans--1001-650')['next_attempt_at']);
+    }
+
+    public function testParkedResultDeliveredOnceAfterTelegramRecovers(): void
+    {
+        $this->seedTask(['office_task_id' => 'vb-abc', 'office_revision' => 40, 'status' => 'waiting_executor']);
+        $done = $this->item(['status' => 'done', 'result' => 'Готово', 'revision' => 70, 'updated_at' => '2026-10-11T10:30:00']);
+        $later = $this->item(['task_id' => 'vb-zzz', 'client_task_id' => 'tg-1-2', 'updated_at' => '2026-10-11T11:00:00']);
+        $this->tg->failAll = true;
+        for ($i = 1; $i <= 6; $i++) {
+            $this->listWith($i <= 5 ? [$done, $later] : []);
+            $this->poller()->run();
+        }
+        $this->assertSame('2026-10-11T10:59:59', $this->repo->getState('poll_since')); // курсор ушёл вперёд
+        $this->assertNull($this->repo->getState('att_vb-abc'));
+        $this->assertNull($this->repo->findTaskByKey('vb--1001-600')['result_delivered_at']);
+
+        $this->tg->failAll = false;
+        $before = count($this->tg->callsTo('sendMessage'));
+        $this->listWith([]);
+        $this->http->push(200, ['delivered_revision' => 70]);
+        $st = $this->poller()->run();
+        $this->assertSame(1, $st['results']);
+        $this->assertCount($before + 1, $this->tg->callsTo('sendMessage'));
+        $this->assertSame(70, $this->repo->findTaskByKey('vb--1001-600')['office_delivered_revision']);
+        $this->assertSame('[]', (string) $this->repo->getState('parked_ids'));
+
+        $this->listWith([]);
+        $this->poller()->run();
+        $this->assertCount($before + 1, $this->tg->callsTo('sendMessage'));
+    }
+
+    public function testParkedTaskGivesFinalNoticeAfter24h(): void
+    {
+        $this->seedTask(['office_task_id' => 'vb-abc', 'office_revision' => 40, 'status' => 'waiting_executor']);
+        $done = $this->item(['status' => 'done', 'result' => 'Готово', 'revision' => 70]);
+        $this->tg->failAll = true;
+        for ($i = 1; $i <= 5; $i++) {
+            $this->listWith([$done]);
+            $this->poller()->run();
+        }
+        $this->now += 86401;
+        $this->tg->failAll = false;
+        $this->tg->failNext = 1; // результат не уходит, итоговое уведомление уходит
+        $this->listWith([]);
+        $this->poller()->run();
+        $texts = array_map(static fn($c) => $c['params']['text'], $this->tg->callsTo('sendMessage'));
+        $notices = array_values(array_filter($texts, static fn($t) => str_contains($t, 'Не удалось доставить результат')));
+        $this->assertCount(1, $notices);
+        $this->assertStringContainsString('error aibot.office.poll.abandoned', implode("\n", $this->logLines));
+        $this->listWith([]);
+        $this->poller()->run();
+        $texts = array_map(static fn($c) => $c['params']['text'], $this->tg->callsTo('sendMessage'));
+        $this->assertCount(1, array_filter($texts, static fn($t) => str_contains($t, 'Не удалось доставить результат')));
+    }
+
+    public function testBlockedStatusSetOnlyAfterNoticeSent(): void
+    {
+        $this->seedTask(['office_task_id' => 'vb-abc', 'office_revision' => 40, 'status' => 'waiting_executor']);
+        $this->tg->failAll = true;
+        $this->listWith([$this->item(['status' => 'blocked', 'revision' => 50])]);
+        $st = $this->poller()->run();
+        $this->assertSame(1, $st['errors']);
+        $this->assertSame('waiting_executor', $this->repo->findTaskByKey('vb--1001-600')['status']);
+        $this->assertNull($this->repo->findTaskByKey('vb--1001-600')['office_delivered_revision']);
+        $this->tg->failAll = false;
+        $this->listWith([$this->item(['status' => 'blocked', 'revision' => 50])]);
+        $this->http->push(200, []);
+        $this->poller()->run();
+        $this->assertSame('blocked', $this->repo->findTaskByKey('vb--1001-600')['status']);
+    }
+
+    public function testDeferredTooLongRowFailsWithNotice(): void
+    {
+        $this->seedTask();
+        $this->seedAnswer();
+        $row = $this->repo->findOutboxByKey('vb-ans--1001-650');
+        $row['created_at'] = date('Y-m-d H:i:s', self::NOW - 90000);
+        $this->sender->send($row);
+        $this->assertSame('failed', $this->repo->findOutboxByKey('vb-ans--1001-650')['status']);
+        $this->assertCount(1, $this->notes);
     }
 }

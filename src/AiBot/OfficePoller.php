@@ -18,6 +18,10 @@ final class OfficePoller implements OfficePollerInterface
 {
     public const STATE_SINCE = 'poll_since';
     private const MAX_ITEM_ATTEMPTS = 5;
+    private const PARK_TTL = 86400;
+    private const STATE_PARKED = 'parked_ids';
+    private const ATT_PREFIX = 'att_';
+    private const ITEM_PREFIX = 'park_item_';
     private const BATCH = 20;
     private const PAGE = 100;
     private const MAX_PAGES = 20;
@@ -64,6 +68,8 @@ final class OfficePoller implements OfficePollerInterface
         $cursor = null;
         $maxTs = null;
         $minFailTs = null;
+        $parked = [];
+        $seen = [];
         for ($page = 0; $page < self::MAX_PAGES; $page++) {
             try {
                 $r = $this->api->listTasks($since, $cursor, self::PAGE);
@@ -91,9 +97,10 @@ final class OfficePoller implements OfficePollerInterface
                 }
                 if (!$ok) {
                     $st['errors']++;
-                    $ok = $this->giveUpAfterRetries((string) ($item['task_id'] ?? ''));
+                    $ok = $this->onItemFailure((string) ($item['task_id'] ?? ''), $item, $parked);
                 } elseif (isset($item['task_id'])) {
-                    $this->resetAttempts((string) $item['task_id']);
+                    $this->onItemSuccess((string) $item['task_id']);
+                    $seen[(string) $item['task_id']] = true;
                 }
                 if ($ts === null) {
                     continue;
@@ -109,6 +116,7 @@ final class OfficePoller implements OfficePollerInterface
                 break;
             }
         }
+        $this->retryParked($parked + $seen, $st);
         $mark = $minFailTs ?? $maxTs;
         if ($mark !== null) {
             $new = gmdate('Y-m-d\TH:i:s', $mark - 1);
@@ -119,26 +127,105 @@ final class OfficePoller implements OfficePollerInterface
         return $st;
     }
 
-    /** Счётчик неудач на задачу: после MAX_ITEM_ATTEMPTS курсор идёт дальше (одна задача не держит остальные). */
-    private function giveUpAfterRetries(string $officeId): bool
+    /**
+     * Неудача по задаче: первые MAX_ITEM_ATTEMPTS раз держим курсор; потом задача "паркуется" в retry-наборе
+     * (tg_office_state) и перепроверяется каждый проход по сохранённым данным, а курсор идёт дальше.
+     *
+     * @param array<string,mixed> $item
+     * @param array<string,bool> $parked
+     */
+    private function onItemFailure(string $officeId, array $item, array &$parked): bool
     {
         if ($officeId === '') {
             return false;
         }
-        $k = 'att_' . $officeId;
-        $n = (int) ($this->repo->getState($k) ?? 0) + 1;
-        $this->repo->setState($k, (string) $n);
-        if ($n >= self::MAX_ITEM_ATTEMPTS) {
-            $this->logger->error('aibot.office.poll.give_up', ['task' => $officeId, 'attempts' => $n]);
-            return true;
+        $set = $this->parkedSet();
+        if (isset($set[$officeId])) {
+            $this->repo->setState(self::ITEM_PREFIX . $officeId, (string) json_encode($item, JSON_UNESCAPED_UNICODE));
+            $parked[$officeId] = true;
+            return true; // уже запаркована: обработает retryParked
         }
-        return false;
+        $k = self::ATT_PREFIX . $officeId;
+        $att = json_decode((string) ($this->repo->getState($k) ?? ''), true);
+        $n = (is_array($att) ? (int) ($att['n'] ?? 0) : 0) + 1;
+        $first = is_array($att) ? (int) ($att['ts'] ?? 0) : ($this->clock)();
+        $this->repo->setState($k, (string) json_encode(['n' => $n, 'ts' => $first]));
+        if ($n < self::MAX_ITEM_ATTEMPTS) {
+            return false;
+        }
+        $set[$officeId] = $first;
+        $this->saveSet($set);
+        $this->repo->setState(self::ITEM_PREFIX . $officeId, (string) json_encode($item, JSON_UNESCAPED_UNICODE));
+        $this->repo->deleteState($k);
+        $parked[$officeId] = true;
+        $this->logger->error('aibot.office.poll.give_up', ['task' => $officeId, 'attempts' => $n]);
+        return true;
     }
 
-    private function resetAttempts(string $officeId): void
+    private function onItemSuccess(string $officeId): void
     {
-        if ($this->repo->getState('att_' . $officeId) !== null) {
-            $this->repo->setState('att_' . $officeId, '0');
+        $this->repo->deleteState(self::ATT_PREFIX . $officeId);
+        $this->unpark($officeId);
+    }
+
+    private function unpark(string $officeId): void
+    {
+        $set = $this->parkedSet();
+        if (isset($set[$officeId])) {
+            unset($set[$officeId]);
+            $this->saveSet($set);
+        }
+        $this->repo->deleteState(self::ITEM_PREFIX . $officeId);
+    }
+
+    /** @return array<string,int> office_task_id => ts первой неудачи */
+    private function parkedSet(): array
+    {
+        $d = json_decode((string) ($this->repo->getState(self::STATE_PARKED) ?? ''), true);
+        return is_array($d) ? array_map('intval', $d) : [];
+    }
+
+    /** @param array<string,int> $set */
+    private function saveSet(array $set): void
+    {
+        $this->repo->setState(self::STATE_PARKED, (string) json_encode($set));
+    }
+
+    /**
+     * Перепроверка запаркованных задач по сохранённому снимку (без удержания курсора).
+     * Через PARK_TTL с первой неудачи - итоговое уведомление владельцу и снятие с учёта.
+     *
+     * @param array<string,bool> $skip задачи, уже обработанные в этом проходе
+     * @param array<string,int> $st
+     */
+    private function retryParked(array $skip, array &$st): void
+    {
+        foreach ($this->parkedSet() as $id => $firstTs) {
+            if (isset($skip[$id])) {
+                continue;
+            }
+            $item = json_decode((string) ($this->repo->getState(self::ITEM_PREFIX . $id) ?? ''), true);
+            if (!is_array($item)) {
+                $this->unpark($id);
+                continue;
+            }
+            try {
+                $ok = $this->handle($item, $st);
+            } catch (\Throwable $e) {
+                $ok = false;
+                $this->logger->error('aibot.office.poll.parked_failed', ['task' => $id, 'err' => get_class($e)]);
+            }
+            if ($ok) {
+                $this->unpark($id);
+                continue;
+            }
+            if (($this->clock)() - $firstTs > self::PARK_TTL) {
+                $local = $this->repo->findTaskByOfficeId($id);
+                $this->logger->error('aibot.office.poll.abandoned', ['task' => $id]);
+                if ($local === null || $this->say($local, '⚠️ Не удалось доставить результат задачи #' . ($local['id'] ?? $local['task_key']) . ' - откройте офис')) {
+                    $this->unpark($id); // уведомление ушло ровно один раз: задача снята с учёта
+                }
+            }
         }
     }
 
@@ -219,8 +306,11 @@ final class OfficePoller implements OfficePollerInterface
             if ($ok && $questions === []) {
                 if ($status === 'blocked') {
                     if ((string) $fresh['status'] !== 'blocked' && !in_array((string) $fresh['status'], ['done', 'failed', 'cancelled'], true)) {
-                        $this->repo->updateTask($key, ['status' => 'blocked']);
-                        $this->say($fresh, '⏸ Задача #' . ($fresh['id'] ?? $key) . ' приостановлена');
+                        if ($this->say($fresh, '⏸ Задача #' . ($fresh['id'] ?? $key) . ' приостановлена')) {
+                            $this->repo->updateTask($key, ['status' => 'blocked']);
+                        } else {
+                            $ok = false; // уведомление не ушло: повтор на следующем проходе
+                        }
                     }
                 } elseif (!in_array((string) $fresh['status'], ['done', 'failed', 'cancelled'], true)) {
                     $this->repo->updateTask($key, ['status' => $lease ? 'in_progress' : 'waiting_executor']);

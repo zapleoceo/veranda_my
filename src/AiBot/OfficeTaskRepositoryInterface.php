@@ -50,4 +50,6 @@ interface OfficeTaskRepositoryInterface
     public function getState(string $key): ?string;
 
     public function setState(string $key, string $value): void;
+
+    public function deleteState(string $key): void;
 }

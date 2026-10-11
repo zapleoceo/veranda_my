@@ -128,6 +128,11 @@ final class InMemoryOfficeRepository implements OfficeTaskRepositoryInterface
         return $this->state[$key] ?? null;
     }
 
+    public function deleteState(string $key): void
+    {
+        unset($this->state[$key]);
+    }
+
     public function setState(string $key, string $value): void
     {
         $this->state[$key] = $value;
