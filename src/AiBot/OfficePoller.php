@@ -17,6 +17,7 @@ use Psr\Log\LoggerInterface;
 final class OfficePoller implements OfficePollerInterface
 {
     public const STATE_SINCE = 'poll_since';
+    private const MAX_ITEM_ATTEMPTS = 5;
     private const BATCH = 20;
     private const PAGE = 100;
     private const MAX_PAGES = 20;
@@ -90,6 +91,9 @@ final class OfficePoller implements OfficePollerInterface
                 }
                 if (!$ok) {
                     $st['errors']++;
+                    $ok = $this->giveUpAfterRetries((string) ($item['task_id'] ?? ''));
+                } elseif (isset($item['task_id'])) {
+                    $this->resetAttempts((string) $item['task_id']);
                 }
                 if ($ts === null) {
                     continue;
@@ -115,7 +119,33 @@ final class OfficePoller implements OfficePollerInterface
         return $st;
     }
 
+    /** Счётчик неудач на задачу: после MAX_ITEM_ATTEMPTS курсор идёт дальше (одна задача не держит остальные). */
+    private function giveUpAfterRetries(string $officeId): bool
+    {
+        if ($officeId === '') {
+            return false;
+        }
+        $k = 'att_' . $officeId;
+        $n = (int) ($this->repo->getState($k) ?? 0) + 1;
+        $this->repo->setState($k, (string) $n);
+        if ($n >= self::MAX_ITEM_ATTEMPTS) {
+            $this->logger->error('aibot.office.poll.give_up', ['task' => $officeId, 'attempts' => $n]);
+            return true;
+        }
+        return false;
+    }
+
+    private function resetAttempts(string $officeId): void
+    {
+        if ($this->repo->getState('att_' . $officeId) !== null) {
+            $this->repo->setState('att_' . $officeId, '0');
+        }
+    }
+
     /**
+     * Доставка в Telegram и отметка /delivered не атомарны: при сбое между ними вопрос/результат
+     * может уйти повторно (at-least-once). Вопрос защищён last_question_id, результат — result_delivered_at.
+     *
      * @param array<string,mixed> $item
      * @param array<string,int> $st
      * @return bool false: не всё доставлено, повторить на следующем проходе
@@ -160,22 +190,41 @@ final class OfficePoller implements OfficePollerInterface
         } else {
             $questions = array_values(array_filter((array) ($item['questions'] ?? []), 'is_array'));
             usort($questions, static fn($a, $b) => (int) ($a['question_id'] ?? 0) <=> (int) ($b['question_id'] ?? 0));
-            foreach ($questions as $q) {
-                $qid = (string) (int) ($q['question_id'] ?? 0);
-                $text = trim((string) ($q['text'] ?? ''));
-                if ($qid === '0' || $text === '') {
-                    continue;
-                }
-                $already = (string) ($this->repo->findTaskByKey($key)['last_question_id'] ?? '') === $qid;
-                $id = $this->service->recordQuestion($key, $qid, '❓ ' . self::esc(mb_substr($text, 0, self::RESULT_MAX)));
-                if ($id === null) {
-                    $ok = false;
-                } elseif (!$already) {
-                    $st['questions']++;
+            $fresh = $this->repo->findTaskByKey($key) ?? $local;
+            if (in_array((string) $fresh['status'], ['done', 'failed', 'cancelled'], true)) {
+                // Вопрос к локально закрытой задаче: не шлём, но ревизию отмечаем доставленной.
+                $questions = [];
+                $this->logger->info('aibot.office.poll.question_on_closed', ['task' => $officeId, 'local' => $fresh['status']]);
+            } elseif ($questions !== []) {
+                // Один вопрос за раз: самый младший открытый, который ещё не отправляли.
+                $last = ctype_digit((string) ($fresh['last_question_id'] ?? '')) ? (int) $fresh['last_question_id'] : 0;
+                $open = array_map(static fn($q) => (int) ($q['question_id'] ?? 0), $questions);
+                if (!in_array($last, $open, true)) { // отправленный ещё открыт -> ждём ответа на него
+                    foreach ($questions as $q) {
+                        $qid = (int) ($q['question_id'] ?? 0);
+                        $text = trim((string) ($q['text'] ?? ''));
+                        if ($qid <= $last || $text === '') {
+                            continue; // уже отправленные номера не повторяем
+                        }
+                        $id = $this->service->recordQuestion($key, (string) $qid, '❓ ' . self::esc(mb_substr($text, 0, self::RESULT_MAX)));
+                        if ($id === null) {
+                            $ok = false;
+                        } else {
+                            $st['questions']++;
+                        }
+                        break;
+                    }
                 }
             }
             if ($ok && $questions === []) {
-                $this->repo->updateTask($key, ['status' => $lease ? 'in_progress' : 'waiting_executor']);
+                if ($status === 'blocked') {
+                    if ((string) $fresh['status'] !== 'blocked' && !in_array((string) $fresh['status'], ['done', 'failed', 'cancelled'], true)) {
+                        $this->repo->updateTask($key, ['status' => 'blocked']);
+                        $this->say($fresh, '⏸ Задача #' . ($fresh['id'] ?? $key) . ' приостановлена');
+                    }
+                } elseif (!in_array((string) $fresh['status'], ['done', 'failed', 'cancelled'], true)) {
+                    $this->repo->updateTask($key, ['status' => $lease ? 'in_progress' : 'waiting_executor']);
+                }
             }
         }
         if (!$ok) {

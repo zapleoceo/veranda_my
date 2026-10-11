@@ -13,6 +13,7 @@ final class ScriptedOfficeTransport implements OfficeHttpTransport
     public array $calls = [];
     /** @var list<array{status:int,headers?:array<string,string>,body?:array}|\Throwable> */
     private array $queue = [];
+    public ?\Closure $onSend = null;
 
     /** @param array<string,mixed> $body */
     public function push(int $status, array $body = [], array $headers = []): self
@@ -30,6 +31,9 @@ final class ScriptedOfficeTransport implements OfficeHttpTransport
     public function send(string $method, string $url, array $headers, ?string $body, int $timeoutSeconds): array
     {
         $this->calls[] = compact('method', 'url', 'headers', 'body');
+        if ($this->onSend !== null) {
+            ($this->onSend)(count($this->calls));
+        }
         $next = array_shift($this->queue);
         if ($next === null) {
             throw new \LogicException('unexpected office request: ' . $method . ' ' . $url);

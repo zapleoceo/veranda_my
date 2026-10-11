@@ -25,6 +25,8 @@ final class CurlOfficeTransport implements OfficeHttpTransport
             CURLOPT_TIMEOUT => $timeoutSeconds,
             CURLOPT_CONNECTTIMEOUT => min(5, $timeoutSeconds),
             CURLOPT_FOLLOWLOCATION => false,
+            CURLOPT_PROTOCOLS => str_starts_with(strtolower($url), 'https://') ? CURLPROTO_HTTPS : (CURLPROTO_HTTPS | CURLPROTO_HTTP),
+            CURLOPT_REDIR_PROTOCOLS => CURLPROTO_HTTPS,
             CURLOPT_HEADERFUNCTION => static function ($c, string $h) use (&$respHeaders): int {
                 $p = explode(':', $h, 2);
                 if (count($p) === 2) {

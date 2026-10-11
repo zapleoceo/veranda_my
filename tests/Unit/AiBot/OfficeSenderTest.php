@@ -252,7 +252,7 @@ final class OfficeSenderTest extends TestCase
         $this->http->push(404, ['error' => 'not_found', 'retryable' => false]);
         $this->assertFalse($this->sender->send($row));
         $this->assertSame('failed', $this->repo->findOutboxByKey('vb-ans--1001-650')['status']);
-        $this->assertSame('waiting_owner', $this->repo->findTaskByKey('vb--1001-600')['status']);
+        $this->assertSame('waiting_executor', $this->repo->findTaskByKey('vb--1001-600')['status']);
         $this->assertStringContainsString('вопрос уже закрыт', $this->notes[0]);
     }
 
@@ -392,5 +392,130 @@ final class OfficeSenderTest extends TestCase
         $client = OfficeWiring::client(OfficeWiring::config($both), $this->http);
         $this->assertInstanceOf(HttpOfficeOutboxSender::class, OfficeWiring::sender($client, $this->repo, $this->log, $this->bot));
         $this->assertInstanceOf(OfficePoller::class, OfficeWiring::poller($client, $this->repo, $this->sender, $this->service, $this->bot, $this->log));
+    }
+
+    public function testConfigRequiresHttpsExceptLoopback(): void
+    {
+        $mk = static fn(string $u) => OfficeApiConfig::fromConfig(static fn(string $k): string => ['OFFICE_API_URL' => $u, 'OFFICE_SERVICE_TOKEN' => 't'][$k] ?? '');
+        $this->assertNull($mk('http://vera.example.com'));
+        $this->assertNull($mk('ftp://vera.example.com'));
+        $this->assertNull($mk('vera.example.com'));
+        $this->assertNotNull($mk('https://vera.example.com/'));
+        $this->assertNotNull($mk('http://localhost:8080'));
+        $this->assertNotNull($mk('http://127.0.0.1:8080'));
+    }
+
+    private function listWith(array $items): void
+    {
+        $this->http->push(200, ['tasks' => $items, 'next_cursor' => null]);
+    }
+
+    public function testQuestionOnLocallyClosedTaskIsSkippedButDelivered(): void
+    {
+        $this->seedTask(['office_task_id' => 'vb-abc', 'office_revision' => 40, 'status' => 'cancelled']);
+        $this->listWith([$this->item(['questions' => [['question_id' => 3, 'text' => 'ещё?']]])]);
+        $this->http->push(200, ['delivered_revision' => 50]);
+        $st = $this->poller()->run();
+        $this->assertSame(0, $st['questions']);
+        $this->assertSame([], $this->tg->callsTo('sendMessage'));
+        $this->assertSame(50, $this->repo->findTaskByKey('vb--1001-600')['office_delivered_revision']);
+        $this->assertSame('2026-10-11T09:59:59', $this->repo->getState('poll_since'));
+    }
+
+    public function testStuckItemReleasesCursorAfterRetryCap(): void
+    {
+        $this->seedTask(['office_task_id' => 'vb-abc', 'office_revision' => 40, 'status' => 'waiting_executor']);
+        for ($i = 1; $i <= 5; $i++) {
+            $this->listWith([
+                $this->item(['updated_at' => '2026-10-11T10:30:00']),
+                $this->item(['task_id' => 'vb-zzz', 'client_task_id' => 'tg-1-2', 'updated_at' => '2026-10-11T11:00:00']), // чужая: ok
+            ]);
+            $this->http->push(503, ['error' => 'in_progress']);
+            $this->poller()->run();
+            $this->assertSame($i < 5 ? '2026-10-11T10:29:59' : '2026-10-11T10:59:59', $this->repo->getState('poll_since'), "run $i");
+        }
+        $this->assertStringContainsString('aibot.office.poll.give_up', implode("\n", $this->logLines));
+    }
+
+    public function testOnlyLowestOpenQuestionIsSentUntilAnswered(): void
+    {
+        $this->seedTask(['office_task_id' => 'vb-abc', 'office_revision' => 40, 'status' => 'waiting_executor']);
+        $q = [['question_id' => 1, 'text' => 'Q1'], ['question_id' => 2, 'text' => 'Q2']];
+        $this->listWith([$this->item(['questions' => $q, 'revision' => 50])]);
+        $this->http->push(200, []);
+        $this->poller()->run();
+        $sent = $this->tg->callsTo('sendMessage');
+        $this->assertCount(1, $sent);
+        $this->assertStringContainsString('Q1', $sent[0]['params']['text']);
+
+        $this->listWith([$this->item(['questions' => $q, 'revision' => 51])]);
+        $this->http->push(200, []);
+        $this->poller()->run();
+        $this->assertCount(1, $this->tg->callsTo('sendMessage'));
+
+        $this->listWith([$this->item(['questions' => [$q[1]], 'revision' => 60])]);
+        $this->http->push(200, []);
+        $this->poller()->run();
+        $sent = $this->tg->callsTo('sendMessage');
+        $this->assertCount(2, $sent);
+        $this->assertStringContainsString('Q2', $sent[1]['params']['text']);
+        $this->assertSame('2', $this->repo->findTaskByKey('vb--1001-600')['last_question_id']);
+
+        $this->listWith([$this->item(['questions' => [$q[1]], 'revision' => 61])]);
+        $this->http->push(200, []);
+        $this->poller()->run();
+        $this->assertCount(2, $this->tg->callsTo('sendMessage'));
+    }
+
+    public function testBlockedNoticeIsSentOnce(): void
+    {
+        $this->seedTask(['office_task_id' => 'vb-abc', 'office_revision' => 40, 'status' => 'waiting_executor']);
+        foreach ([50, 51] as $rev) {
+            $this->listWith([$this->item(['status' => 'blocked', 'revision' => $rev])]);
+            $this->http->push(200, []);
+            $this->poller()->run();
+        }
+        $sent = $this->tg->callsTo('sendMessage');
+        $this->assertCount(1, $sent);
+        $this->assertStringContainsString('приостановлена', $sent[0]['params']['text']);
+        $this->assertSame('blocked', $this->repo->findTaskByKey('vb--1001-600')['status']);
+    }
+
+    public function testRevisionRefreshPrefersPollerValueWithoutListing(): void
+    {
+        $this->seedTask(['office_task_id' => 'vb-abc', 'office_revision' => 40, 'status' => 'waiting_owner']);
+        $row = $this->seedAnswer();
+        $repo = $this->repo;
+        $this->http->onSend = static function (int $n) use ($repo): void {
+            if ($n === 1) {
+                $repo->updateTask('vb--1001-600', ['office_revision' => 70]); // поллер обновил ревизию
+            }
+        };
+        $this->http->push(409, ['error' => 'revision_mismatch'])->push(200, ['task_id' => 'vb-abc', 'revision' => 71]);
+        $this->assertTrue($this->sender->send($row));
+        $this->assertCount(2, $this->http->calls);
+        $this->assertSame(70, $this->http->bodies()[1]['expected_revision']);
+        $this->assertSame('vb-ans--1001-650', $this->http->bodies()[1]['idempotency_key']);
+    }
+
+    public function testRevisionNotFoundDefersWithoutBurningAttempt(): void
+    {
+        $this->seedTask(['office_task_id' => 'vb-abc', 'office_revision' => 40, 'status' => 'waiting_owner']);
+        $row = $this->seedAnswer();
+        $this->http->push(409, ['error' => 'revision_mismatch'])->push(200, ['tasks' => [], 'next_cursor' => null]);
+        $this->assertFalse($this->sender->send($row));
+        $r = $this->repo->findOutboxByKey('vb-ans--1001-650');
+        $this->assertSame('pending', $r['status']);
+        $this->assertSame(0, $r['attempts']);
+        $this->assertSame(date('Y-m-d H:i:s', self::NOW + 60), $r['next_attempt_at']);
+        $this->assertStringContainsString('updated_since=', $this->http->calls[1]['url']);
+    }
+
+    public function testAnswerWithoutOfficeIdGetsBackoff(): void
+    {
+        $this->seedTask();
+        $row = $this->seedAnswer();
+        $this->sender->send($row);
+        $this->assertSame(date('Y-m-d H:i:s', self::NOW + 30), $this->repo->findOutboxByKey('vb-ans--1001-650')['next_attempt_at']);
     }
 }

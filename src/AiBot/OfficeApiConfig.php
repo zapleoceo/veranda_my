@@ -17,7 +17,22 @@ final class OfficeApiConfig
     {
         $url = rtrim(trim((string) $get('OFFICE_API_URL')), '/');
         $token = trim((string) $get('OFFICE_SERVICE_TOKEN'));
-        return $url === '' || $token === '' ? null : new self($url, $token);
+        if ($url === '' || $token === '' || !self::schemeAllowed($url)) {
+            return null; // токен по открытому каналу не отдаём
+        }
+        return new self($url, $token);
+    }
+
+    /** https всегда; http только для localhost/127.0.0.1/[::1] (тесты, локальный стенд). */
+    private static function schemeAllowed(string $url): bool
+    {
+        $p = parse_url($url);
+        $scheme = strtolower((string) ($p['scheme'] ?? ''));
+        $host = strtolower((string) ($p['host'] ?? ''));
+        if ($host === '') {
+            return false;
+        }
+        return $scheme === 'https' || ($scheme === 'http' && in_array($host, ['localhost', '127.0.0.1', '[::1]', '::1'], true));
     }
 
     public function token(): string

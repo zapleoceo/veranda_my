@@ -18,7 +18,7 @@ final class HttpOfficeOutboxSender implements OfficeOutboxSenderInterface
     private const MAX_ATTEMPTS = 40;
     private const BACKOFF_BASE = 30;
     private const BACKOFF_MAX = 3600;
-    private const REFRESH_PAGES = 10;
+    private const REFRESH_PAGES = 3;
 
     private bool $halted = false;
     /** @var \Closure(): int */
@@ -168,7 +168,8 @@ final class HttpOfficeOutboxSender implements OfficeOutboxSenderInterface
         }
         $officeId = (string) ($task['office_task_id'] ?? '');
         if ($officeId === '') {
-            return false; // create ещё не доставлен: ждём, попытку не тратим
+            $this->defer($row, 30, 'waiting_create'); // create ещё не доставлен: ждём, попытку не тратим
+            return false;
         }
         $qid = (string) ($p['question_id'] ?? '');
         if ($qid === '' || !ctype_digit($qid)) {
@@ -176,9 +177,9 @@ final class HttpOfficeOutboxSender implements OfficeOutboxSenderInterface
         }
         $revision = isset($task['office_revision']) ? (int) $task['office_revision'] : null;
         if ($revision === null) {
-            $revision = $this->refreshRevision($officeId);
+            $revision = $this->refreshRevision($taskKey, $officeId, -1);
             if ($revision === null) {
-                $this->retryLater($row, null, 'revision_unknown');
+                $this->defer($row, 60, 'revision_unknown');
                 return false;
             }
         }
@@ -190,9 +191,9 @@ final class HttpOfficeOutboxSender implements OfficeOutboxSenderInterface
         ];
         $resp = $this->api->answer($officeId, $build($revision));
         if ($resp->status === 409 && $resp->errorCode() === 'revision_mismatch') {
-            $fresh = $this->refreshRevision($officeId);
+            $fresh = $this->refreshRevision($taskKey, $officeId, $revision);
             if ($fresh === null) {
-                $this->retryLater($row, $resp, 'revision_mismatch');
+                $this->defer($row, 60, 'revision_mismatch'); // попытку не жжём: ждём, пока поллер обновит ревизию
                 return false;
             }
             $this->repo->updateTask($taskKey, ['office_revision' => $fresh]);
@@ -211,16 +212,27 @@ final class HttpOfficeOutboxSender implements OfficeOutboxSenderInterface
             $this->markSent($row);
             return true;
         }
+        if ($resp->status === 404 && (string) $task['status'] === OfficeTaskService::STATUS_WAITING_OWNER) {
+            $this->repo->updateTask($taskKey, ['status' => 'waiting_executor']); // вопрос закрыт: не ждём ответа
+        }
         $text = $resp->status === 404 ? 'вопрос уже закрыт' : 'не удалось отправить ответ в офис';
         return $this->failOrRetry($row, $resp, $text, $task, taskFailed: false);
     }
 
-    /** Текущая серверная ревизия своей задачи: перечитываем список (GET по id у Vera нет). */
-    private function refreshRevision(string $officeId): ?int
+    /**
+     * Свежая ревизия: сначала то, что поллер уже записал в задачу; иначе узкий список
+     * (updated_since = сутки назад, до REFRESH_PAGES страниц). null - пока не нашли.
+     */
+    private function refreshRevision(string $taskKey, string $officeId, int $stale): ?int
     {
+        $local = $this->repo->findTaskByKey($taskKey);
+        if ($local !== null && isset($local['office_revision']) && (int) $local['office_revision'] !== $stale) {
+            return (int) $local['office_revision'];
+        }
+        $since = gmdate('Y-m-d\TH:i:s', ($this->clock)() - 86400);
         $cursor = null;
         for ($i = 0; $i < self::REFRESH_PAGES; $i++) {
-            $r = $this->api->listTasks(null, $cursor, 100);
+            $r = $this->api->listTasks($since, $cursor, 100);
             if (!$r->ok()) {
                 return null;
             }
@@ -235,6 +247,14 @@ final class HttpOfficeOutboxSender implements OfficeOutboxSenderInterface
             }
         }
         return null;
+    }
+
+    /** Отложить строку без траты попытки. @param array<string,mixed> $row */
+    private function defer(array $row, int $seconds, string $reason): void
+    {
+        $this->repo->updateOutbox((string) $row['idempotency_key'], [
+            'next_attempt_at' => date('Y-m-d H:i:s', ($this->clock)() + $seconds), 'last_error' => $reason,
+        ]);
     }
 
     /**
