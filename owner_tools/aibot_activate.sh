@@ -123,6 +123,28 @@ TOKEN=$(env_get ai_tg_bot)
 [ -n "$TOKEN" ] || fail "ai_tg_bot_missing (.env не менялся)" 1
 [[ "$TOKEN" =~ ^[0-9]+:[A-Za-z0-9_-]+$ ]] || { TOKEN=""; fail "ai_tg_bot_invalid_format (.env не менялся)" 1; }
 
+# Keep the token out of argv and logs. BotFather inline mode intercepts a
+# leading @Veranda_aibot in Telegram's composer, but this bot handles messages
+# and callbacks only. Fail before changing .env or the webhook in that case.
+tg() {
+  local method="$1"; shift
+  {
+    printf 'url = "https://api.telegram.org/bot%s/%s"\n' "$TOKEN" "$method"
+    local l; for l in "$@"; do printf '%s\n' "$l"; done
+  } | curl -sS --max-time 20 --doh-url "$DOH" -K - 2>/dev/null
+}
+ME=$(tg getMe) || ME=""
+if [[ "$ME" != *'"ok":true'* ]]; then
+  TOKEN=""
+  fail "getMe_failed (inline mode not checked)" 1
+fi
+if [[ "$ME" == *'"supports_inline_queries":true'* ]]; then
+  TOKEN=""
+  fail "inline_mode_enabled (disable in BotFather before activation)" 1
+fi
+ME=""
+echo "inline_mode: OFF"
+
 # 3) секрет вебхука: существующий оставляем (должен быть [A-Za-z0-9_-]), иначе генерируем
 SECRET=$(env_get AIBOT_WEBHOOK_SECRET)
 if [ -n "$SECRET" ]; then
@@ -144,15 +166,6 @@ SET_VALUES[AIBOT_CONFIRM_NOT_BEFORE]="$TS"
 env_commit
 SET_VALUES=()
 echo "env: updated"
-
-# Bot API: URL с токеном и данные — только в конфиге curl на stdin.
-tg() {
-  local method="$1"; shift
-  {
-    printf 'url = "https://api.telegram.org/bot%s/%s"\n' "$TOKEN" "$method"
-    local l; for l in "$@"; do printf '%s\n' "$l"; done
-  } | curl -sS --max-time 20 --doh-url "$DOH" -K - 2>/dev/null
-}
 
 # 5) setWebhook (очередь не сбрасываем)
 RESP=$(tg setWebhook \
