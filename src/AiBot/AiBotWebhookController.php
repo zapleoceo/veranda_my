@@ -168,8 +168,8 @@ final class AiBotWebhookController
             }
             // Повторный триггер на тот же источник — показываем существующий результат.
             $status = (string) ($draft['status'] ?? '');
-            if (in_array($status, ['done', 'partial'], true)) {
-                $bot->sendMessageWithKeyboard($this->drafts->journal($draft), [], $threadId, $triggerId);
+            if (in_array($status, ['done', 'partial', 'review', 'reconcile'], true)) {
+                $bot->sendMessageWithKeyboard($this->drafts->journal($draft), self::cardLinkKeyboard($draft), $threadId, $triggerId);
             } elseif (empty($draft['card_msg_id'])) {
                 $card = $this->drafts->renderFresh($draft);
                 $id = $bot->sendMessageWithKeyboard($card['text'], $card['keyboard'], $threadId, $triggerId);
@@ -178,7 +178,7 @@ final class AiBotWebhookController
                 }
             } else {
                 $bot->sendMessageWithKeyboard('Черновик #' . (int) $draft['id'] . ' по этому сообщению уже есть — карточка выше.',
-                    [], $threadId, (int) $draft['card_msg_id']);
+                    self::cardLinkKeyboard($draft), $threadId, (int) $draft['card_msg_id']);
             }
         };
         // Отложенная работа идёт уже после ответа Telegram — исключение здесь
@@ -200,6 +200,17 @@ final class AiBotWebhookController
         } else {
             $job();
         }
+    }
+
+    /** A repeated status points to the canonical card; only its callbacks are accepted. */
+    private static function cardLinkKeyboard(array $draft): array
+    {
+        $chatId = (string) ($draft['chat_id'] ?? '');
+        $cardId = (int) ($draft['card_msg_id'] ?? 0);
+        if ($cardId <= 0 || !preg_match('/^-100([1-9][0-9]*)$/', $chatId, $m)) {
+            return [];
+        }
+        return [[['text' => 'Открыть карточку с кнопками', 'url' => 'https://t.me/c/' . $m[1] . '/' . $cardId]]];
     }
 
     private function onCallback(array $cb): void

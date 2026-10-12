@@ -34,7 +34,7 @@ final class FinanceDraftService
     public const SPLIT_PERSON = 'person';
     public const SPLIT_PARTS = 'parts';
 
-    private const DUP_WINDOW_DAYS = 3;
+    private const RECONCILE_WINDOW_DAYS = 3;
     private const DATE_PICK_DAYS = 6;
     private const EXEC_STALE_SEC = 120;
     public const MAX_PEOPLE = 30;
@@ -532,18 +532,37 @@ final class FinanceDraftService
         if ($pending === []) {
             return $records;
         }
-        $d = new \DateTimeImmutable($date, new \DateTimeZone(AiBotConfig::TZ));
+        $today = (new \DateTimeImmutable('@' . ($this->clock)()))
+            ->setTimezone(new \DateTimeZone(AiBotConfig::TZ))->format('Y-m-d');
         // Пагинации у finance.getTransactions в коде проекта нет (ExpenseService берёт
         // месяц одним вызовом; per_page/limit есть только у transactions./dash.getTransactions).
-        // Здесь окно 7 дней по одному счёту — объём на порядки меньше месяца.
+        // Обычные похожие записи ищем только за сегодняшний день в TZ бота.
         $rows = $this->poster->client()->request('finance.getTransactions', [
-            'dateFrom' => $d->modify('-' . self::DUP_WINDOW_DAYS . ' days')->format('Ymd'),
-            'dateTo' => $d->modify('+' . self::DUP_WINDOW_DAYS . ' days')->format('Ymd'),
+            'dateFrom' => str_replace('-', '', $today),
+            'dateTo' => str_replace('-', '', $today),
             'account_id' => $accountId,
             'timezone' => 'client',
         ]);
         if (!is_array($rows)) {
             throw new \RuntimeException('неожиданный ответ finance.getTransactions');
+        }
+
+        // Ambiguous sends are reconciled around their intended transaction date.
+        // This separate search never makes an uncertain record safe to resend.
+        $uncertain = array_filter($records, static fn(array $r) =>
+            $r['status'] === 'sending' || ($r['status'] === 'failed' && ($r['outcome'] ?? 'unknown') !== 'rejected'));
+        if ($uncertain !== []) {
+            $d = new \DateTimeImmutable($date, new \DateTimeZone(AiBotConfig::TZ));
+            $reconcileRows = $this->poster->client()->request('finance.getTransactions', [
+                'dateFrom' => $d->modify('-' . self::RECONCILE_WINDOW_DAYS . ' days')->format('Ymd'),
+                'dateTo' => $d->modify('+' . self::RECONCILE_WINDOW_DAYS . ' days')->format('Ymd'),
+                'account_id' => $accountId,
+                'timezone' => 'client',
+            ]);
+            if (!is_array($reconcileRows)) {
+                throw new \RuntimeException('неожиданный ответ finance.getTransactions');
+            }
+            $rows = array_merge($rows, $reconcileRows);
         }
 
         $own = [];
@@ -601,6 +620,7 @@ final class FinanceDraftService
             $claimed += array_flip($cand);
         }
         $pool = array_diff_key($pool, $claimed);
+        $pool = array_filter($pool, static fn(array $t) => substr($t['date'], 0, 10) === $today);
 
         // Проход 2 — возможные дубли для остальных строк.
         foreach ($records as $i => $r) {
