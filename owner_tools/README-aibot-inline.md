@@ -6,10 +6,12 @@ Telegram treats `@Veranda_aibot` at the start of the composer as an inline
 query. The client waits for inline results instead of sending a group message;
 the webhook cannot fix that composer behavior.
 
-The bot owner should open **@BotFather** in Telegram, select **/mybots →
-@Veranda_aibot → Bot Settings → Inline Mode**, and turn Inline Mode off. This
-does not require changing the bot token, webhook secret, or webhook. Do not
-rerun `aibot_activate.sh` just to apply this BotFather setting.
+The bot owner should open **@BotFather** in Telegram, send `/setinline`, select
+**@Veranda_aibot**, and use BotFather's displayed control to turn Inline Mode
+off. The final BotFather prompt can change; verify the result with `getMe`
+instead of assuming a command succeeded. This does not require changing the
+bot token, webhook secret, or webhook. Do not rerun `aibot_activate.sh` just
+to apply this BotFather setting.
 
 Verify with the Bot API `getMe` that `supports_inline_queries` is absent or
 false. The webhook should still have `allowed_updates` set to `message` and
