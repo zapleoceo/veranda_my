@@ -149,7 +149,7 @@ final class FinanceDraftService
         return $this->drafts->get($id);
     }
 
-    /** Recheck saved duplicate candidates without sending anything to Poster. */
+    /** Recheck unresolved duplicate and pending rows without sending anything to Poster. */
     public function refreshDuplicateCandidates(int $id): array
     {
         return $this->lock->synchronized('aibot_fd_' . $id, 10, function () use ($id): array {
@@ -161,16 +161,16 @@ final class FinanceDraftService
                 return $draft;
             }
             $records = self::dec($draft['poster_tx_ids_json'] ?? null);
-            $hasDuplicate = array_filter($records, static fn(array $r) => ($r['status'] ?? '') === 'dup') !== [];
-            if (!$hasDuplicate) {
+            $hasOpenRows = array_filter($records, static fn(array $r) => in_array(($r['status'] ?? ''), ['dup', 'pending'], true)) !== [];
+            if (!$hasOpenRows) {
                 return $draft;
             }
 
-            // Probe only the unresolved duplicate rows. Preserve every completed,
-            // pending, and uncertain row, including its original transaction IDs.
+            // Probe only duplicate and pending rows. Preserve completed and
+            // uncertain rows, including their original transaction IDs.
             $probe = $records;
             foreach ($probe as &$row) {
-                if (($row['status'] ?? '') === 'dup') {
+                if (in_array(($row['status'] ?? ''), ['dup', 'pending'], true)) {
                     $row['status'] = 'pending';
                     unset($row['dup_of']);
                 } else {
@@ -180,7 +180,7 @@ final class FinanceDraftService
             unset($row);
             $rechecked = $this->markDuplicates($probe, (int) $draft['account_id'], (string) $draft['tx_date']);
             foreach ($records as $i => &$row) {
-                if (($row['status'] ?? '') !== 'dup') {
+                if (!in_array(($row['status'] ?? ''), ['dup', 'pending'], true)) {
                     continue;
                 }
                 $row['status'] = $rechecked[$i]['status'];
@@ -741,8 +741,30 @@ final class FinanceDraftService
             if (preg_match('/(?<!\p{L})' . preg_quote($name, '/') . '(?!\p{L})/iu', $t['comment'])) {
                 return (int) $tid;
             }
+            // Poster comments are sometimes entered in Latin letters while
+            // the source message uses Cyrillic (Стас / Stas). The account,
+            // category, local day, and amount have already been checked.
+            $latinName = self::latinize($name);
+            $latinComment = self::latinize((string) $t['comment']);
+            if ($latinName !== '' && preg_match('/(?<!\p{L})' . preg_quote($latinName, '/') . '(?!\p{L})/u', $latinComment)) {
+                return (int) $tid;
+            }
         }
         return null;
+    }
+
+    private static function latinize(string $text): string
+    {
+        return strtr(mb_strtolower($text, 'UTF-8'), [
+            'а' => 'a', 'б' => 'b', 'в' => 'v', 'г' => 'g', 'д' => 'd',
+            'е' => 'e', 'ё' => 'yo', 'ж' => 'zh', 'з' => 'z', 'и' => 'i',
+            'й' => 'y', 'к' => 'k', 'л' => 'l', 'м' => 'm', 'н' => 'n',
+            'о' => 'o', 'п' => 'p', 'р' => 'r', 'с' => 's', 'т' => 't',
+            'у' => 'u', 'ф' => 'f', 'х' => 'kh', 'ц' => 'ts', 'ч' => 'ch',
+            'ш' => 'sh', 'щ' => 'shch', 'ъ' => '', 'ы' => 'y', 'ь' => '',
+            'э' => 'e', 'ю' => 'yu', 'я' => 'ya',
+            'і' => 'i', 'ї' => 'yi', 'є' => 'ye', 'ґ' => 'g',
+        ]);
     }
 
     /**
