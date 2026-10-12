@@ -14,12 +14,16 @@ final class RecordingHttp extends HttpClient
     private int $nextId = 900;
     public bool $failAll = false;
     public int $failNext = 0;
+    public bool $rejectEdits = false;
 
     public function __construct() {}
 
     public function postJson(string $url, array $params = []): array|null
     {
         $this->calls[] = ['method' => (string) substr($url, strrpos($url, '/') + 1), 'params' => $params];
+        if ($this->rejectEdits && str_ends_with($url, '/editMessageText')) {
+            return ['ok' => false, 'error_code' => 400, 'description' => 'Bad Request: message to edit not found'];
+        }
         if ($this->failNext > 0) {
             $this->failNext--;
             return ['ok' => false];

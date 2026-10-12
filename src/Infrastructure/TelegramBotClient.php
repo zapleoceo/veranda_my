@@ -62,6 +62,12 @@ class TelegramBotClient
 
     public function editMessageText(int $messageId, string $text, array|null $keyboard = null): bool
     {
+        return $this->tryEditMessageText($messageId, $text, $keyboard) === true;
+    }
+
+    /** True if edited, false for Telegram's terminal rejection, null if delivery is uncertain. */
+    public function tryEditMessageText(int $messageId, string $text, array|null $keyboard = null): ?bool
+    {
         $params = [
             'chat_id'    => $this->chatId,
             'message_id' => $messageId,
@@ -75,7 +81,14 @@ class TelegramBotClient
             );
         }
         $result = $this->_call('editMessageText', $params);
-        return self::_isEditOk($result);
+        if ($result === null) {
+            return null;
+        }
+        if (self::_isEditOk($result)) {
+            return true;
+        }
+        $code = (int) ($result['error_code'] ?? 0);
+        return ($code === 429 || $code >= 500) ? null : false;
     }
 
     /**

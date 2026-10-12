@@ -170,11 +170,30 @@ final class AiBotWebhookController
             $status = (string) ($draft['status'] ?? '');
             if ((int) ($draft['initiator_tg_id'] ?? 0) === $fromId
                 && in_array($status, ['review', 'partial'], true)) {
-                $draft = $this->drafts->refreshDuplicateCandidates((int) $draft['id']);
+                try {
+                    $draft = $this->drafts->refreshDuplicateCandidates((int) $draft['id']);
+                } catch (\Throwable $e) {
+                    $this->logger->error('aibot.duplicate_refresh_failed', ['draft' => $draft['id'], 'err' => $e->getMessage()]);
+                    $bot->sendMessageWithKeyboard('Не удалось перепроверить совпадения для черновика. Новых записей не добавлено.',
+                        [], $threadId, $triggerId);
+                    return;
+                }
                 $card = $this->drafts->renderFresh($draft);
-                if (!empty($draft['card_msg_id'])
-                    && !$bot->editMessageText((int) $draft['card_msg_id'], $card['text'], $card['keyboard'])) {
-                    throw new \RuntimeException('Не удалось обновить карточку черновика');
+                $edited = !empty($draft['card_msg_id'])
+                    ? $bot->tryEditMessageText((int) $draft['card_msg_id'], $card['text'], $card['keyboard'])
+                    : false;
+                if ($edited === false) {
+                    // Telegram explicitly rejected the old card. Its nonce is already
+                    // invalid, so issue one replacement and point future status links to it.
+                    $newCardId = $bot->sendMessageWithKeyboard($card['text'], $card['keyboard'], $threadId, $triggerId);
+                    if ($newCardId === null) {
+                        throw new \RuntimeException('Не удалось создать новую карточку после отказа Telegram');
+                    }
+                    $this->drafts->attachCard((int) $draft['id'], $newCardId);
+                } elseif ($edited === null) {
+                    $bot->sendMessageWithKeyboard('Обновление карточки Telegram не подтверждено. Записей не добавлено; состояние черновика сохранено.',
+                        [], $threadId, $triggerId);
+                    return;
                 }
                 $draft = (array) $this->drafts->get((int) $draft['id']);
                 $status = (string) $draft['status'];
