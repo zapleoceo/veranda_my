@@ -124,6 +124,10 @@ final class FinanceDraftService
             }
             $accountId = $this->matchAccountHint($transaction['account_hint']);
             $accountToId = $transaction['type'] === 3 ? $this->matchAccountHint($transaction['account_to_hint']) : null;
+            $categoryId = $transaction['type'] === 2
+                && preg_match('/дивиденд/iu', $transaction['comment'])
+                && isset($this->categoryChoices()[AiBotConfig::CATEGORY_ID])
+                ? AiBotConfig::CATEGORY_ID : null;
             $id = $this->drafts->insert([
                 'chat_id' => $chatId,
                 'source_msg_id' => $sourceMsgId,
@@ -137,7 +141,7 @@ final class FinanceDraftService
                     'source_date' => $sourceDate,
                     'direct' => ['type' => $transaction['type'], 'amount' => $transaction['amount'],
                         'account_hint' => $transaction['account_hint'], 'account_to_hint' => $transaction['account_to_hint'],
-                        'account_to_id' => $accountToId, 'comment' => $transaction['comment'], 'category_id' => null],
+                        'account_to_id' => $accountToId, 'comment' => $transaction['comment'], 'category_id' => $categoryId],
                 ]),
                 'account_id' => $accountId,
                 'split_mode' => self::SPLIT_PERSON,

@@ -131,7 +131,7 @@ final class AiBotWebhookController
         $bot = $this->bot->withChatId($chatId);
 
         if ($topicRootReply && !$directFinanceCommand) {
-            $bot->sendMessageWithKeyboard('Для дивидендов ответьте на сообщение с выплатами или укажите реквизиты в самой команде.', [], $threadId, $triggerId);
+            $bot->sendMessageWithKeyboard('Ответьте на сообщение с выплатами для дивидендов или укажите реквизиты в самой команде.', [], $threadId, $triggerId);
             return;
         }
 
@@ -145,6 +145,13 @@ final class AiBotWebhookController
             }
         }
         if ($directFinanceCommand || $transaction !== null) {
+            $this->logger->info('aibot.finance.route', [
+                'chat' => $chatId, 'msg' => $triggerId, 'thread' => $threadId,
+                'reply' => (int) ($msg['reply_to_message']['message_id'] ?? 0),
+                'forum_root' => $topicRootReply,
+                'source' => (int) ($transactionSource['message_id'] ?? 0),
+                'type' => $transaction['type'] ?? null,
+            ]);
             if ($transaction === null) {
                 $bot->sendMessageWithKeyboard('Укажите запись в VND: «Добавь -1000 Со счета Стаса Комментарий», «Добавь +1000 На счет Касса Комментарий» или «Переведи 1000 Со счета Стаса На счет Касса Комментарий». Для многословного счёта используйте отдельные строки.', [], $threadId, $triggerId);
                 return;

@@ -66,7 +66,7 @@ final class OfficeIntakeTest extends TestCase
         $lookup = new class implements PosterLookupServiceInterface {
             public function employees(): array { return []; }
             public function financeAccounts(): array { return [1 => '1 Счет Стаса', 2 => 'Касса']; }
-            public function financeCategories(): array { return [13 => ['name' => 'Household expenses', 'parent_id' => 0]]; }
+            public function financeCategories(): array { return [13 => ['name' => 'Household expenses', 'parent_id' => 0], 22 => ['name' => 'Инвесторы', 'parent_id' => 0]]; }
         };
         $this->drafts = new InMemoryDraftRepository();
         $fin = new FinanceDraftService($this->drafts,
@@ -355,6 +355,21 @@ final class OfficeIntakeTest extends TestCase
         $this->assertSame(590, $draft['source_msg_id']);
         $this->assertSame(600, $draft['trigger_msg_id']);
         $this->assertSame(self::NOW - 300, json_decode($draft['rows_json'], true)['source_date']);
+    }
+
+    public function test_self_contained_dividend_expense_in_topic_needs_no_source_reply(): void
+    {
+        $this->grants->setPerm(self::USER, 'aibot_finance', true);
+        $this->post($this->msg([
+            'text' => '@Veranda_aibot Добавь -1 Со счета стаса Дивиденды стасу',
+            'is_topic_message' => true, 'message_thread_id' => 12,
+            'reply_to_message' => ['message_id' => 12, 'forum_topic_created' => ['name' => 'Дивиденды учёт']],
+        ]));
+        $draft = $this->drafts->get(1);
+        $this->assertSame(600, $draft['source_msg_id']);
+        $this->assertSame(22, json_decode($draft['rows_json'], true)['direct']['category_id']);
+        $this->assertNull($this->finance->blocker($draft));
+        $this->assertSame([], $this->poster->callsTo('finance.createTransactions'));
     }
 
     public function test_direct_income_and_transfer_use_supported_poster_types(): void
