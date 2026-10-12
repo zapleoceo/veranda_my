@@ -51,7 +51,7 @@ final class AiBotFlowTest extends TestCase
     private int $nextTx = 20000;
 
     /** @param list<array<string,mixed>> $existing ответ finance.getTransactions */
-    public function boot(array $existing = [], ?\Closure $create = null, array $owners = [self::OWNER], array $chats = [self::CHAT], int $approver = self::OWNER, int $notBefore = 0, bool $anyGroup = false, ?\App\AiBot\FinanceAuthorizerInterface $auth = null): void
+    public function boot(array $existing = [], ?\Closure $create = null, array $owners = [self::OWNER], array $chats = [self::CHAT], int $approver = self::OWNER, int $notBefore = 0, bool $anyGroup = false, ?\App\AiBot\FinanceAuthorizerInterface $auth = null, ?int $now = null): void
     {
         $this->tg = new RecordingHttp();
         $this->poster = new ScriptedPoster([
@@ -67,7 +67,7 @@ final class AiBotFlowTest extends TestCase
             public function financeAccounts(): array { return [1 => '1 Счет Стаса', 2 => 'Касса', 8 => 'Tips', 9 => 'Vietnam Comp', 11 => 'Zana4ka']; }
             public function financeCategories(): array { return []; }
         };
-        $clock = static fn(): int => self::NOW;
+        $clock = static fn(): int => $now ?? self::NOW;
         $svc = new FinanceDraftService(
             $this->repo,
             new PosterTransactionCreateService($this->poster, $settings, $this->audit, $this->lock),
@@ -223,7 +223,7 @@ final class AiBotFlowTest extends TestCase
         // Как в реальном Poster: комментарий — имя получателя.
         foreach ([11895 => [5000000, 'Олег'], 11896 => [378800, 'Олег'], 11897 => [3693200, 'Дима'], 11898 => [3978800, 'Ли'], 11899 => [4057200, 'Игорь'], 11900 => [2436000, 'Стас']] as $id => [$vnd, $who]) {
             $existing[] = ['transaction_id' => $id, 'account_id' => 1, 'category_id' => 22, 'type' => 0,
-                'amount' => (string) (-$vnd * 100), 'date' => '2026-10-09 15:00:00', 'comment' => $who];
+                'amount' => (string) (-$vnd * 100), 'date' => '2026-10-10 15:00:00', 'comment' => $who];
         }
         foreach (['parts', 'person'] as $mode) {
             $this->boot($existing);
@@ -242,7 +242,7 @@ final class AiBotFlowTest extends TestCase
             sort($ids);
             $this->assertSame([11895, 11896, 11897, 11898, 11899, 11900], $ids);
             $q = $this->poster->callsTo('finance.getTransactions')[0]['params'];
-            $this->assertSame(['20261007', '20261013', 1], [$q['dateFrom'], $q['dateTo'], $q['account_id']]);
+            $this->assertSame(['20261010', '20261010', 1], [$q['dateFrom'], $q['dateTo'], $q['account_id']]);
             $edit = $this->tg->callsTo('editMessageText');
             $this->assertStringContainsString('возможный дубль: #1189', end($edit)['params']['text']);
             $this->assertStringContainsString('Повторить?', end($edit)['params']['text']);
@@ -498,7 +498,7 @@ final class AiBotFlowTest extends TestCase
     private static function tx(int $id, int $vnd, string $comment, int $acc = 1, int $cat = 22): array
     {
         return ['transaction_id' => $id, 'account_id' => $acc, 'category_id' => $cat, 'type' => 0,
-            'amount' => (string) (-$vnd * 100), 'date' => '2026-10-09 15:00:00', 'comment' => $comment];
+            'amount' => (string) (-$vnd * 100), 'date' => '2026-10-10 15:00:00', 'comment' => $comment];
     }
 
     private function runSingle(string $source): void
@@ -514,6 +514,56 @@ final class AiBotFlowTest extends TestCase
         return array_values(array_filter($this->audit->rows, fn($r) => $r['action'] === 'aibot.finance_draft.duplicate_decision'));
     }
 
+    public function test_old_similar_payout_does_not_block_today(): void
+    {
+        $old = self::tx(9001, 1000000, 'Олег');
+        $old['date'] = '2026-10-09 23:59:59';
+        $this->boot([$old]);
+        $this->runSingle('Дивиденды: Олег 1 000 000');
+        $this->assertCount(1, $this->creates());
+        $this->assertSame('done', $this->repo->rows[1]['status']);
+        $q = $this->poster->callsTo('finance.getTransactions')[0]['params'];
+        $this->assertSame(['20261010', '20261010'], [$q['dateFrom'], $q['dateTo']]);
+    }
+
+    public function test_local_midnight_includes_today_and_excludes_yesterday(): void
+    {
+        $yesterday = self::tx(9001, 1000000, 'Олег');
+        $yesterday['date'] = '2026-10-09 23:59:59';
+        $today = self::tx(9002, 1000000, 'Олег');
+        $today['date'] = '2026-10-10 00:00:00';
+        $now = (new \DateTimeImmutable('2026-10-10 00:05:00', new \DateTimeZone(AiBotConfig::TZ)))->getTimestamp();
+        $this->boot([$yesterday, $today], now: $now);
+        $this->runSingle('Дивиденды: Олег 1 000 000');
+        $this->assertSame('review', $this->repo->rows[1]['status']);
+        $this->assertSame([], $this->creates());
+        $records = json_decode($this->repo->rows[1]['poster_tx_ids_json'], true);
+        $this->assertSame([9002], array_column($records[0]['dup_of'], 'id'));
+    }
+
+    public function test_repeated_review_status_links_to_live_card_and_cannot_act_as_card(): void
+    {
+        $this->boot([self::tx(9001, 1000000, 'Олег')]);
+        $this->runSingle('Дивиденды: Олег 1 000 000');
+        $cardId = (int) $this->repo->rows[1]['card_msg_id'];
+        $this->post(self::command(['message_id' => 601], 'Дивиденды: Олег 1 000 000'));
+        $sent = $this->tg->callsTo('sendMessage');
+        $status = end($sent)['params'];
+        $this->assertStringContainsString('Повторить?', $status['text']);
+        $keyboard = json_decode($status['reply_markup'], true)['inline_keyboard'];
+        $this->assertSame('https://t.me/c/1/' . $cardId, $keyboard[0][0]['url']);
+        $this->assertArrayNotHasKey('callback_data', $keyboard[0][0]);
+
+        $statusMsgId = 900 + count($this->tg->calls);
+        $this->press('fd_rep:1:0:' . $this->repo->rows[1]['confirm_nonce'], self::OWNER, $statusMsgId, true);
+        $this->assertSame([], $this->decisions());
+        $this->assertSame([], $this->creates());
+        $this->press('fd_rep:1:0');
+        $this->assertCount(1, $this->creates());
+        $this->press('fd_rep:1:0');
+        $this->assertCount(1, $this->creates());
+    }
+
     public function test_equal_payout_same_person_asks_and_repeats_on_confirm(): void
     {
         $this->bootLedger([self::tx(9001, 1000000, 'Олег')]);
@@ -522,7 +572,7 @@ final class AiBotFlowTest extends TestCase
         $this->assertSame('review', $this->repo->rows[1]['status']);
         $journal = array_values(array_filter($this->tg->callsTo('sendMessage'), fn($c) => str_contains($c['params']['text'], '📒')));
         $this->assertCount(1, $journal, 'бот пишет владельцу о дубле');
-        $this->assertStringContainsString('возможный дубль: #9001 от 09.10.2026, 1 000 000, «Олег». Повторить?', $journal[0]['params']['text']);
+        $this->assertStringContainsString('возможный дубль: #9001 от 10.10.2026, 1 000 000, «Олег». Повторить?', $journal[0]['params']['text']);
         $card = $this->ctlRender();
         $nonce = $this->repo->rows[1]['confirm_nonce'];
         $this->assertSame(['fd_rep:1:0:' . $nonce, 'fd_skip:1:0:' . $nonce], array_column($card['keyboard'][0], 'callback_data'));
