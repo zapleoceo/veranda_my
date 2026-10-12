@@ -168,6 +168,17 @@ final class AiBotWebhookController
             }
             // Повторный триггер на тот же источник — показываем существующий результат.
             $status = (string) ($draft['status'] ?? '');
+            if ((int) ($draft['initiator_tg_id'] ?? 0) === $fromId
+                && in_array($status, ['review', 'partial'], true)) {
+                $draft = $this->drafts->refreshDuplicateCandidates((int) $draft['id']);
+                $card = $this->drafts->renderFresh($draft);
+                if (!empty($draft['card_msg_id'])
+                    && !$bot->editMessageText((int) $draft['card_msg_id'], $card['text'], $card['keyboard'])) {
+                    throw new \RuntimeException('Не удалось обновить карточку черновика');
+                }
+                $draft = (array) $this->drafts->get((int) $draft['id']);
+                $status = (string) $draft['status'];
+            }
             if (in_array($status, ['done', 'partial', 'review', 'reconcile'], true)) {
                 $bot->sendMessageWithKeyboard($this->drafts->journal($draft), self::cardLinkKeyboard($draft), $threadId, $triggerId);
             } elseif (empty($draft['card_msg_id'])) {

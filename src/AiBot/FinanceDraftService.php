@@ -35,7 +35,6 @@ final class FinanceDraftService
     public const SPLIT_PARTS = 'parts';
 
     private const RECONCILE_WINDOW_DAYS = 3;
-    private const DATE_PICK_DAYS = 6;
     private const EXEC_STALE_SEC = 120;
     public const MAX_PEOPLE = 30;
 
@@ -98,6 +97,7 @@ final class FinanceDraftService
                 ]),
                 // Явно показанные переводы → по умолчанию отдельной записью на каждый.
                 'split_mode' => $hasParts ? self::SPLIT_PARTS : self::SPLIT_PERSON,
+                'tx_date' => $sourceDate > 0 ? $this->localDate($sourceDate, 'Y-m-d') : null,
                 'status' => 'draft',
             ]);
             $draft = (array) $this->drafts->get($id);
@@ -149,6 +149,68 @@ final class FinanceDraftService
         return $this->drafts->get($id);
     }
 
+    /** Recheck saved duplicate candidates without sending anything to Poster. */
+    public function refreshDuplicateCandidates(int $id): array
+    {
+        return $this->lock->synchronized('aibot_fd_' . $id, 10, function () use ($id): array {
+            $draft = $this->drafts->get($id);
+            if ($draft === null) {
+                throw new \RuntimeException('Черновик не найден');
+            }
+            if (!in_array((string) $draft['status'], ['review', 'partial'], true)) {
+                return $draft;
+            }
+            $records = self::dec($draft['poster_tx_ids_json'] ?? null);
+            $hasDuplicate = array_filter($records, static fn(array $r) => ($r['status'] ?? '') === 'dup') !== [];
+            if (!$hasDuplicate) {
+                return $draft;
+            }
+
+            // Probe only the unresolved duplicate rows. Preserve every completed,
+            // pending, and uncertain row, including its original transaction IDs.
+            $probe = $records;
+            foreach ($probe as &$row) {
+                if (($row['status'] ?? '') === 'dup') {
+                    $row['status'] = 'pending';
+                    unset($row['dup_of']);
+                } else {
+                    $row['status'] = 'done';
+                }
+            }
+            unset($row);
+            $rechecked = $this->markDuplicates($probe, (int) $draft['account_id'], (string) $draft['tx_date']);
+            foreach ($records as $i => &$row) {
+                if (($row['status'] ?? '') !== 'dup') {
+                    continue;
+                }
+                $row['status'] = $rechecked[$i]['status'];
+                $row['tx_ids'] = $rechecked[$i]['tx_ids'];
+                if ($row['status'] === 'dup') {
+                    $row['dup_of'] = $rechecked[$i]['dup_of'];
+                } else {
+                    unset($row['dup_of']);
+                }
+            }
+            unset($row);
+            $has = static fn(string $status): bool => array_filter($records, static fn(array $r) => $r['status'] === $status) !== [];
+            $status = ($has('pending') || $has('failed') || $has('sending')) ? 'partial'
+                : ($has('dup') ? 'review' : ($has('unverified') ? 'reconcile' : 'done'));
+            $sourceDate = (int) (self::dec($draft['rows_json'] ?? null)['source_date'] ?? 0);
+            $txDate = $sourceDate > 0 ? $this->localDate($sourceDate, 'Y-m-d') : null;
+            if ($records !== self::dec($draft['poster_tx_ids_json'] ?? null) || $status !== $draft['status'] || $txDate !== $draft['tx_date']) {
+                $this->drafts->update($id, [
+                    'status' => $status,
+                    'tx_date' => $txDate,
+                    'poster_tx_ids_json' => self::enc($records),
+                    'confirm_nonce' => bin2hex(random_bytes(4)),
+                    'confirm_nonce_at' => ($this->clock)(),
+                ]);
+                return (array) $this->drafts->get($id);
+            }
+            return $draft;
+        });
+    }
+
     public function attachCard(int $id, int $cardMsgId): void
     {
         $this->drafts->update($id, ['card_msg_id' => $cardMsgId]);
@@ -193,12 +255,7 @@ final class FinanceDraftService
                 $this->drafts->update($draftId, ['account_id' => $acc]);
                 return 'Счёт: ' . $this->accountChoices()[$acc];
             case 'date':
-                $date = $this->resolveDate($arg);
-                if ($date === null) {
-                    return 'Недопустимая дата';
-                }
-                $this->drafts->update($draftId, ['tx_date' => $date]);
-                return 'Дата: ' . self::dm($date);
+                return 'Дата и время берутся из исходного сообщения';
             case 'split':
                 $mode = (string) $draft['split_mode'] === self::SPLIT_PARTS ? self::SPLIT_PERSON : self::SPLIT_PARTS;
                 $this->drafts->update($draftId, ['split_mode' => $mode]);
@@ -264,7 +321,8 @@ final class FinanceDraftService
                 return ['draft' => (array) $this->drafts->get($draftId), 'message' => 'Отправлять нечего — ' . self::statusLabel($final)];
             }
             $accountId = (int) $draft['account_id'];
-            $date = (string) $draft['tx_date'];
+            $sourceDate = (int) (self::dec($draft['rows_json'] ?? null)['source_date'] ?? 0);
+            $date = $this->localDate($sourceDate, 'Y-m-d');
 
             // Сверка с Poster ДО записи. Не смогли проверить — не пишем (fail closed).
             try {
@@ -276,7 +334,7 @@ final class FinanceDraftService
 
             $this->drafts->update($draftId, ['status' => 'executing', 'poster_tx_ids_json' => self::enc($records), 'error' => null, 'heartbeat_at' => ($this->clock)()]);
 
-            $datetime = $this->txDateTime($date);
+            $datetime = $this->localDate($sourceDate, 'Y-m-d H:i:s');
             foreach ($records as $i => $rec) {
                 if (in_array($rec['status'], self::SETTLED, true)) {
                     continue;
@@ -408,7 +466,7 @@ final class FinanceDraftService
         $L[] = 'Записей в Poster: ' . count($preview) . ((string) $draft['split_mode'] === self::SPLIT_PARTS ? ' (по переводам)' : ' (одна на человека)');
         $accId = (int) ($draft['account_id'] ?? 0);
         $L[] = 'Счёт: ' . ($accId > 0 ? self::h($this->accountChoices()[$accId] ?? ('#' . $accId)) : '— выберите —');
-        $L[] = 'Дата: ' . (!empty($draft['tx_date']) ? self::dm((string) $draft['tx_date'], true) : '— выберите —');
+        $L[] = 'Дата и время: ' . (!empty($data['source_date']) ? $this->localDate((int) $data['source_date'], 'd.m.Y H:i:s') : '— нет даты исходного сообщения —');
 
         if ($status === 'draft') {
             $L[] = 'Комментарии:';
@@ -465,8 +523,8 @@ final class FinanceDraftService
         if (!isset($this->accountChoices()[(int) $draft['account_id']])) {
             return 'Счёт больше не входит в настроенные — выберите заново';
         }
-        if (empty($draft['tx_date'])) {
-            return 'Выберите дату';
+        if ((int) ($data['source_date'] ?? 0) <= 0) {
+            return 'Нет даты исходного сообщения';
         }
         return null;
     }
@@ -873,20 +931,6 @@ final class FinanceDraftService
             $kb[] = $row;
         }
 
-        $chosen = (string) ($draft['tx_date'] ?? '');
-        $row = [];
-        foreach ($this->dateChoices($draft) as $ymd => $label) {
-            $mark = $chosen === $ymd ? '✅ ' : '';
-            $row[] = ['text' => $mark . $label, 'callback_data' => 'fd_date:' . $id . ':' . str_replace('-', '', $ymd)];
-            if (count($row) === 4) {
-                $kb[] = $row;
-                $row = [];
-            }
-        }
-        if ($row !== []) {
-            $kb[] = $row;
-        }
-
         $hasParts = false;
         foreach ($people as $p) {
             $hasParts = $hasParts || !empty($p['parts']);
@@ -904,45 +948,6 @@ final class FinanceDraftService
         $last[] = ['text' => '✖️ Отмена', 'callback_data' => 'fd_cancel:' . $id];
         $kb[] = $last;
         return $kb;
-    }
-
-    /** @return array<string,string> 'Y-m-d' → подпись */
-    private function dateChoices(array $draft): array
-    {
-        $today = $this->localDate(($this->clock)(), 'Y-m-d');
-        $out = [$today => 'Сегодня ' . self::dm($today)];
-        $data = self::dec($draft['rows_json'] ?? null);
-        if (!empty($data['source_date'])) {
-            $src = $this->localDate((int) $data['source_date'], 'Y-m-d');
-            if ($src !== $today) {
-                $out[$src] = 'Сообщ. ' . self::dm($src);
-            }
-        }
-        $d = new \DateTimeImmutable($today, new \DateTimeZone(AiBotConfig::TZ));
-        for ($k = 1; $k <= self::DATE_PICK_DAYS; $k++) {
-            $ymd = $d->modify('-' . $k . ' days')->format('Y-m-d');
-            $out[$ymd] ??= self::dm($ymd);
-        }
-        return $out;
-    }
-
-    /** 'YYYYMMDD' → 'Y-m-d', только не в будущем и не старше 31 дня. */
-    private function resolveDate(string $arg): ?string
-    {
-        if (!preg_match('/^(\d{4})(\d{2})(\d{2})$/', $arg, $m) || !checkdate((int) $m[2], (int) $m[3], (int) $m[1])) {
-            return null;
-        }
-        $ymd = $m[1] . '-' . $m[2] . '-' . $m[3];
-        $today = $this->localDate(($this->clock)(), 'Y-m-d');
-        $min = (new \DateTimeImmutable($today))->modify('-31 days')->format('Y-m-d');
-        return ($ymd > $today || $ymd < $min) ? null : $ymd;
-    }
-
-    /** Сегодня — текущее время (Вьетнам); прошлый день — полдень, без выдуманного времени. */
-    private function txDateTime(string $ymd): string
-    {
-        $now = ($this->clock)();
-        return $this->localDate($now, 'Y-m-d') === $ymd ? $this->localDate($now, 'Y-m-d H:i:s') : $ymd . ' 12:00:00';
     }
 
     private function localDate(int $ts, string $fmt): string
