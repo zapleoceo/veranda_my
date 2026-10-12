@@ -66,7 +66,12 @@ final class OfficeIntakeTest extends TestCase
         $lookup = new class implements PosterLookupServiceInterface {
             public function employees(): array { return []; }
             public function financeAccounts(): array { return [1 => '1 Счет Стаса', 2 => 'Касса']; }
-            public function financeCategories(): array { return [13 => ['name' => 'Household expenses', 'parent_id' => 0], 22 => ['name' => 'Инвесторы', 'parent_id' => 0]]; }
+            public function financeCategories(): array { return [
+                13 => ['name' => 'Household expenses', 'parent_id' => 0, 'operations' => 3],
+                14 => ['name' => 'Income only', 'parent_id' => 0, 'operations' => 1],
+                18 => ['name' => 'Expense only', 'parent_id' => 0, 'operations' => 2],
+                22 => ['name' => 'Инвесторы', 'parent_id' => 0, 'operations' => 3],
+            ]; }
         };
         $this->drafts = new InMemoryDraftRepository();
         $fin = new FinanceDraftService($this->drafts,
@@ -397,6 +402,9 @@ final class OfficeIntakeTest extends TestCase
         $this->post($this->msg(['text' => '@Veranda_aibot Добавь +25 На счет Касса Возврат']));
         $income = $this->drafts->get(1);
         $this->assertSame(1, json_decode($income['rows_json'], true)['direct']['type']);
+        $incomeButtons = json_encode($this->finance->render($income)['keyboard'], JSON_UNESCAPED_UNICODE);
+        $this->assertStringContainsString('Income only', $incomeButtons);
+        $this->assertStringNotContainsString('Expense only', $incomeButtons);
         $this->finance->applyChoice(1, 'cat', '13');
         $this->finance->execute(1, self::USER, (string) $this->drafts->get(1)['confirm_nonce']);
         $created = $this->poster->callsTo('finance.createTransactions');

@@ -48,6 +48,9 @@ final class FinanceDraftService
     /** @var array<int,string>|null */
     private ?array $categoryNames = null;
 
+    /** @var array<int,int> */
+    private array $categoryOperations = [];
+
     /** @var \Closure(): int */
     private \Closure $clock;
 
@@ -126,7 +129,7 @@ final class FinanceDraftService
             $accountToId = $transaction['type'] === 3 ? $this->matchAccountHint($transaction['account_to_hint']) : null;
             $categoryId = $transaction['type'] === 2
                 && preg_match('/дивиденд/iu', $transaction['comment'])
-                && isset($this->categoryChoices()[AiBotConfig::CATEGORY_ID])
+                && isset($this->categoryChoices(2)[AiBotConfig::CATEGORY_ID])
                 ? AiBotConfig::CATEGORY_ID : null;
             $id = $this->drafts->insert([
                 'chat_id' => $chatId,
@@ -303,13 +306,13 @@ final class FinanceDraftService
                 $this->drafts->update($draftId, ['account_id' => $acc]);
                 return 'Счёт: ' . $this->accountChoices()[$acc];
             case 'cat':
-                if ((string) $draft['intent'] !== self::DIRECT_INTENT || !isset($this->categoryChoices()[(int) $arg])) {
+                if ((string) $draft['intent'] !== self::DIRECT_INTENT || !isset($this->categoryChoices(self::typeFor($draft))[(int) $arg])) {
                     return 'Категория недоступна';
                 }
                 $data = self::dec($draft['rows_json'] ?? null);
                 $data['direct']['category_id'] = (int) $arg;
                 $this->drafts->update($draftId, ['rows_json' => self::enc($data)]);
-                return 'Категория: ' . $this->categoryChoices()[(int) $arg];
+                return 'Категория: ' . $this->categoryChoices(self::typeFor($draft))[(int) $arg];
             case 'to':
                 if (self::typeFor($draft) !== 3 || !isset($this->accountChoices()[(int) $arg])) {
                     return 'Счёт назначения недоступен';
@@ -574,7 +577,7 @@ final class FinanceDraftService
                 . self::h($this->accountChoices()[$accountId] ?? '— выберите —'),
             $type === 3
                 ? 'На счёт: ' . self::h($this->accountChoices()[self::accountToFor($draft)] ?? '— выберите —')
-                : 'Категория: ' . self::h($this->categoryChoices()[$categoryId] ?? '— выберите —'),
+                : 'Категория: ' . self::h($this->categoryChoices($type)[$categoryId] ?? '— выберите —'),
             'Комментарий: ' . self::h((string) ($direct['comment'] ?? '')),
         ];
         if ((string) $draft['status'] !== 'draft') {
@@ -629,7 +632,7 @@ final class FinanceDraftService
                     || self::accountToFor($draft) === (int) $draft['account_id']) {
                     return 'Выберите другой счёт назначения';
                 }
-            } elseif (!isset($this->categoryChoices()[self::categoryFor($draft)])) {
+            } elseif (!isset($this->categoryChoices(self::typeFor($draft))[self::categoryFor($draft)])) {
                 return 'Выберите категорию';
             }
         }
@@ -642,22 +645,28 @@ final class FinanceDraftService
     // ─── внутреннее ────────────────────────────────────────────────────────
 
     /** @return array<int,string> */
-    public function categoryChoices(): array
+    public function categoryChoices(int $type = 0): array
     {
-        if ($this->categoryNames !== null) {
+        if ($this->categoryNames === null) {
+            $out = [];
+            try {
+                foreach ($this->lookup->financeCategories() as $id => $category) {
+                    if ((int) $id > 0 && trim((string) ($category['name'] ?? '')) !== '') {
+                        $out[(int) $id] = trim((string) $category['name']);
+                        $this->categoryOperations[(int) $id] = (int) ($category['operations'] ?? 3);
+                    }
+                }
+            } catch (\Throwable) {
+                // No category choice is safer than a guessed Poster category.
+            }
+            $this->categoryNames = $out;
+        }
+        if ($type !== 1 && $type !== 2) {
             return $this->categoryNames;
         }
-        $out = [];
-        try {
-            foreach ($this->lookup->financeCategories() as $id => $category) {
-                if ((int) $id > 0 && trim((string) ($category['name'] ?? '')) !== '') {
-                    $out[(int) $id] = trim((string) $category['name']);
-                }
-            }
-        } catch (\Throwable) {
-            // No category choice is safer than a guessed Poster category.
-        }
-        return $this->categoryNames = $out;
+        $bit = $type === 1 ? 1 : 2;
+        return array_filter($this->categoryNames, fn(string $name, int $id) =>
+            ($this->categoryOperations[$id] & $bit) !== 0, ARRAY_FILTER_USE_BOTH);
     }
 
     private function matchAccountHint(string $hint): ?int
@@ -1177,7 +1186,7 @@ final class FinanceDraftService
 
         if ((string) ($draft['intent'] ?? '') === self::DIRECT_INTENT) {
             $row = [];
-            $choices = self::typeFor($draft) === 3 ? $this->accountChoices() : $this->categoryChoices();
+            $choices = self::typeFor($draft) === 3 ? $this->accountChoices() : $this->categoryChoices(self::typeFor($draft));
             foreach ($choices as $choiceId => $name) {
                 $mark = (self::typeFor($draft) === 3 ? self::accountToFor($draft) : self::categoryFor($draft)) === $choiceId ? '✅ ' : '';
                 $row[] = ['text' => $mark . $name, 'callback_data' => 'fd_' . (self::typeFor($draft) === 3 ? 'to' : 'cat') . ':' . $id . ':' . $choiceId];
