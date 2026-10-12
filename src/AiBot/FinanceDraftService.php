@@ -30,6 +30,7 @@ use App\Payday3\Domain\Actor;
 final class FinanceDraftService
 {
     public const INTENT = 'investor_dividends';
+    public const DIRECT_INTENT = 'direct_expense';
 
     public const SPLIT_PERSON = 'person';
     public const SPLIT_PARTS = 'parts';
@@ -43,6 +44,9 @@ final class FinanceDraftService
 
     /** @var array<int,string>|null */
     private ?array $accountNames = null;
+
+    /** @var array<int,string>|null */
+    private ?array $categoryNames = null;
 
     /** @var \Closure(): int */
     private \Closure $clock;
@@ -97,6 +101,46 @@ final class FinanceDraftService
                 ]),
                 // Явно показанные переводы → по умолчанию отдельной записью на каждый.
                 'split_mode' => $hasParts ? self::SPLIT_PARTS : self::SPLIT_PERSON,
+                'tx_date' => $sourceDate > 0 ? $this->localDate($sourceDate, 'Y-m-d') : null,
+                'status' => 'draft',
+            ]);
+            $draft = (array) $this->drafts->get($id);
+            $cardId = $sendCard($draft);
+            if ($cardId !== null && $cardId > 0) {
+                $this->drafts->update($id, ['card_msg_id' => $cardId]);
+                $draft['card_msg_id'] = $cardId;
+            }
+            return ['draft' => $draft, 'created' => true];
+        });
+    }
+
+    /** @param array{amount:int,account_hint:string,comment:string} $expense */
+    public function createOrGetDirect(string $chatId, int $msgId, int $initiatorTgId, int $sourceDate, array $expense, callable $sendCard): array
+    {
+        return $this->lock->synchronized('aibot_src_' . $chatId . '_' . $msgId, 5, function () use ($chatId, $msgId, $initiatorTgId, $sourceDate, $expense, $sendCard) {
+            $existing = $this->drafts->findBySource($chatId, $msgId, self::DIRECT_INTENT);
+            if ($existing !== null) {
+                return ['draft' => $existing, 'created' => false];
+            }
+            $matches = array_filter($this->accountChoices(), static fn(string $name) =>
+                mb_stripos($name, $expense['account_hint'], 0, 'UTF-8') !== false);
+            $accountId = count($matches) === 1 ? (int) array_key_first($matches) : null;
+            $id = $this->drafts->insert([
+                'chat_id' => $chatId,
+                'source_msg_id' => $msgId,
+                'trigger_msg_id' => $msgId,
+                'initiator_tg_id' => $initiatorTgId,
+                'intent' => self::DIRECT_INTENT,
+                'rows_json' => self::enc([
+                    'people' => [PayoutParser::row($expense['comment'], $expense['amount'], [])],
+                    'period' => null,
+                    'errors' => [],
+                    'source_date' => $sourceDate,
+                    'direct' => ['amount' => $expense['amount'], 'account_hint' => $expense['account_hint'],
+                        'comment' => $expense['comment'], 'category_id' => null],
+                ]),
+                'account_id' => $accountId,
+                'split_mode' => self::SPLIT_PERSON,
                 'tx_date' => $sourceDate > 0 ? $this->localDate($sourceDate, 'Y-m-d') : null,
                 'status' => 'draft',
             ]);
@@ -178,7 +222,7 @@ final class FinanceDraftService
                 }
             }
             unset($row);
-            $rechecked = $this->markDuplicates($probe, (int) $draft['account_id'], (string) $draft['tx_date']);
+            $rechecked = $this->markDuplicates($probe, (int) $draft['account_id'], (string) $draft['tx_date'], self::categoryFor($draft));
             foreach ($records as $i => &$row) {
                 if (!in_array(($row['status'] ?? ''), ['dup', 'pending'], true)) {
                     continue;
@@ -254,6 +298,14 @@ final class FinanceDraftService
                 }
                 $this->drafts->update($draftId, ['account_id' => $acc]);
                 return 'Счёт: ' . $this->accountChoices()[$acc];
+            case 'cat':
+                if ((string) $draft['intent'] !== self::DIRECT_INTENT || !isset($this->categoryChoices()[(int) $arg])) {
+                    return 'Категория недоступна';
+                }
+                $data = self::dec($draft['rows_json'] ?? null);
+                $data['direct']['category_id'] = (int) $arg;
+                $this->drafts->update($draftId, ['rows_json' => self::enc($data)]);
+                return 'Категория: ' . $this->categoryChoices()[(int) $arg];
             case 'date':
                 return 'Дата и время берутся из исходного сообщения';
             case 'split':
@@ -326,7 +378,7 @@ final class FinanceDraftService
 
             // Сверка с Poster ДО записи. Не смогли проверить — не пишем (fail closed).
             try {
-                $records = $this->markDuplicates($records, $accountId, $date);
+                $records = $this->markDuplicates($records, $accountId, $date, self::categoryFor($draft));
             } catch (\Throwable $e) {
                 $this->drafts->update($draftId, ['error' => 'Проверка дублей в Poster не удалась: ' . mb_substr($e->getMessage(), 0, 300)]);
                 return ['draft' => (array) $this->drafts->get($draftId), 'message' => 'Не смог проверить дубли в Poster — ничего не внесено'];
@@ -350,7 +402,7 @@ final class FinanceDraftService
                         'amount' => (int) $rec['amount'],
                         'date' => $datetime,
                         'comment' => (string) $rec['comment'],
-                        'category_id' => AiBotConfig::CATEGORY_ID,
+                        'category_id' => self::categoryFor($draft),
                         'account_from' => $accountId,
                     ], new Actor('tg:' . $actorTgId, 'tgdraft:' . $draftId . ':' . $i));
                     // Успех — только при подтверждении с ID транзакции (Poster отвечает
@@ -381,7 +433,7 @@ final class FinanceDraftService
             // кнопка «Повторить незавершённые» такую запись не пошлёт.
             if (array_filter($records, static fn(array $r) => $r['status'] === 'failed' && ($r['outcome'] ?? 'unknown') !== 'rejected') !== []) {
                 try {
-                    $records = $this->markDuplicates($records, $accountId, $date);
+                    $records = $this->markDuplicates($records, $accountId, $date, self::categoryFor($draft));
                 } catch (\Throwable) {
                     foreach ($records as $k => $r) {
                         if ($r['status'] === 'failed' && ($r['outcome'] ?? 'unknown') !== 'rejected') {
@@ -403,7 +455,7 @@ final class FinanceDraftService
                     'chat_id' => $draft['chat_id'],
                     'source_msg_id' => (int) $draft['source_msg_id'],
                     'account_id' => $accountId,
-                    'category_id' => AiBotConfig::CATEGORY_ID,
+                    'category_id' => self::categoryFor($draft),
                     'date' => $datetime,
                     'status' => $final,
                     'records' => $records,
@@ -429,6 +481,9 @@ final class FinanceDraftService
     /** @return array{text:string, keyboard:list<list<array{text:string,callback_data:string}>>} */
     public function render(array $draft): array
     {
+        if ((string) ($draft['intent'] ?? '') === self::DIRECT_INTENT) {
+            return $this->renderDirect($draft);
+        }
         $id = (int) $draft['id'];
         $data = self::dec($draft['rows_json'] ?? null);
         $people = (array) ($data['people'] ?? []);
@@ -488,6 +543,33 @@ final class FinanceDraftService
     }
 
     /** Ответ-журнал после внесения: Poster tx id по каждой записи. */
+    /** @return array{text:string,keyboard:array} */
+    private function renderDirect(array $draft): array
+    {
+        $data = self::dec($draft['rows_json'] ?? null);
+        $direct = (array) ($data['direct'] ?? []);
+        $accountId = (int) ($draft['account_id'] ?? 0);
+        $categoryId = self::categoryFor($draft);
+        $lines = [
+            '💳 <b>Финансовый черновик #' . (int) $draft['id'] . '</b>',
+            'Источник: сообщение #' . (int) $draft['source_msg_id'],
+            'Дата и время: ' . (!empty($data['source_date']) ? $this->localDate((int) $data['source_date'], 'd.m.Y H:i:s') : '—'),
+            'Расход: ' . PayoutParser::fmt((int) ($direct['amount'] ?? 0)) . ' VND',
+            'Счёт: ' . self::h($this->accountChoices()[$accountId] ?? '— выберите —'),
+            'Категория: ' . self::h($this->categoryChoices()[$categoryId] ?? '— выберите —'),
+            'Комментарий: ' . self::h((string) ($direct['comment'] ?? '')),
+        ];
+        if ((string) $draft['status'] !== 'draft') {
+            $lines[] = 'Статус: ' . self::statusLabel((string) $draft['status']);
+            foreach (self::dec($draft['poster_tx_ids_json'] ?? null) as $record) {
+                $lines[] = self::recordLine($record);
+            }
+        } else {
+            $lines[] = $this->blocker($draft) ?? 'Проверьте поля и подтвердите запись';
+        }
+        return ['text' => implode("\n", $lines), 'keyboard' => $this->keyboard($draft, (array) ($data['people'] ?? []))];
+    }
+
     public function journal(array $draft): string
     {
         $L = ['📒 Черновик #' . (int) $draft['id'] . ' — ' . self::statusLabel((string) $draft['status'])];
@@ -523,6 +605,10 @@ final class FinanceDraftService
         if (!isset($this->accountChoices()[(int) $draft['account_id']])) {
             return 'Счёт больше не входит в настроенные — выберите заново';
         }
+        if ((string) ($draft['intent'] ?? '') === self::DIRECT_INTENT
+            && !isset($this->categoryChoices()[self::categoryFor($draft)])) {
+            return 'Выберите категорию';
+        }
         if ((int) ($data['source_date'] ?? 0) <= 0) {
             return 'Нет даты исходного сообщения';
         }
@@ -530,6 +616,33 @@ final class FinanceDraftService
     }
 
     // ─── внутреннее ────────────────────────────────────────────────────────
+
+    /** @return array<int,string> */
+    public function categoryChoices(): array
+    {
+        if ($this->categoryNames !== null) {
+            return $this->categoryNames;
+        }
+        $out = [];
+        try {
+            foreach ($this->lookup->financeCategories() as $id => $category) {
+                if ((int) $id > 0 && trim((string) ($category['name'] ?? '')) !== '') {
+                    $out[(int) $id] = trim((string) $category['name']);
+                }
+            }
+        } catch (\Throwable) {
+            // No category choice is safer than a guessed Poster category.
+        }
+        return $this->categoryNames = $out;
+    }
+
+    private static function categoryFor(array $draft): int
+    {
+        if ((string) ($draft['intent'] ?? '') !== self::DIRECT_INTENT) {
+            return AiBotConfig::CATEGORY_ID;
+        }
+        return (int) (self::dec($draft['rows_json'] ?? null)['direct']['category_id'] ?? 0);
+    }
 
     /** @return array<int,string> id → название; только счета из настроек payday. */
     public function accountChoices(): array
@@ -556,6 +669,12 @@ final class FinanceDraftService
     private function buildRecords(array $draft): array
     {
         $data = self::dec($draft['rows_json'] ?? null);
+        if ((string) ($draft['intent'] ?? '') === self::DIRECT_INTENT) {
+            $direct = (array) ($data['direct'] ?? []);
+            $comment = (string) ($direct['comment'] ?? '');
+            return [['name' => $comment, 'amount' => (int) ($direct['amount'] ?? 0), 'parts' => [],
+                'comment' => $comment, 'status' => 'pending', 'tx_ids' => []]];
+        }
         $period = isset($data['period']) && $data['period'] !== '' ? ' ' . $data['period'] : '';
         $split = (string) $draft['split_mode'] === self::SPLIT_PARTS;
         $out = [];
@@ -584,7 +703,7 @@ final class FinanceDraftService
      * @param list<array<string,mixed>> $records
      * @return list<array<string,mixed>>
      */
-    private function markDuplicates(array $records, int $accountId, string $date): array
+    private function markDuplicates(array $records, int $accountId, string $date, int $categoryId): array
     {
         $pending = array_filter($records, static fn(array $r) => !in_array($r['status'], self::SETTLED, true));
         if ($pending === []) {
@@ -639,7 +758,7 @@ final class FinanceDraftService
                 continue;
             }
             $tid = (int) ($t['transaction_id'] ?? 0);
-            if ($tid <= 0 || isset($own[$tid]) || (int) ($t['category_id'] ?? 0) !== AiBotConfig::CATEGORY_ID) {
+            if ($tid <= 0 || isset($own[$tid]) || (int) ($t['category_id'] ?? 0) !== $categoryId) {
                 continue;
             }
             $acc = (int) ($t['account_id'] ?? $accountId);
@@ -951,6 +1070,21 @@ final class FinanceDraftService
         }
         if ($row !== []) {
             $kb[] = $row;
+        }
+
+        if ((string) ($draft['intent'] ?? '') === self::DIRECT_INTENT) {
+            $row = [];
+            foreach ($this->categoryChoices() as $categoryId => $name) {
+                $mark = self::categoryFor($draft) === $categoryId ? '✅ ' : '';
+                $row[] = ['text' => $mark . $name, 'callback_data' => 'fd_cat:' . $id . ':' . $categoryId];
+                if (count($row) === 2) {
+                    $kb[] = $row;
+                    $row = [];
+                }
+            }
+            if ($row !== []) {
+                $kb[] = $row;
+            }
         }
 
         $hasParts = false;

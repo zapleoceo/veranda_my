@@ -39,6 +39,8 @@ final class OfficeIntakeTest extends TestCase
 
     private RecordingHttp $tg;
     private InMemoryDraftRepository $drafts;
+    private FinanceDraftService $finance;
+    private ScriptedPoster $poster;
     private InMemoryOfficeRepository $repo;
     private GrantTable $grants;
     private InterleavingLock $lock;
@@ -58,17 +60,19 @@ final class OfficeIntakeTest extends TestCase
         $this->office = new OfficeTaskService($config, $this->repo, $bot,
             new TelegramPermissionAuthorizer($this->grants, 'aibot_office'), $this->lock, new NullLogger(), $clock);
         $poster = new ScriptedPoster(['finance.getTransactions' => [], 'finance.createTransactions' => fn() => 1]);
+        $this->poster = $poster;
         $settings = FixedSettings::defaults();
         $audit = new InMemoryAuditLog();
         $lookup = new class implements PosterLookupServiceInterface {
             public function employees(): array { return []; }
-            public function financeAccounts(): array { return [1 => 'A']; }
-            public function financeCategories(): array { return []; }
+            public function financeAccounts(): array { return [1 => '1 Счет Стаса']; }
+            public function financeCategories(): array { return [13 => ['name' => 'Household expenses', 'parent_id' => 0]]; }
         };
         $this->drafts = new InMemoryDraftRepository();
         $fin = new FinanceDraftService($this->drafts,
             new PosterTransactionCreateService($poster, $settings, $audit, $this->lock), $poster, $settings, $lookup, $audit, $this->lock, $clock,
             new UserFinanceAuthorizer($this->grants));
+        $this->finance = $fin;
         $this->ctl = new AiBotWebhookController($config, $fin, $bot, new PayoutParser(), null, new NullLogger(), $clock,
             static fn(\Closure $j) => $j(), $this->office);
     }
@@ -270,9 +274,30 @@ final class OfficeIntakeTest extends TestCase
 
         $this->assertSame([], $this->repo->tasks);
         $this->assertSame([], $this->repo->outbox);
-        $this->assertSame([], $this->drafts->rows);
+        $this->assertSame([], $this->poster->callsTo('finance.createTransactions'));
+        $this->assertCount(1, $this->drafts->rows);
+        $draft = array_values($this->drafts->rows)[0];
+        $this->assertSame('direct_expense', $draft['intent']);
+        $this->assertSame(600, $draft['source_msg_id']);
+        $this->assertSame(1, (int) $draft['account_id']);
+        $data = json_decode($draft['rows_json'], true);
+        $this->assertSame(self::NOW - 30, $data['source_date']);
+        $this->assertSame(1, $data['direct']['amount']);
+        $this->assertSame('Корректировка- тест', $data['direct']['comment']);
+        $this->assertNull($data['direct']['category_id']);
+        $this->assertSame('Выберите категорию', $this->finance->blocker($draft));
         $this->assertCount(1, $this->sent());
-        $this->assertStringContainsString('Прямое добавление финансовой операции пока не поддерживается', $this->sent()[0]['params']['text']);
+        $this->assertStringContainsString('Финансовый черновик', $this->sent()[0]['params']['text']);
+
+        $this->finance->applyChoice((int) $draft['id'], 'cat', '13');
+        $ready = (array) $this->drafts->get((int) $draft['id']);
+        $this->assertNull($this->finance->blocker($ready));
+        $this->assertSame(13, json_decode($ready['rows_json'], true)['direct']['category_id']);
+        $this->assertStringContainsString('Household expenses', $this->finance->render($ready)['text']);
+
+        $this->post($this->msg(['text' => "@Veranda_aibot Добавь \n-1\nСо счета стаса \nКорректировка- тест"], 2));
+        $this->assertCount(1, $this->drafts->rows, 'повтор Telegram использует тот же черновик');
+        $this->assertSame([], $this->poster->callsTo('finance.createTransactions'));
     }
 
     public function test_direct_account_transaction_without_finance_permission_is_not_office_task(): void
@@ -290,6 +315,53 @@ final class OfficeIntakeTest extends TestCase
 
         $this->assertCount(1, $this->repo->tasks);
         $this->assertCount(1, $this->repo->outbox);
+    }
+
+    public function test_ambiguous_direct_expense_does_not_create_draft_or_office_task(): void
+    {
+        $this->grants->setPerm(self::USER, 'aibot_finance', true);
+        $this->post($this->msg(['text' => '@Veranda_aibot добавь -1 со счета стаса']));
+
+        $this->assertSame([], $this->repo->tasks);
+        $this->assertSame([], $this->drafts->rows);
+        $this->assertStringContainsString('тремя строками', $this->sent()[0]['params']['text']);
+    }
+
+    public function test_confirmed_direct_expense_uses_source_time_and_selected_category(): void
+    {
+        $this->grants->setPerm(self::USER, 'aibot_finance', true);
+        $this->post($this->msg(['text' => "@Veranda_aibot Добавь\n-1\nСо счета стаса\nКорректировка- тест"]));
+        $this->finance->applyChoice(1, 'cat', '13');
+        $ready = (array) $this->drafts->get(1);
+        $this->assertSame([], $this->poster->callsTo('finance.createTransactions'));
+
+        $this->finance->execute(1, self::USER, (string) $ready['confirm_nonce']);
+        $created = $this->poster->callsTo('finance.createTransactions');
+        $this->assertCount(1, $created);
+        $this->assertSame(13, $created[0]['params']['category']);
+        $this->assertSame(1, $created[0]['params']['account_from']);
+        $this->assertSame(1, $created[0]['params']['amount_from']);
+        $this->assertSame('Корректировка- тест', $created[0]['params']['comment']);
+        $expectedDate = (new \DateTimeImmutable('@' . (self::NOW - 30)))
+            ->setTimezone(new \DateTimeZone('Asia/Ho_Chi_Minh'))->format('Y-m-d H:i:s');
+        $this->assertSame($expectedDate, $created[0]['params']['date']);
+    }
+
+    public function test_same_day_direct_expense_duplicate_is_not_sent_to_poster(): void
+    {
+        $this->grants->setPerm(self::USER, 'aibot_finance', true);
+        $this->post($this->msg(['text' => "@Veranda_aibot Добавь\n-1\nСо счета стаса\nКорректировка- тест"]));
+        $this->finance->applyChoice(1, 'cat', '13');
+        $day = (new \DateTimeImmutable('@' . self::NOW))->setTimezone(new \DateTimeZone('Asia/Ho_Chi_Minh'))->format('Y-m-d');
+        $this->poster->responses['finance.getTransactions'] = [[
+            'transaction_id' => 4321, 'account_id' => 1, 'category_id' => 13,
+            'amount' => -100, 'comment' => 'Корректировка- тест', 'date' => $day . ' 12:00:00',
+        ]];
+
+        $ready = (array) $this->drafts->get(1);
+        $this->finance->execute(1, self::USER, (string) $ready['confirm_nonce']);
+        $this->assertSame([], $this->poster->callsTo('finance.createTransactions'));
+        $this->assertSame('review', $this->drafts->get(1)['status']);
     }
 
     public function test_token_never_stored(): void

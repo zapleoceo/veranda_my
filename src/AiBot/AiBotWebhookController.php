@@ -25,7 +25,7 @@ final class AiBotWebhookController
 {
     private const TRIGGER_RE = '/^\s*(?:@\w+[\s,:]*)?(?:внеси|занеси|запиши|проведи)(?![\p{L}])/iu';
     private const INTENT_RE = '/инвестор|дивиденд/iu';
-    private const CALLBACK_RE = '/^fd_(acc|date|split|go|cancel|rep|skip):(\d+)(?::(\d+))?(?::([0-9a-f]{8}))?$/';
+    private const CALLBACK_RE = '/^fd_(acc|cat|date|split|go|cancel|rep|skip):(\d+)(?::(\d+))?(?::([0-9a-f]{8}))?$/';
 
     /** @var \Closure(): int */
     private \Closure $clock;
@@ -124,10 +124,29 @@ final class AiBotWebhookController
         $bot = $this->bot->withChatId($chatId);
 
         if ($reply === null && $directFinanceCommand) {
-            $bot->sendMessageWithKeyboard(
-                'Прямое добавление финансовой операции пока не поддерживается. Запись в Poster не создана. Для дивидендов ответьте на исходное сообщение командой «внеси дивиденды».',
-                [], $threadId, $triggerId
-            );
+            $expense = DirectExpenseParser::parse($text, $this->config->botUsername);
+            if ($expense === null) {
+                $bot->sendMessageWithKeyboard('Укажите расход в VND тремя строками: «Добавь -1000», «Со счета Название», «Комментарий». Категорию можно выбрать в черновике.', [], $threadId, $triggerId);
+                return;
+            }
+            $result = $this->drafts->createOrGetDirect($chatId, $triggerId, $fromId, (int) ($msg['date'] ?? 0), $expense,
+                function (array $draft) use ($bot, $threadId, $triggerId): ?int {
+                    $card = $this->drafts->renderFresh($draft);
+                    return $bot->sendMessageWithKeyboard($card['text'], $card['keyboard'], $threadId, $triggerId);
+                });
+            if (!$result['created']) {
+                $draft = $result['draft'];
+                $card = $this->drafts->renderFresh($draft);
+                $edited = !empty($draft['card_msg_id'])
+                    ? $bot->tryEditMessageText((int) $draft['card_msg_id'], $card['text'], $card['keyboard'])
+                    : false;
+                if ($edited === false) {
+                    $cardId = $bot->sendMessageWithKeyboard($card['text'], $card['keyboard'], $threadId, $triggerId);
+                    if ($cardId !== null) {
+                        $this->drafts->attachCard((int) $draft['id'], $cardId);
+                    }
+                }
+            }
             return;
         }
 
