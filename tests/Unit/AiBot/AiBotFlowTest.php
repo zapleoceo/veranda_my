@@ -690,6 +690,62 @@ final class AiBotFlowTest extends TestCase
         $this->assertSame('done', $this->repo->rows[1]['status']);
     }
 
+    public function test_cyrillic_name_matches_latin_poster_comment_without_creating(): void
+    {
+        $this->bootLedger([self::tx(12005, 2436000, 'Stas')]);
+        $this->runSingle('Дивиденды: Стас 2 436 000');
+
+        $this->assertSame('review', $this->repo->rows[1]['status']);
+        $this->assertSame([], $this->creates());
+        $records = json_decode($this->repo->rows[1]['poster_tx_ids_json'], true);
+        $this->assertSame('dup', $records[0]['status']);
+        $this->assertSame([12005], array_column($records[0]['dup_of'], 'id'));
+    }
+
+    public function test_latin_name_must_still_match_as_a_whole_word(): void
+    {
+        $this->bootLedger([self::tx(12005, 2436000, 'Stasik')]);
+        $this->runSingle('Дивиденды: Стас 2 436 000');
+
+        $this->assertSame('done', $this->repo->rows[1]['status']);
+        $this->assertCount(1, $this->creates());
+    }
+
+    public function test_same_amount_different_latin_name_is_not_a_duplicate(): void
+    {
+        $this->bootLedger([self::tx(12005, 2436000, 'Igor')]);
+        $this->runSingle('Дивиденды: Стас 2 436 000');
+
+        $this->assertSame('done', $this->repo->rows[1]['status']);
+        $this->assertCount(1, $this->creates());
+    }
+
+    public function test_repeated_pending_draft_shows_new_latin_candidate_before_confirmation(): void
+    {
+        $this->bootLedger([self::tx(12005, 2436000, 'Stas')]);
+        $source = 'Дивиденды: Стас 2 436 000';
+        $this->post(self::command([], $source, 12833));
+        $this->press('fd_acc:1:1');
+        $this->repo->update(1, ['status' => 'partial', 'poster_tx_ids_json' => json_encode([[
+            'name' => 'Стас', 'amount' => 2436000, 'parts' => [], 'comment' => 'Дивиденды — Стас',
+            'status' => 'pending', 'tx_ids' => [],
+        ]], JSON_UNESCAPED_UNICODE)]);
+        $oldNonce = (string) $this->repo->rows[1]['confirm_nonce'];
+
+        $this->post(self::command(['message_id' => 601], $source, 12833));
+
+        $this->assertCount(1, $this->repo->rows);
+        $this->assertSame('review', $this->repo->rows[1]['status']);
+        $this->assertSame([], $this->creates());
+        $this->assertNotSame($oldNonce, $this->repo->rows[1]['confirm_nonce']);
+        $records = json_decode($this->repo->rows[1]['poster_tx_ids_json'], true);
+        $this->assertSame([12005], array_column($records[0]['dup_of'], 'id'));
+        $edits = $this->tg->callsTo('editMessageText');
+        $card = end($edits)['params'];
+        $this->assertStringContainsString('#12005', $card['text']);
+        $this->assertStringContainsString('fd_skip:1:0:', $card['reply_markup']);
+    }
+
     public function test_name_must_match_as_a_whole_word(): void
     {
         // «Ли» не совпадает с «Ливия».
