@@ -40,6 +40,7 @@ cfg=""
 for a in "\$@"; do [ "\$a" = "-K" ] && cfg=\$(cat); done
 printf '%s\n---\n' "\$cfg" >> "$WORK/curl_stdin.log"
 case "\$cfg" in
+  *getMe*)         cat "$WORK/resp_me" ;;
   *setWebhook*)    cat "$WORK/resp_set" ;;
   *getWebhookInfo*) cat "$WORK/resp_info" ;;
   *deleteWebhook*) echo '{"ok":true,"result":true}' ;;
@@ -51,6 +52,7 @@ printf '#!/usr/bin/env bash\nprintf "%%s %%s\\n" php "$*" >> "%s"\nif [ "$(cat "
 chmod +x "$STUBS/openssl" "$STUBS/curl" "$STUBS/php"
 
 GOOD_INFO='{"ok":true,"result":{"url":"https://veranda.my/aibot_webhook","has_custom_certificate":false,"pending_update_count":129,"last_error_message":"Wrong response from the webhook: 503 bot123456:TESTTOKENxyz","allowed_updates":["message","callback_query"]}}'
+GOOD_ME='{"ok":true,"result":{"id":123456,"is_bot":true,"username":"Veranda_aibot"}}'
 
 setup() { # $1 = содержимое .env (printf-формат), далее аргументы printf
   rm -rf "$WORK/app" "$WORK/home" "$ARGV_LOG" "$WORK/curl_stdin.log"
@@ -60,6 +62,7 @@ setup() { # $1 = содержимое .env (printf-формат), далее а�
   chmod 640 "$WORK/app/.env"
   cp "$WORK/app/.env" "$WORK/env.orig"
   echo '{"ok":true,"result":true,"description":"Webhook was set"}' > "$WORK/resp_set"
+  echo "$GOOD_ME" > "$WORK/resp_me"
   echo "$GOOD_INFO" > "$WORK/resp_info"
   printf '403' > "$WORK/resp_post"
   echo ok > "$WORK/grant"
@@ -172,6 +175,26 @@ cmp -s "$WORK/app/.env" "$WORK/env.orig" && pass "12: .env не тронут" ||
 [ -e "$WORK/home/.aibot_env_backups" ] && bad "12: бэкап/каталог созданы до проверки" || pass "12: ничего не создано"
 [ -e "$WORK/curl_stdin.log" ] && bad "12: обращение к Telegram" || pass "12: Telegram не вызывался"
 grep -q '^php .*aibot_check_grant.php' "$ARGV_LOG" && pass "12: вызвана проверка права" || bad "12: проверка не вызвана"
+
+# 13. Inline mode steals leading @mentions; activation must stop before changing
+# the webhook or .env, while keeping Bot API responses and the token private.
+setup 'ai_tg_bot=%s\nAIBOT_WEBHOOK_SECRET=\n' "$TOKEN_VAL"
+echo '{"ok":true,"result":{"is_bot":true,"supports_inline_queries":true}}' > "$WORK/resp_me"
+code=$(run aibot_activate.sh)
+[ "$code" = 1 ] && pass "13: inline mode rejected" || bad "13: exit $code"
+grep -q 'inline_mode_enabled' "$WORK/out.txt" && pass "13: actionable status" || bad "13: status missing"
+cmp -s "$WORK/app/.env" "$WORK/env.orig" && pass "13: .env unchanged" || bad "13: .env changed"
+grep -q 'setWebhook' "$WORK/curl_stdin.log" && bad "13: webhook changed" || pass "13: webhook unchanged"
+no_leak "13"
+
+# 14. An unknown getMe result must not silently pass the inline preflight.
+setup 'ai_tg_bot=%s\nAIBOT_WEBHOOK_SECRET=\n' "$TOKEN_VAL"
+: > "$WORK/resp_me"
+code=$(run aibot_activate.sh)
+[ "$code" = 1 ] && pass "14: getMe failure rejected" || bad "14: exit $code"
+cmp -s "$WORK/app/.env" "$WORK/env.orig" && pass "14: .env unchanged" || bad "14: .env changed"
+grep -q 'setWebhook' "$WORK/curl_stdin.log" && bad "14: webhook changed" || pass "14: webhook unchanged"
+no_leak "14"
 
 echo
 [ "$fails" = 0 ] && { echo "ALL PASSED"; exit 0; } || { echo "$fails FAILED"; exit 1; }
