@@ -609,6 +609,28 @@ final class AiBotFlowTest extends TestCase
         $this->assertCount(1, $this->creates());
     }
 
+    public function test_repeated_review_replaces_card_after_terminal_telegram_edit_rejection(): void
+    {
+        $this->boot([self::tx(9001, 1000000, 'Игорь')]);
+        $this->runSingle('Дивиденды: Игорь 1 000 000');
+        $this->assertSame('review', $this->repo->rows[1]['status']);
+        $oldCardId = (int) $this->repo->rows[1]['card_msg_id'];
+        $oldNonce = (string) $this->repo->rows[1]['confirm_nonce'];
+        $this->tg->rejectEdits = true;
+
+        $this->post(self::command(['message_id' => 601], 'Дивиденды: Игорь 1 000 000'));
+
+        $newCardId = (int) $this->repo->rows[1]['card_msg_id'];
+        $this->assertNotSame($oldCardId, $newCardId);
+        $this->assertNotSame($oldNonce, $this->repo->rows[1]['confirm_nonce']);
+        $this->assertSame('review', $this->repo->rows[1]['status']);
+        $this->assertSame([], $this->creates());
+        $sent = $this->tg->callsTo('sendMessage');
+        $this->assertStringContainsString('fd_rep:1:0:', $sent[count($sent) - 2]['params']['reply_markup']);
+        $statusKeyboard = json_decode(end($sent)['params']['reply_markup'], true)['inline_keyboard'];
+        $this->assertSame('https://t.me/c/1/' . $newCardId, $statusKeyboard[0][0]['url']);
+    }
+
     public function test_equal_payout_same_person_asks_and_repeats_on_confirm(): void
     {
         $this->bootLedger([self::tx(9001, 1000000, 'Олег')]);
