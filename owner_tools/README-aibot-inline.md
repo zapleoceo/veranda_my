@@ -14,8 +14,9 @@ rerun `aibot_activate.sh` just to apply this BotFather setting.
 Verify with the Bot API `getMe` that `supports_inline_queries` is absent or
 false. The webhook should still have `allowed_updates` set to `message` and
 `callback_query`. Then, in the authorized group, reply to an ordinary message
-with the harmless text `@Veranda_aibot проверка` and confirm that Telegram
-sends it. Do not use a financial command for this smoke test.
+from a person with only `@Veranda_aibot` and confirm that Telegram sends it.
+The empty task text does not create an office task, and it has no financial
+intent. Do not use a financial command for this smoke test.
 
 Until Inline Mode is turned off, placing ordinary text before the mention
 (for example, `проверка @Veranda_aibot`) avoids Telegram's leading-mention
