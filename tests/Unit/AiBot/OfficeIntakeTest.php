@@ -65,8 +65,13 @@ final class OfficeIntakeTest extends TestCase
         $audit = new InMemoryAuditLog();
         $lookup = new class implements PosterLookupServiceInterface {
             public function employees(): array { return []; }
-            public function financeAccounts(): array { return [1 => '1 Счет Стаса']; }
-            public function financeCategories(): array { return [13 => ['name' => 'Household expenses', 'parent_id' => 0]]; }
+            public function financeAccounts(): array { return [1 => '1 Счет Стаса', 2 => 'Касса']; }
+            public function financeCategories(): array { return [
+                13 => ['name' => 'Household expenses', 'parent_id' => 0, 'operations' => 3],
+                14 => ['name' => 'Income only', 'parent_id' => 0, 'operations' => 1],
+                18 => ['name' => 'Expense only', 'parent_id' => 0, 'operations' => 2],
+                22 => ['name' => 'Инвесторы', 'parent_id' => 0, 'operations' => 3],
+            ]; }
         };
         $this->drafts = new InMemoryDraftRepository();
         $fin = new FinanceDraftService($this->drafts,
@@ -311,7 +316,7 @@ final class OfficeIntakeTest extends TestCase
 
     public function test_non_financial_add_request_remains_office_task(): void
     {
-        $this->post($this->msg(['text' => '@Veranda_aibot добавь файл в отчёт']));
+        $this->post($this->msg(['text' => '@Veranda_aibot добавь 5 файлов в отчёт']));
 
         $this->assertCount(1, $this->repo->tasks);
         $this->assertCount(1, $this->repo->outbox);
@@ -324,7 +329,115 @@ final class OfficeIntakeTest extends TestCase
 
         $this->assertSame([], $this->repo->tasks);
         $this->assertSame([], $this->drafts->rows);
-        $this->assertStringContainsString('тремя строками', $this->sent()[0]['params']['text']);
+        $this->assertStringContainsString('Укажите запись в VND', $this->sent()[0]['params']['text']);
+    }
+
+    public function test_forum_topic_root_does_not_replace_self_contained_source(): void
+    {
+        $this->grants->setPerm(self::USER, 'aibot_finance', true);
+        $this->post($this->msg([
+            'text' => '@Veranda_aibot Добавь -1 Со счета стаса Корректировка- тест',
+            'is_topic_message' => true, 'message_thread_id' => 12,
+            'reply_to_message' => ['message_id' => 12, 'date' => self::NOW - 900,
+                'forum_topic_created' => ['name' => 'Дивиденды учёт'], 'from' => ['id' => 1, 'is_bot' => true]],
+        ]));
+        $this->assertSame([], $this->repo->tasks);
+        $this->assertCount(1, $this->drafts->rows);
+        $draft = $this->drafts->get(1);
+        $this->assertSame(600, $draft['source_msg_id']);
+        $this->assertSame(self::NOW - 30, json_decode($draft['rows_json'], true)['source_date']);
+        $this->assertSame('Корректировка- тест', json_decode($draft['rows_json'], true)['direct']['comment']);
+    }
+
+    public function test_reply_with_accounting_fields_uses_replied_message_and_time(): void
+    {
+        $this->grants->setPerm(self::USER, 'aibot_finance', true);
+        $this->post($this->msg(['text' => '@Veranda_aibot Добавь', 'reply_to_message' => [
+            'message_id' => 590, 'date' => self::NOW - 300, 'from' => ['id' => 333],
+            'text' => '-1 Со счета стаса Корректировка- тест',
+        ]]));
+        $draft = $this->drafts->get(1);
+        $this->assertSame(590, $draft['source_msg_id']);
+        $this->assertSame(600, $draft['trigger_msg_id']);
+        $this->assertSame(self::NOW - 300, json_decode($draft['rows_json'], true)['source_date']);
+    }
+
+    public function test_replied_income_and_transfer_keep_their_source_message(): void
+    {
+        $this->grants->setPerm(self::USER, 'aibot_finance', true);
+        foreach ([
+            [600, 590, '+25 На счет Касса Возврат', 1],
+            [601, 591, 'Переведи 30 Со счета стаса На счет Касса Внутренний перевод', 3],
+        ] as $n => [$trigger, $source, $sourceText, $type]) {
+            $this->post($this->msg(['message_id' => $trigger, 'text' => '@Veranda_aibot Добавь',
+                'reply_to_message' => ['message_id' => $source, 'date' => self::NOW - 300 - $n,
+                    'from' => ['id' => 333], 'text' => $sourceText]], $n + 1));
+            $draft = $this->drafts->get($n + 1);
+            $this->assertSame($source, $draft['source_msg_id']);
+            $this->assertSame($trigger, $draft['trigger_msg_id']);
+            $this->assertSame(self::NOW - 300 - $n, json_decode($draft['rows_json'], true)['source_date']);
+            $this->assertSame($type, json_decode($draft['rows_json'], true)['direct']['type']);
+        }
+        $this->assertSame([], $this->poster->callsTo('finance.createTransactions'));
+    }
+
+    public function test_self_contained_dividend_expense_in_topic_needs_no_source_reply(): void
+    {
+        $this->grants->setPerm(self::USER, 'aibot_finance', true);
+        $this->post($this->msg([
+            'text' => '@Veranda_aibot Добавь -1 Со счета стаса Дивиденды стасу',
+            'is_topic_message' => true, 'message_thread_id' => 12,
+            'reply_to_message' => ['message_id' => 12, 'forum_topic_created' => ['name' => 'Дивиденды учёт']],
+        ]));
+        $draft = $this->drafts->get(1);
+        $this->assertSame(600, $draft['source_msg_id']);
+        $this->assertSame(22, json_decode($draft['rows_json'], true)['direct']['category_id']);
+        $this->assertNull($this->finance->blocker($draft));
+        $this->assertSame([], $this->poster->callsTo('finance.createTransactions'));
+    }
+
+    public function test_direct_income_and_transfer_use_supported_poster_types(): void
+    {
+        $this->grants->setPerm(self::USER, 'aibot_finance', true);
+        $this->post($this->msg(['text' => '@Veranda_aibot Добавь +25 На счет Касса Возврат']));
+        $income = $this->drafts->get(1);
+        $this->assertSame(1, json_decode($income['rows_json'], true)['direct']['type']);
+        $incomeButtons = json_encode($this->finance->render($income)['keyboard'], JSON_UNESCAPED_UNICODE);
+        $this->assertStringContainsString('Income only', $incomeButtons);
+        $this->assertStringNotContainsString('Expense only', $incomeButtons);
+        $this->finance->applyChoice(1, 'cat', '13');
+        $this->finance->execute(1, self::USER, (string) $this->drafts->get(1)['confirm_nonce']);
+        $created = $this->poster->callsTo('finance.createTransactions');
+        $this->assertSame(1, $created[0]['params']['type']);
+        $this->assertSame(2, $created[0]['params']['account_to']);
+        $this->assertSame(25, $created[0]['params']['amount_to']);
+
+        $this->post($this->msg(['message_id' => 601, 'text' => '@Veranda_aibot Переведи 30 Со счета стаса На счет Касса Внутренний перевод'], 2));
+        $transfer = $this->drafts->get(2);
+        $this->assertSame(3, json_decode($transfer['rows_json'], true)['direct']['type']);
+        $this->assertNull($this->finance->blocker($transfer));
+        $this->finance->execute(2, self::USER, (string) $transfer['confirm_nonce']);
+        $created = $this->poster->callsTo('finance.createTransactions');
+        $this->assertSame(2, $created[1]['params']['type'], 'Poster wire type 2 is a transfer');
+        $this->assertSame(1, $created[1]['params']['account_from']);
+        $this->assertSame(2, $created[1]['params']['account_to']);
+        $this->assertSame(30, $created[1]['params']['amount_from']);
+    }
+
+    public function test_transfer_with_one_matching_poster_leg_requires_duplicate_review(): void
+    {
+        $this->grants->setPerm(self::USER, 'aibot_finance', true);
+        $this->post($this->msg(['text' => '@Veranda_aibot Переведи 30 Со счета стаса На счет Касса Внутренний перевод']));
+        $day = (new \DateTimeImmutable('@' . self::NOW))->setTimezone(new \DateTimeZone('Asia/Ho_Chi_Minh'))->format('Y-m-d');
+        $this->poster->responses['finance.getTransactions'] = static fn(array $params) =>
+            (int) $params['account_id'] === 1 ? [[
+                'transaction_id' => 4321, 'account_id' => 1, 'type' => 0,
+                'amount' => -3000, 'comment' => 'Внутренний перевод', 'date' => $day . ' 12:00:00',
+            ]] : [];
+        $draft = $this->drafts->get(1);
+        $this->finance->execute(1, self::USER, (string) $draft['confirm_nonce']);
+        $this->assertSame([], $this->poster->callsTo('finance.createTransactions'));
+        $this->assertSame('review', $this->drafts->get(1)['status']);
     }
 
     public function test_confirmed_direct_expense_uses_source_time_and_selected_category(): void

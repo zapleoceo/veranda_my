@@ -56,6 +56,7 @@ final class PosterLookupService implements PosterLookupServiceInterface
                 $out[$cid] = [
                     'name'      => $name,
                     'parent_id' => (int)($r['parent_id'] ?? 0),
+                    'operations'=> (int)($r['operations'] ?? 0),
                 ];
             }
         }
