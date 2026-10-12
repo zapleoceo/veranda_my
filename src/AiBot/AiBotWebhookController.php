@@ -23,9 +23,9 @@ use Psr\Log\LoggerInterface;
  */
 final class AiBotWebhookController
 {
-    private const TRIGGER_RE = '/^\s*(?:@\w+[\s,:]*)?(?:внеси|занеси|запиши|проведи)(?![\p{L}])/iu';
+    private const TRIGGER_RE = '/^\s*(?:@\w+[\s,:]*)?(?:добавь|переведи|перевод|внеси|занеси|запиши|проведи)(?![\p{L}])/iu';
     private const INTENT_RE = '/инвестор|дивиденд/iu';
-    private const CALLBACK_RE = '/^fd_(acc|cat|date|split|go|cancel|rep|skip):(\d+)(?::(\d+))?(?::([0-9a-f]{8}))?$/';
+    private const CALLBACK_RE = '/^fd_(acc|to|cat|date|split|go|cancel|rep|skip):(\d+)(?::(\d+))?(?::([0-9a-f]{8}))?$/';
 
     /** @var \Closure(): int */
     private \Closure $clock;
@@ -82,6 +82,11 @@ final class AiBotWebhookController
         $fromId = (int) ($msg['from']['id'] ?? 0);
         $text = trim((string) ($msg['text'] ?? $msg['caption'] ?? ''));
         $reply = is_array($msg['reply_to_message'] ?? null) ? $msg['reply_to_message'] : null;
+        // Telegram represents a standalone message in a forum topic as a
+        // reply to that topic's service root. It is not a finance source.
+        if ($reply !== null && !empty($reply['forum_topic_created'])) {
+            $reply = null;
+        }
 
         if (!$this->config->chatAllowed($chatId)) {
             $this->logger->info('aibot.skip.chat', ['chat' => $chatId]);
@@ -123,13 +128,22 @@ final class AiBotWebhookController
         $threadId = !empty($msg['is_topic_message']) ? (int) ($msg['message_thread_id'] ?? 0) : null;
         $bot = $this->bot->withChatId($chatId);
 
-        if ($reply === null && $directFinanceCommand) {
-            $expense = DirectExpenseParser::parse($text, $this->config->botUsername);
-            if ($expense === null) {
-                $bot->sendMessageWithKeyboard('Укажите расход в VND тремя строками: «Добавь -1000», «Со счета Название», «Комментарий». Категорию можно выбрать в черновике.', [], $threadId, $triggerId);
+        $transaction = $directFinanceCommand
+            ? DirectFinanceParser::parse($text, $this->config->botUsername, true) : null;
+        $transactionSource = $msg;
+        if ($transaction === null && $reply !== null && preg_match(self::TRIGGER_RE, $text)) {
+            $transaction = DirectFinanceParser::parse((string) ($reply['text'] ?? $reply['caption'] ?? ''), $this->config->botUsername, true);
+            if ($transaction !== null) {
+                $transactionSource = $reply;
+            }
+        }
+        if ($directFinanceCommand || $transaction !== null) {
+            if ($transaction === null) {
+                $bot->sendMessageWithKeyboard('Укажите запись в VND: «Добавь -1000 Со счета Стаса Комментарий», «Добавь +1000 На счет Касса Комментарий» или «Переведи 1000 Со счета Стаса На счет Касса Комментарий». Для многословного счёта используйте отдельные строки.', [], $threadId, $triggerId);
                 return;
             }
-            $result = $this->drafts->createOrGetDirect($chatId, $triggerId, $fromId, (int) ($msg['date'] ?? 0), $expense,
+            $sourceId = (int) ($transactionSource['message_id'] ?? 0);
+            $result = $this->drafts->createOrGetDirect($chatId, $sourceId, $triggerId, $fromId, (int) ($transactionSource['date'] ?? 0), $transaction,
                 function (array $draft) use ($bot, $threadId, $triggerId): ?int {
                     $card = $this->drafts->renderFresh($draft);
                     return $bot->sendMessageWithKeyboard($card['text'], $card['keyboard'], $threadId, $triggerId);
@@ -408,12 +422,12 @@ final class AiBotWebhookController
     private function isDirectFinanceCommand(string $text): bool
     {
         $name = $this->config->botUsername;
-        if ($name === '' || !preg_match('/^\s*@' . preg_quote($name, '/') . '(?![\w])[\s,:;\-]*(.*)$/isu', $text, $m)) {
+        if ($name !== '' && preg_match('/^\s*@' . preg_quote($name, '/') . '(?![\w])[\s,:;\-]*(.*)$/isu', $text, $m)) {
+            $text = trim($m[1]);
+        } elseif (str_starts_with(trim($text), '@')) {
             return false;
         }
-        $task = trim($m[1]);
-        return (bool) preg_match('/^(?:добавь|внеси|занеси|запиши|проведи)(?![\p{L}])/iu', $task)
-            && (bool) preg_match('/(?<!\d)[+-]\s*\d+(?!\d)/u', $task)
-            && (bool) preg_match('/(?:со?\s+сч[её]та|на\s+сч[её]т)/iu', $task);
+        return (bool) preg_match('/^(?:добавь|внеси|занеси|запиши|проведи|переведи|перевод)(?![\p{L}])/iu', trim($text))
+            && (bool) preg_match('/(?<!\d)[+-]?\s*\d+(?!\d)/u', $text);
     }
 }
