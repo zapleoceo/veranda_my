@@ -397,6 +397,22 @@ final class OfficeIntakeTest extends TestCase
         $this->assertSame(30, $created[1]['params']['amount_from']);
     }
 
+    public function test_transfer_with_one_matching_poster_leg_requires_duplicate_review(): void
+    {
+        $this->grants->setPerm(self::USER, 'aibot_finance', true);
+        $this->post($this->msg(['text' => '@Veranda_aibot Переведи 30 Со счета стаса На счет Касса Внутренний перевод']));
+        $day = (new \DateTimeImmutable('@' . self::NOW))->setTimezone(new \DateTimeZone('Asia/Ho_Chi_Minh'))->format('Y-m-d');
+        $this->poster->responses['finance.getTransactions'] = static fn(array $params) =>
+            (int) $params['account_id'] === 1 ? [[
+                'transaction_id' => 4321, 'account_id' => 1, 'type' => 0,
+                'amount' => -3000, 'comment' => 'Внутренний перевод', 'date' => $day . ' 12:00:00',
+            ]] : [];
+        $draft = $this->drafts->get(1);
+        $this->finance->execute(1, self::USER, (string) $draft['confirm_nonce']);
+        $this->assertSame([], $this->poster->callsTo('finance.createTransactions'));
+        $this->assertSame('review', $this->drafts->get(1)['status']);
+    }
+
     public function test_confirmed_direct_expense_uses_source_time_and_selected_category(): void
     {
         $this->grants->setPerm(self::USER, 'aibot_finance', true);
