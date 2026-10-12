@@ -357,6 +357,25 @@ final class OfficeIntakeTest extends TestCase
         $this->assertSame(self::NOW - 300, json_decode($draft['rows_json'], true)['source_date']);
     }
 
+    public function test_replied_income_and_transfer_keep_their_source_message(): void
+    {
+        $this->grants->setPerm(self::USER, 'aibot_finance', true);
+        foreach ([
+            [600, 590, '+25 На счет Касса Возврат', 1],
+            [601, 591, 'Переведи 30 Со счета стаса На счет Касса Внутренний перевод', 3],
+        ] as $n => [$trigger, $source, $sourceText, $type]) {
+            $this->post($this->msg(['message_id' => $trigger, 'text' => '@Veranda_aibot Добавь',
+                'reply_to_message' => ['message_id' => $source, 'date' => self::NOW - 300 - $n,
+                    'from' => ['id' => 333], 'text' => $sourceText]], $n + 1));
+            $draft = $this->drafts->get($n + 1);
+            $this->assertSame($source, $draft['source_msg_id']);
+            $this->assertSame($trigger, $draft['trigger_msg_id']);
+            $this->assertSame(self::NOW - 300 - $n, json_decode($draft['rows_json'], true)['source_date']);
+            $this->assertSame($type, json_decode($draft['rows_json'], true)['direct']['type']);
+        }
+        $this->assertSame([], $this->poster->callsTo('finance.createTransactions'));
+    }
+
     public function test_self_contained_dividend_expense_in_topic_needs_no_source_reply(): void
     {
         $this->grants->setPerm(self::USER, 'aibot_finance', true);
