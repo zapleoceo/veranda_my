@@ -311,7 +311,7 @@ final class OfficeIntakeTest extends TestCase
 
     public function test_non_financial_add_request_remains_office_task(): void
     {
-        $this->post($this->msg(['text' => '@Veranda_aibot добавь файл в отчёт']));
+        $this->post($this->msg(['text' => '@Veranda_aibot добавь 5 файлов в отчёт']));
 
         $this->assertCount(1, $this->repo->tasks);
         $this->assertCount(1, $this->repo->outbox);
@@ -376,7 +376,7 @@ final class OfficeIntakeTest extends TestCase
         $this->assertNull($this->finance->blocker($transfer));
         $this->finance->execute(2, self::USER, (string) $transfer['confirm_nonce']);
         $created = $this->poster->callsTo('finance.createTransactions');
-        $this->assertSame(3, $created[1]['params']['type']);
+        $this->assertSame(2, $created[1]['params']['type'], 'Poster wire type 2 is a transfer');
         $this->assertSame(1, $created[1]['params']['account_from']);
         $this->assertSame(2, $created[1]['params']['account_to']);
         $this->assertSame(30, $created[1]['params']['amount_from']);

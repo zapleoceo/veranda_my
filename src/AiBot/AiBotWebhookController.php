@@ -82,9 +82,10 @@ final class AiBotWebhookController
         $fromId = (int) ($msg['from']['id'] ?? 0);
         $text = trim((string) ($msg['text'] ?? $msg['caption'] ?? ''));
         $reply = is_array($msg['reply_to_message'] ?? null) ? $msg['reply_to_message'] : null;
+        $topicRootReply = $reply !== null && !empty($reply['forum_topic_created']);
         // Telegram represents a standalone message in a forum topic as a
         // reply to that topic's service root. It is not a finance source.
-        if ($reply !== null && !empty($reply['forum_topic_created'])) {
+        if ($topicRootReply) {
             $reply = null;
         }
 
@@ -105,7 +106,8 @@ final class AiBotWebhookController
         if ($this->office !== null && !$isFinanceCommand && $this->office->handleIntake($msg, $updateId)) {
             return;
         }
-        if (($reply === null && !$directFinanceCommand) || !$this->isTrigger($text)) {
+        if (($reply === null && !$directFinanceCommand && !($topicRootReply && preg_match(self::INTENT_RE, $text)))
+            || !$this->isTrigger($text)) {
             return; // обычная переписка — не наше дело
         }
         // Пересланное / цитата / от имени чата — не команда владельца, даже если текст его.
@@ -127,6 +129,11 @@ final class AiBotWebhookController
         $triggerId = (int) ($msg['message_id'] ?? 0);
         $threadId = !empty($msg['is_topic_message']) ? (int) ($msg['message_thread_id'] ?? 0) : null;
         $bot = $this->bot->withChatId($chatId);
+
+        if ($topicRootReply && !$directFinanceCommand) {
+            $bot->sendMessageWithKeyboard('Для дивидендов ответьте на сообщение с выплатами или укажите реквизиты в самой команде.', [], $threadId, $triggerId);
+            return;
+        }
 
         $transaction = $directFinanceCommand
             ? DirectFinanceParser::parse($text, $this->config->botUsername, true) : null;
@@ -427,7 +434,11 @@ final class AiBotWebhookController
         } elseif (str_starts_with(trim($text), '@')) {
             return false;
         }
-        return (bool) preg_match('/^(?:добавь|внеси|занеси|запиши|проведи|переведи|перевод)(?![\p{L}])/iu', trim($text))
-            && (bool) preg_match('/(?<!\d)[+-]?\s*\d+(?!\d)/u', $text);
+        $task = trim($text);
+        return (bool) preg_match('/^(?:добавь|внеси|занеси|запиши|проведи|переведи|перевод)(?![\p{L}])/iu', $task)
+            && (bool) preg_match('/\d/u', $task)
+            && ((bool) preg_match('/(?<!\d)[+-]\s*\d/u', $task)
+                || (bool) preg_match('/(?:со\s+сч[её]та|на\s+сч[её]т)/iu', $task)
+                || (bool) preg_match('/^(?:переведи|перевод)(?![\p{L}])/iu', $task));
     }
 }
