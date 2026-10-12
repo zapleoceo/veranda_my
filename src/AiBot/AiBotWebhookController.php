@@ -94,12 +94,13 @@ final class AiBotWebhookController
         if ($this->office !== null && $this->office->handleAnswer($msg, $updateId)) {
             return;
         }
-        $isFinanceCommand = $reply !== null && $this->isTrigger($text)
-            && (preg_match(self::TRIGGER_RE, $text) || preg_match(self::INTENT_RE, $text));
+        $directFinanceCommand = $this->isDirectFinanceCommand($text);
+        $isFinanceCommand = $directFinanceCommand || ($reply !== null && $this->isTrigger($text)
+            && (preg_match(self::TRIGGER_RE, $text) || preg_match(self::INTENT_RE, $text)));
         if ($this->office !== null && !$isFinanceCommand && $this->office->handleIntake($msg, $updateId)) {
             return;
         }
-        if ($reply === null || !$this->isTrigger($text)) {
+        if (($reply === null && !$directFinanceCommand) || !$this->isTrigger($text)) {
             return; // обычная переписка — не наше дело
         }
         // Пересланное / цитата / от имени чата — не команда владельца, даже если текст его.
@@ -121,6 +122,14 @@ final class AiBotWebhookController
         $triggerId = (int) ($msg['message_id'] ?? 0);
         $threadId = !empty($msg['is_topic_message']) ? (int) ($msg['message_thread_id'] ?? 0) : null;
         $bot = $this->bot->withChatId($chatId);
+
+        if ($reply === null && $directFinanceCommand) {
+            $bot->sendMessageWithKeyboard(
+                'Прямое добавление финансовой операции пока не поддерживается. Запись в Poster не создана. Для дивидендов ответьте на исходное сообщение командой «внеси дивиденды».',
+                [], $threadId, $triggerId
+            );
+            return;
+        }
 
         if (!preg_match(self::INTENT_RE, $text)) {
             $bot->sendMessageWithKeyboard('Пока умею вносить только расходы категории «Инвесторы» (дивиденды).', [], $threadId, $triggerId);
@@ -375,5 +384,17 @@ final class AiBotWebhookController
             return true;
         }
         return $this->config->botUsername !== '' && stripos($text, '@' . $this->config->botUsername) !== false;
+    }
+
+    private function isDirectFinanceCommand(string $text): bool
+    {
+        $name = $this->config->botUsername;
+        if ($name === '' || !preg_match('/^\s*@' . preg_quote($name, '/') . '(?![\w])[\s,:;\-]*(.*)$/isu', $text, $m)) {
+            return false;
+        }
+        $task = trim($m[1]);
+        return (bool) preg_match('/^(?:добавь|внеси|занеси|запиши|проведи)(?![\p{L}])/iu', $task)
+            && (bool) preg_match('/(?<!\d)[+-]\s*\d+(?!\d)/u', $task)
+            && (bool) preg_match('/(?:со?\s+сч[её]та|на\s+сч[её]т)/iu', $task);
     }
 }

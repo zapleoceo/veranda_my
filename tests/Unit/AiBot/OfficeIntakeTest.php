@@ -263,6 +263,35 @@ final class OfficeIntakeTest extends TestCase
         $this->assertSame([], $this->repo->tasks, 'финансовая команда не становится задачей');
     }
 
+    public function test_direct_account_transaction_is_not_sent_to_office_or_poster(): void
+    {
+        $this->grants->setPerm(self::USER, 'aibot_finance', true);
+        $this->post($this->msg(['text' => "@Veranda_aibot Добавь \n-1\nСо счета стаса \nКорректировка- тест"]));
+
+        $this->assertSame([], $this->repo->tasks);
+        $this->assertSame([], $this->repo->outbox);
+        $this->assertSame([], $this->drafts->rows);
+        $this->assertCount(1, $this->sent());
+        $this->assertStringContainsString('Прямое добавление финансовой операции пока не поддерживается', $this->sent()[0]['params']['text']);
+    }
+
+    public function test_direct_account_transaction_without_finance_permission_is_not_office_task(): void
+    {
+        $this->post($this->msg(['text' => '@Veranda_aibot добавь -1 со счета стаса']));
+
+        $this->assertSame([], $this->repo->tasks);
+        $this->assertSame([], $this->repo->outbox);
+        $this->assertSame([], $this->sent());
+    }
+
+    public function test_non_financial_add_request_remains_office_task(): void
+    {
+        $this->post($this->msg(['text' => '@Veranda_aibot добавь файл в отчёт']));
+
+        $this->assertCount(1, $this->repo->tasks);
+        $this->assertCount(1, $this->repo->outbox);
+    }
+
     public function test_token_never_stored(): void
     {
         $this->post($this->msg());
