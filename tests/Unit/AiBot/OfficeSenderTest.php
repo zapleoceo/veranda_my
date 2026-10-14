@@ -478,7 +478,9 @@ final class OfficeSenderTest extends TestCase
         }
         $sent = $this->tg->callsTo('sendMessage');
         $this->assertCount(1, $sent);
-        $this->assertStringContainsString('приостановлена', $sent[0]['params']['text']);
+        $this->assertStringContainsString('заблокирована в Office', $sent[0]['params']['text']);
+        $this->assertStringContainsString('Office не передал подробности блокировки', $sent[0]['params']['text']);
+        $this->assertStringContainsString('Следующий шаг: проверьте задачу в Office', $sent[0]['params']['text']);
         $this->assertSame('blocked', $this->repo->findTaskByKey('vb--1001-600')['status']);
     }
 
