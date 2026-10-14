@@ -335,7 +335,9 @@ final class OfficePoller implements OfficePollerInterface
             if ($ok && $questions === []) {
                 if ($status === 'blocked') {
                     if ((string) $fresh['status'] !== 'blocked' && !in_array((string) $fresh['status'], ['done', 'failed', 'cancelled'], true)) {
-                        if ($this->say($fresh, '⏸ Задача #' . ($fresh['id'] ?? $key) . ' приостановлена')) {
+                        if ($this->say($fresh, '⚠️ Задача #' . ($fresh['id'] ?? $key)
+                            . ' заблокирована в Office. Причина: Office не передал подробности блокировки.'
+                            . ' Следующий шаг: проверьте задачу в Office и устраните блокер.')) {
                             $this->repo->updateTask($key, ['status' => 'blocked']);
                         } else {
                             $ok = false; // уведомление не ушло: повтор на следующем проходе
