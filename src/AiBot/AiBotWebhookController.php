@@ -402,7 +402,9 @@ final class AiBotWebhookController
             $bot->editMessageText($msgId, $card['text'], $card['keyboard']);
             $this->bot->answerCallbackQuery($cbId, $res['message'], !in_array((string) ($after['status'] ?? ''), ['done', 'partial', 'review', 'reconcile'], true));
             if ((string) ($draft['status'] ?? '') !== (string) ($after['status'] ?? '') || (string) ($draft['poster_tx_ids_json'] ?? '') !== (string) ($after['poster_tx_ids_json'] ?? '')) {
-                if (in_array((string) ($after['status'] ?? ''), ['done', 'partial', 'review', 'reconcile'], true)) {
+                if (in_array((string) ($after['status'] ?? ''), ['done', 'partial', 'review', 'reconcile'], true)
+                    && ((string) ($after['intent'] ?? '') !== FinanceDraftService::DIRECT_INTENT
+                        || $this->drafts->directWriteSucceeded($after))) {
                     $bot->sendMessageWithKeyboard($this->drafts->journal($after), [], null, $msgId);
                 }
             }
@@ -436,6 +438,9 @@ final class AiBotWebhookController
     private function isDirectFinanceCommand(string $text): bool
     {
         $name = $this->config->botUsername;
+        if (DirectFinanceParser::parse($text, $name) !== null) {
+            return true;
+        }
         if ($name !== '' && preg_match('/^\s*@' . preg_quote($name, '/') . '(?![\w])[\s,:;\-]*(.*)$/isu', $text, $m)) {
             $text = trim($m[1]);
         } elseif (str_starts_with(trim($text), '@')) {
