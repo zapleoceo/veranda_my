@@ -30,7 +30,7 @@ final class Contacts
         public readonly string $filmSchedule = 'https://t.me/gamezone_vietnam/1860', // афиша фильмов (пост в TG)
         public readonly string $telegramVeranda = 'https://t.me/Veranda_my',
         public readonly string $instagram = 'https://www.instagram.com/veranda.my/',
-        public readonly string $kidsInstagram = 'https://www.instagram.com/prazdniki_hnatrang/',
+        public readonly string $kidsInstagram = 'https://www.instagram.com/prazdniki_nhatrang/',
         public readonly string $director = 'https://t.me/zapleosoft',
         public readonly string $facebook = 'https://www.facebook.com/vngamezone/',
         // Локация — рабочая короткая ссылка (взята из /links, не плейсхолдер)
