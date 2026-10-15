@@ -11,6 +11,7 @@ use App\Payday3\Contracts\PosterApiProviderInterface;
 use App\Payday3\Contracts\PosterLookupServiceInterface;
 use App\Payday3\Contracts\PosterTransactionCreateServiceInterface;
 use App\Payday3\Domain\Actor;
+use App\Payday3\Domain\PosterIds;
 
 /**
  * Черновик расходов «Инвесторы» из Telegram: карточка, выбор счёта/даты,
@@ -117,7 +118,7 @@ final class FinanceDraftService
         });
     }
 
-    /** @param array{type:int,amount:int,account_hint:string,account_to_hint:string,comment:string} $transaction */
+    /** @param array{type:int,amount:int,account_hint:string,account_to_hint:string,comment:string,category_hint?:string} $transaction */
     public function createOrGetDirect(string $chatId, int $sourceMsgId, int $triggerMsgId, int $initiatorTgId, int $sourceDate, array $transaction, callable $sendCard): array
     {
         return $this->lock->synchronized('aibot_src_' . $chatId . '_' . $sourceMsgId, 5, function () use ($chatId, $sourceMsgId, $triggerMsgId, $initiatorTgId, $sourceDate, $transaction, $sendCard) {
@@ -127,10 +128,13 @@ final class FinanceDraftService
             }
             $accountId = $this->matchAccountHint($transaction['account_hint']);
             $accountToId = $transaction['type'] === 3 ? $this->matchAccountHint($transaction['account_to_hint']) : null;
-            $categoryId = $transaction['type'] === 2
+            $categoryHint = trim((string) ($transaction['category_hint'] ?? ''));
+            $categoryId = $categoryHint !== '' ? $this->matchCategoryHint($categoryHint, $transaction['type']) : null;
+            if ($categoryHint === '' && $transaction['type'] === 2
                 && preg_match('/дивиденд/iu', $transaction['comment'])
-                && isset($this->categoryChoices(2)[AiBotConfig::CATEGORY_ID])
-                ? AiBotConfig::CATEGORY_ID : null;
+                && isset($this->categoryChoices(2)[AiBotConfig::CATEGORY_ID])) {
+                $categoryId = AiBotConfig::CATEGORY_ID;
+            }
             $id = $this->drafts->insert([
                 'chat_id' => $chatId,
                 'source_msg_id' => $sourceMsgId,
@@ -144,7 +148,8 @@ final class FinanceDraftService
                     'source_date' => $sourceDate,
                     'direct' => ['type' => $transaction['type'], 'amount' => $transaction['amount'],
                         'account_hint' => $transaction['account_hint'], 'account_to_hint' => $transaction['account_to_hint'],
-                        'account_to_id' => $accountToId, 'comment' => $transaction['comment'], 'category_id' => $categoryId],
+                        'account_to_id' => $accountToId, 'comment' => $transaction['comment'],
+                        'category_hint' => $categoryHint, 'category_id' => $categoryId],
                 ]),
                 'account_id' => $accountId,
                 'split_mode' => self::SPLIT_PERSON,
@@ -580,6 +585,9 @@ final class FinanceDraftService
                 : 'Категория: ' . self::h($this->categoryChoices($type)[$categoryId] ?? '— выберите —'),
             'Комментарий: ' . self::h((string) ($direct['comment'] ?? '')),
         ];
+        if ($type !== 3 && $categoryId === 0 && !empty($direct['category_hint'])) {
+            $lines[] = 'Запрошена категория: ' . self::h((string) $direct['category_hint']) . ' — выберите вариант ниже';
+        }
         if ((string) $draft['status'] !== 'draft') {
             $lines[] = 'Статус: ' . self::statusLabel((string) $draft['status']);
             foreach (self::dec($draft['poster_tx_ids_json'] ?? null) as $record) {
@@ -593,11 +601,25 @@ final class FinanceDraftService
 
     public function journal(array $draft): string
     {
+        if ($this->directWriteSucceeded($draft)) {
+            $records = self::dec($draft['poster_tx_ids_json'] ?? null);
+            return 'Готово: ' . self::recordLine($records[0]);
+        }
         $L = ['📒 Черновик #' . (int) $draft['id'] . ' — ' . self::statusLabel((string) $draft['status'])];
         foreach (self::dec($draft['poster_tx_ids_json'] ?? null) as $r) {
             $L[] = self::recordLine($r);
         }
         return implode("\n", $L);
+    }
+
+    public function directWriteSucceeded(array $draft): bool
+    {
+        if ((string) ($draft['intent'] ?? '') !== self::DIRECT_INTENT || (string) ($draft['status'] ?? '') !== 'done') {
+            return false;
+        }
+        $records = self::dec($draft['poster_tx_ids_json'] ?? null);
+        return count($records) === 1 && (string) ($records[0]['status'] ?? '') === 'done'
+            && !empty($records[0]['tx_ids']);
     }
 
     /** Почему «Внести» сейчас нельзя (null = можно). */
@@ -678,6 +700,21 @@ final class FinanceDraftService
         $matches = array_filter($this->accountChoices(), static fn(string $name) =>
             mb_stripos($name, $hint, 0, 'UTF-8') !== false);
         return count($matches) === 1 ? (int) array_key_first($matches) : null;
+    }
+
+    private function matchCategoryHint(string $hint, int $type): ?int
+    {
+        $choices = $this->categoryChoices($type);
+        $normalized = mb_strtolower(trim($hint), 'UTF-8');
+        $matches = array_filter($choices, static fn(string $name) => mb_strtolower($name, 'UTF-8') === $normalized);
+        if (count($matches) === 1) {
+            return (int) array_key_first($matches);
+        }
+        if ($type === 2 && $normalized === 'корректировка'
+            && ($choices[PosterIds::CATEGORY_BALANCE_CORRECTION] ?? null) === 'Актуализация') {
+            return PosterIds::CATEGORY_BALANCE_CORRECTION;
+        }
+        return null;
     }
 
     private static function typeFor(array $draft): int

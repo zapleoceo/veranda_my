@@ -7,7 +7,7 @@ namespace App\AiBot;
 /** Explicit accounting forms for Poster income, expense, and transfer. */
 final class DirectFinanceParser
 {
-    /** @return array{type:int,amount:int,account_hint:string,account_to_hint:string,comment:string}|null */
+    /** @return array{type:int,amount:int,account_hint:string,account_to_hint:string,comment:string,category_hint:string}|null */
     public static function parse(string $text, string $botUsername, bool $allowUnaddressed = false): ?array
     {
         $body = trim($text);
@@ -17,6 +17,7 @@ final class DirectFinanceParser
             return null;
         }
 
+        $categoryHint = '';
         $transfer = (bool) preg_match('/^(?:переведи|перевод)(?![\p{L}])\s*/iu', $body, $verb);
         if ($transfer) {
             $body = trim(substr($body, strlen($verb[0])));
@@ -45,7 +46,18 @@ final class DirectFinanceParser
             }
             $type = 3;
         } else {
-            if (count($lines) >= 3 && preg_match('/^([+-])\s*(\d[\d .,]*)$/u', $lines[0], $amount)
+            if (count($lines) === 4
+                && preg_match('/^со\s+сч[её]та\s+(.+)$/iu', $lines[0], $from)
+                && preg_match('/^сумма\s*[:—-]?\s*([+-])\s*(\d[\d .,]*)$/iu', $lines[1], $amount)
+                && preg_match('/^(?:категория\s*[:—-]\s*)?([^:]+)$/iu', $lines[2], $category)
+                && preg_match('/^комментарий\s*[:—-]?\s*(.+)$/iu', $lines[3], $note)) {
+                $account = trim($from[1]);
+                $sign = $amount[1];
+                $rawAmount = trim($amount[2]);
+                $direction = 'со счета';
+                $categoryHint = trim($category[1]);
+                $comment = trim($note[1]);
+            } elseif (count($lines) >= 3 && preg_match('/^([+-])\s*(\d[\d .,]*)$/u', $lines[0], $amount)
                 && preg_match('/^(со\s+сч[её]та|на\s+сч[её]т)\s+(.+)$/iu', $lines[1], $accountLine)) {
                 $sign = $amount[1];
                 $rawAmount = trim($amount[2]);
@@ -77,6 +89,6 @@ final class DirectFinanceParser
             return null;
         }
         return ['type' => $type, 'amount' => $amountVnd, 'account_hint' => trim($account),
-            'account_to_hint' => trim($accountTo), 'comment' => trim($comment)];
+            'account_to_hint' => trim($accountTo), 'comment' => trim($comment), 'category_hint' => $categoryHint];
     }
 }

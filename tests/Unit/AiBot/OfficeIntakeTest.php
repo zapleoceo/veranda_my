@@ -67,6 +67,7 @@ final class OfficeIntakeTest extends TestCase
             public function employees(): array { return []; }
             public function financeAccounts(): array { return [1 => '1 Счет Стаса', 2 => 'Касса']; }
             public function financeCategories(): array { return [
+                4 => ['name' => 'Актуализация', 'parent_id' => 0, 'operations' => 2],
                 13 => ['name' => 'Household expenses', 'parent_id' => 0, 'operations' => 3],
                 14 => ['name' => 'Income only', 'parent_id' => 0, 'operations' => 1],
                 18 => ['name' => 'Expense only', 'parent_id' => 0, 'operations' => 2],
@@ -302,6 +303,51 @@ final class OfficeIntakeTest extends TestCase
 
         $this->post($this->msg(['text' => "@Veranda_aibot Добавь \n-1\nСо счета стаса \nКорректировка- тест"], 2));
         $this->assertCount(1, $this->drafts->rows, 'повтор Telegram использует тот же черновик');
+        $this->assertSame([], $this->poster->callsTo('finance.createTransactions'));
+    }
+
+    public function test_labelled_correction_uses_live_poster_category_and_waits_for_confirmation(): void
+    {
+        $this->grants->setPerm(self::USER, 'aibot_finance', true);
+        $text = "@Veranda_aibot Со счета стаса\nСумма -1\nКорректировка\nКомментарий тест";
+        $this->post($this->msg(['text' => $text]));
+
+        $this->assertSame([], $this->repo->tasks);
+        $this->assertCount(1, $this->drafts->rows);
+        $draft = (array) $this->drafts->get(1);
+        $direct = json_decode($draft['rows_json'], true)['direct'];
+        $this->assertSame(1, $direct['amount']);
+        $this->assertSame('тест', $direct['comment']);
+        $this->assertSame('Корректировка', $direct['category_hint']);
+        $this->assertSame(4, $direct['category_id']);
+        $this->assertNull($this->finance->blocker($draft));
+        $this->assertStringContainsString('Актуализация', $this->sent()[0]['params']['text']);
+        $this->assertSame([], $this->poster->callsTo('finance.createTransactions'));
+
+        $nonce = (string) $draft['confirm_nonce'];
+        $button = 'fd_go:1:0:' . $nonce;
+        $callback = ['id' => 'cb1', 'data' => $button, 'from' => ['id' => self::USER],
+            'message' => ['message_id' => (int) $draft['card_msg_id'], 'chat' => ['id' => (int) self::CHAT]]];
+        $this->post(['update_id' => 2, 'callback_query' => $callback]);
+        $this->post(['update_id' => 3, 'callback_query' => $callback]);
+        $created = $this->poster->callsTo('finance.createTransactions');
+        $this->assertCount(1, $created);
+        $this->assertSame(4, $created[0]['params']['category']);
+        $this->assertSame(1, $created[0]['params']['amount_from']);
+        $this->assertSame('тест', $created[0]['params']['comment']);
+        $this->assertStringContainsString('#1', $this->finance->journal((array) $this->drafts->get(1)));
+        $this->assertCount(2, $this->sent(), 'карточка и один ответ после Poster ID');
+        $this->assertStringContainsString('Готово', $this->sent()[1]['params']['text']);
+    }
+
+    public function test_unknown_category_stays_in_card_for_owner_selection(): void
+    {
+        $this->grants->setPerm(self::USER, 'aibot_finance', true);
+        $this->post($this->msg(['text' => "@Veranda_aibot Со счета стаса\nСумма -1\nНеизвестная\nКомментарий тест"]));
+        $draft = (array) $this->drafts->get(1);
+        $this->assertNull(json_decode($draft['rows_json'], true)['direct']['category_id']);
+        $this->assertSame('Выберите категорию', $this->finance->blocker($draft));
+        $this->assertStringContainsString('Неизвестная', $this->sent()[0]['params']['text']);
         $this->assertSame([], $this->poster->callsTo('finance.createTransactions'));
     }
 
