@@ -6,8 +6,8 @@ Worktree: C:/Users/work_zaporozhets/.codex/worktrees/veranda-menu-search-tr3-aud
 Branch codex/menu-search-tr3-audit; base d938f6b4a8fd8e209c375f5f92a24cfaa097dce4.
 Room lease veranda-menu-search-tr3-audit-20261030 fence 1. No conflicting active task found among 45 open tasks.
 Shared workflow read; adapter unregistered; no repository AGENTS/CLAUDE policy found. Main untracked files untouched.
-Next: implement client filter and language-swap regression tests, then rendered QA and TR3 measurements.
-Unverified: PHP runtime unavailable in PATH; browser cold-cache/mobile timing capability; independent review; release permission.
+Completed: implementation, 126 JS tests, independent SOL review, desktop/mobile real-template fixture QA, bounded TR3 network baseline and safe transition checks. Candidate PR32, code f87c8e793165899f90d447364df87bb022986082. CI41064835949 SUCCESS: PHP524 tests/1832 assertions (one existing PHPUnit deprecation), JS126 pass. Next: owner release decision, then real production dataset verification and stronger UI responsiveness measurements.
+Remaining: merge/deploy permission for this release, production dataset search QA, precise all-state UI latency/paint measurements, real-device and write/auth flows. No production changes. Isolated PHP syntax verified; PHPUnit verified in CI.
 
 ## Контекст з KB
 Vera search `Veranda menu живой поиск TR3 быстродействие`: no relevant results.
@@ -59,3 +59,7 @@ A duplicate events_for_day request and serial free/reservations requests were ob
 
 ## Release gate
 Candidate only. Need exact-source CI including PHPUnit; then applicable direct owner approval to merge/deploy this new release (prior September approval is not reused for October feature). Following release, verify real production search dataset and compare same-device timings. Full all-state UI responsiveness audit is not complete: precise UI/paint metrics and authenticated/write paths are unavailable/excluded as listed above.
+
+## Final checkpoint
+2026-10-30 20:42 Asia/Saigon. Code f87c8e79, CI41064835949 green; second PR-triggered CI may duplicate same source. No merge/deploy. Source docs updated for review and evidence limits. Main untracked files remain untouched. Local QA server is read-only and temporary. Release candidate is reviewable, but full TR3 performance objective remains partially unverified as documented.
+
