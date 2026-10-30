@@ -30,6 +30,25 @@
         }
 
         .menu-content a { color: inherit; }
+        .menu-content [hidden] { display: none !important; }
+        .menu-search { margin: 20px 0; }
+        .menu-search label { display: block; margin-bottom: 8px; font-weight: 500; }
+        .menu-search__controls { display: flex; gap: 8px; }
+        .menu-search input {
+            flex: 1; min-width: 0; width: 100%; min-height: 46px; padding: 11px 14px;
+            border: 1px solid var(--border); border-radius: 12px;
+            color: inherit; background: rgba(255,255,255,.06); font: inherit; font-size: 16px;
+        }
+        .menu-search input::placeholder { color: rgba(255,255,255,.55); }
+        .menu-search button {
+            min-height: 46px; padding: 8px 12px; border-radius: 12px;
+            border: 1px solid var(--border); background: rgba(184,135,70,.15);
+            color: inherit; font: inherit; cursor: pointer;
+        }
+        .menu-search input:focus-visible, .menu-search button:focus-visible {
+            outline: 2px solid #b88746; outline-offset: 3px;
+        }
+        .menu-search [role="status"] { margin: 10px 0 0; font-size: 14px; }
         .menu-content a:focus-visible { outline: 2px solid rgba(184,135,70,0.55); outline-offset: 3px; }
 
         .header-left {

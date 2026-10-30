@@ -75,6 +75,9 @@ $mk = function (string $l) use ($self, $baseQs) {
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title><?= htmlspecialchars(tr('page_title')) ?></title>
   <link rel="icon" type="image/svg+xml" href="/links/favicon.svg">
+  <!-- Fetch early; tr3.boot.js still controls execution after bootstrap. -->
+  <link rel="preload" as="script" href="/tr3/assets/plan-presentation.js?v=20260921_0008">
+  <link rel="preload" as="script" href="/tr3/assets/app.js?v=20260921_0008">
   <meta name="description" content="<?= htmlspecialchars($lang === 'ru' ? 'Бронирование столика в Veranda: выберите стол и время.' : ($lang === 'vi' ? 'Đặt bàn tại Veranda: chọn bàn và thời gian.' : ($lang === 'en' ? 'Reserve a table at Veranda: pick a table and time.' : 'Veranda 테이블 예약: 테이블과 시간을 선택하세요.'))) ?>">
   <link rel="canonical" href="<?= htmlspecialchars($_siteBase) ?>/tr3/?lang=<?= urlencode($lang) ?>">
   <meta property="og:site_name" content="Veranda">

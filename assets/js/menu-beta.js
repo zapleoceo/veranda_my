@@ -9,6 +9,7 @@
   }
 
   if (!dom.panelLinks.length || !dom.content) return
+  let search = window.MenuSearch ? window.MenuSearch.init(dom.content) : null
 
   const cookieSet = (name, value) => {
     const maxAge = 31536000
@@ -21,6 +22,7 @@
   }
 
   const view = {
+    finishPending: null,
     setActive(lang) {
       for (const a of dom.panelLinks) {
         const code = langFromHref(a.getAttribute('href') || '')
@@ -28,6 +30,7 @@
       }
     },
     swap(oldNode, newNode) {
+      if (view.finishPending) view.finishPending()
       if (reduced) { oldNode.replaceWith(newNode); return }
       const parent = oldNode.parentElement
       if (!parent) { oldNode.replaceWith(newNode); return }
@@ -38,13 +41,17 @@
 
       const oldLayer = document.createElement('div')
       oldLayer.className = 'i18n-layer i18n-layer--old'
+      oldLayer.inert = true
+      oldLayer.setAttribute('aria-hidden', 'true')
+      oldNode.removeAttribute('id')
+      oldNode.querySelectorAll('[id]').forEach((node) => node.removeAttribute('id'))
+      parent.replaceChild(wrap, oldNode)
       oldLayer.appendChild(oldNode)
 
       const newLayer = document.createElement('div')
       newLayer.className = 'i18n-layer i18n-layer--new'
       newLayer.appendChild(newNode)
 
-      parent.replaceChild(wrap, oldNode)
       wrap.append(oldLayer, newLayer)
       wrap.getBoundingClientRect()
 
@@ -53,7 +60,13 @@
         wrap.classList.add('is-animating')
       })
 
-      window.setTimeout(() => { wrap.replaceWith(newNode) }, 280)
+      const finish = () => {
+        window.clearTimeout(timer)
+        wrap.replaceWith(newNode)
+        view.finishPending = null
+      }
+      const timer = window.setTimeout(finish, 280)
+      view.finishPending = finish
     },
   }
 
@@ -95,8 +108,8 @@
   const state = {
     capture() {
       const cur = dom.content
-      const openKeys = cur ? Array.from(cur.querySelectorAll('details[data-key][open]')).map((d) => String(d.getAttribute('data-key') || '')).filter(Boolean) : []
-      return { openKeys, scrollY: window.scrollY }
+      const openKeys = search ? search.openKeys() : (cur ? Array.from(cur.querySelectorAll('details[data-key][open]')).map((d) => String(d.getAttribute('data-key') || '')).filter(Boolean) : [])
+      return { openKeys, scrollY: window.scrollY, query: search ? search.query() : '' }
     },
     apply(node, s) {
       if (!node || !s) return
@@ -109,8 +122,9 @@
   }
 
   const controller = {
+    requestId: 0,
     async loadLang(href) {
-      const s = state.capture()
+      const requestId = ++controller.requestId
       const url = new URL(href, window.location.href)
       const lang = (url.searchParams.get('lang') || '').toLowerCase()
       if (!lang) return
@@ -119,14 +133,23 @@
         const r = await fetch(url.toString(), { headers: { 'Accept': 'text/html' } })
         if (!r.ok) throw new Error('bad')
         const html = await r.text()
+        if (requestId !== controller.requestId) return
+        const s = state.capture()
         const doc = new DOMParser().parseFromString(html, 'text/html')
         const nextContent = doc.getElementById('menuContent')
         if (!nextContent) throw new Error('no')
 
         nextContent.id = 'menuContent'
         state.apply(nextContent, s)
+        search = window.MenuSearch ? window.MenuSearch.init(nextContent, s.query) : null
         dom.root.setAttribute('lang', doc.documentElement.getAttribute('lang') || lang)
         meta.copyFromDoc(doc)
+        const tagline = document.querySelector('.brand-tagline')
+        const nextTagline = doc.querySelector('.brand-tagline')
+        if (tagline && nextTagline) tagline.textContent = nextTagline.textContent
+        const back = document.querySelector('.menu-back')
+        const nextBack = doc.querySelector('.menu-back')
+        if (back && nextBack) back.setAttribute('href', nextBack.getAttribute('href'))
         view.setActive(lang)
         cookieSet('links_lang', lang)
         window.history.replaceState({}, '', url.toString())
@@ -140,6 +163,7 @@
           window.scrollTo(0, y)
         }, 320)
       } catch (_) {
+        if (requestId !== controller.requestId) return
         window.location.href = url.toString()
       }
     },

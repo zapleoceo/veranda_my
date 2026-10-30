@@ -10,6 +10,12 @@ $seoTitle     = $seo['title'];
 $seoDesc      = $seo['description'];
 $ogImage      = \App\Infrastructure\Config::baseUrl() . '/assets/img/links_bg.png';
 $telephone    = \App\Infrastructure\Contact::phone();
+$searchLabels = match ($lang) {
+    'en' => ['Search menu', 'Dish, drink or ingredient', 'Clear', 'Found: {count}', 'No matches. Try another search.'],
+    'vi' => ['Tìm trong thực đơn', 'Món ăn, đồ uống hoặc nguyên liệu', 'Xóa', 'Tìm thấy: {count}', 'Không tìm thấy. Hãy thử từ khóa khác.'],
+    'ko' => ['메뉴 검색', '요리, 음료 또는 재료', '지우기', '검색 결과: {count}', '검색 결과가 없습니다. 다른 검색어를 입력해 주세요.'],
+    default => ['Поиск по меню', 'Блюдо, напиток или ингредиент', 'Очистить', 'Найдено: {count}', 'Ничего не найдено. Попробуйте другой запрос.'],
+};
 ?>
 <!doctype html>
 <html lang="<?= htmlspecialchars($lang) ?>">
@@ -39,7 +45,7 @@ $telephone    = \App\Infrastructure\Contact::phone();
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Montserrat:wght@300;400;500&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/assets/css/common.css?v=20260516_tokens2">
     <link rel="stylesheet" href="/assets/css/links_index.css?v=20260505_0001">
-    <link rel="stylesheet" href="/assets/css/menu-beta.css?v=20260504_0040">
+    <link rel="stylesheet" href="/assets/css/menu-beta.css?v=20261030_0001">
     <?php $gaFile = ($_SERVER['DOCUMENT_ROOT'] ?? '') . '/analytics.php'; if ($gaFile !== '/analytics.php' && is_file($gaFile)) { include $gaFile; } ?>
 </head>
 <body class="menu-page">
@@ -80,6 +86,18 @@ $telephone    = \App\Infrastructure\Contact::phone();
             </div>
 
             <div class="menu-content" id="menuContent">
+                <?php if (!empty($groups)): ?>
+                    <div class="menu-search" role="search">
+                        <label for="menuSearch"><?= htmlspecialchars($searchLabels[0]) ?></label>
+                        <div class="menu-search__controls">
+                            <input id="menuSearch" data-menu-search type="search" autocomplete="off" enterkeyhint="search"
+                                   placeholder="<?= htmlspecialchars($searchLabels[1]) ?>" aria-controls="menuContent">
+                            <button type="button" data-menu-search-clear hidden><?= htmlspecialchars($searchLabels[2]) ?></button>
+                        </div>
+                        <p data-menu-search-status role="status" aria-live="polite" hidden
+                           data-results="<?= htmlspecialchars($searchLabels[3]) ?>" data-empty="<?= htmlspecialchars($searchLabels[4]) ?>"></p>
+                    </div>
+                <?php endif; ?>
                 <?php if (empty($groups)): ?>
                     <div class="muted"><?= htmlspecialchars(match ($lang) {
                         'vi' => 'Chưa có món được hiển thị.',
@@ -186,6 +204,7 @@ $telephone    = \App\Infrastructure\Contact::phone();
 ?></script>
 
 <script src="/links/links_fx.js?v=20260504_0029" defer></script>
-<script src="/assets/js/menu-beta.js?v=20260504_0029" defer></script>
+<script src="/assets/js/menu-search.js?v=20261030_0001" defer></script>
+<script src="/assets/js/menu-beta.js?v=20261030_0001" defer></script>
 </body>
 </html>
