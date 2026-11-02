@@ -116,6 +116,50 @@ final class AdminAccessGateTest extends TestCase
         }
     }
 
+    public function test_admin_can_grant_and_revoke_cashflow_without_granting_admin(): void
+    {
+        $_SESSION['user_permissions'] = ['admin' => true];
+        $_SESSION['admin_access_csrf'] = 'tok';
+        foreach ([true, false] as $grant) {
+            $statement = $this->createMock(\PDOStatement::class);
+            $statement->method('fetchAll')->willReturn([]);
+            $saved = null;
+            $db = $this->createMock(Database::class);
+            $db->method('t')->willReturn('users');
+            $db->method('query')->willReturnCallback(function ($sql, $params = []) use ($statement, &$saved) {
+                if (str_starts_with($sql, 'UPDATE')) $saved = $params;
+                return $statement;
+            });
+            $body = ['save_user_permissions' => '1', 'perm_email' => 'report@example.com', 'csrf' => 'tok'];
+            if ($grant) $body['perm_cashflow'] = '1';
+            $request = (new ServerRequestFactory())->createServerRequest('POST', '/admin/access')->withParsedBody($body);
+            $response = (new AccessController($db))->index($request, new Response());
+            self::assertSame(200, $response->getStatusCode());
+            $perms = json_decode($saved[0], true);
+            self::assertSame((int) $grant, $perms['cashflow']);
+            self::assertSame(0, $perms['admin']);
+            self::assertSame(0, $perms['payday']);
+            self::assertSame('report@example.com', $saved[3]);
+            self::assertStringContainsString('name="perm_cashflow"', (string) $response->getBody());
+            self::assertStringContainsString('Финотчёт', (string) $response->getBody());
+
+            $statement->method('fetch')->willReturn(['permissions_json' => json_encode($perms)]);
+            $resolved = (new \App\Services\UserPermissionsService($db))->resolve('report@example.com');
+            self::assertSame($grant, $resolved['cashflow']);
+            $_SESSION['user_permissions'] = $resolved;
+            $handler = new class implements \Psr\Http\Server\RequestHandlerInterface {
+                public function handle(\Psr\Http\Message\ServerRequestInterface $request): \Psr\Http\Message\ResponseInterface
+                {
+                    return new Response(204);
+                }
+            };
+            $reportRequest = (new ServerRequestFactory())->createServerRequest('GET', '/cashflowreport');
+            $result = \App\Middleware\RequirePermission::for('cashflow')->process($reportRequest, $handler);
+            self::assertSame($grant ? 204 : 403, $result->getStatusCode());
+            $_SESSION['user_permissions'] = ['admin' => true];
+        }
+    }
+
     public function test_aibot_office_is_separate_explicit_checkbox(): void
     {
         $_SESSION['user_permissions'] = ['admin' => true];
