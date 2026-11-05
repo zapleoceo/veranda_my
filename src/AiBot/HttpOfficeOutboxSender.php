@@ -209,9 +209,12 @@ final class HttpOfficeOutboxSender implements OfficeOutboxSenderInterface
     {
         $result = [];
         foreach (self::mediaItems($payload) as $item) {
-            if (!is_array($item) || !in_array($item['type'] ?? '', ['photo', 'document'], true)
-                || (($item['type'] ?? '') === 'document'
-                    && !str_starts_with((string) ($item['mime_type'] ?? ''), 'image/'))) {
+            if (!is_array($item) || !in_array($item['type'] ?? '', ['photo', 'document'], true)) {
+                continue;
+            }
+            $declared = (string) ($item['mime_type'] ?? '');
+            if (($item['type'] ?? '') === 'document' && !str_starts_with($declared, 'image/')
+                && !in_array($declared, ['text/plain', 'text/csv', 'application/json'], true)) {
                 continue;
             }
             $fileId = (string) ($item['file_id'] ?? '');
@@ -223,6 +226,26 @@ final class HttpOfficeOutboxSender implements OfficeOutboxSenderInterface
             }
             $content = ($this->downloadImage)($fileId, self::MAX_IMAGE_BYTES);
             $mime = (new \finfo(FILEINFO_MIME_TYPE))->buffer($content);
+            if (($item['type'] ?? '') === 'document'
+                && in_array($declared, ['text/plain', 'text/csv', 'application/json'], true)
+                && in_array($mime, ['text/plain', 'text/csv', 'application/json'], true)) {
+                if (in_array($declared, ['text/csv', 'application/json'], true)) {
+                    $mime = $declared;
+                }
+                if (strlen($content) > 65536 || !mb_check_encoding($content, 'UTF-8')
+                    || preg_match('/[\x00-\x08\x0b\x0c\x0e-\x1f]/', $content)) {
+                    throw new TelegramFileException('invalid UTF-8 document or size exceeds 65536', false);
+                }
+                if ($mime === 'application/json') {
+                    json_decode($content, true);
+                    if (json_last_error() !== JSON_ERROR_NONE) {
+                        throw new TelegramFileException('invalid JSON document', false);
+                    }
+                }
+                $result[$fileId] = ['mime' => $mime, 'size' => strlen($content),
+                                    'sha256' => hash('sha256', $content), 'content' => $content];
+                continue;
+            }
             $dimensions = @getimagesizefromstring($content);
             if (!in_array($mime, ['image/jpeg', 'image/png', 'image/webp'], true)
                 || $content === '' || strlen($content) > self::MAX_IMAGE_BYTES
@@ -242,9 +265,7 @@ final class HttpOfficeOutboxSender implements OfficeOutboxSenderInterface
         $reply = $payload['context']['reply_to']['media'] ?? [];
         $reply = is_array($reply) ? $reply : [];
         $reply = array_values(array_filter($reply, static fn($item): bool =>
-            is_array($item) && (($item['type'] ?? '') === 'photo'
-                || (($item['type'] ?? '') === 'document'
-                    && str_starts_with((string) ($item['mime_type'] ?? ''), 'image/')))));
+            is_array($item) && in_array($item['type'] ?? '', ['photo', 'document'], true)));
         $result = [];
         $seen = [];
         foreach (array_merge($current, $reply) as $item) {
