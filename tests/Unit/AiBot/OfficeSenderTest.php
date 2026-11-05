@@ -183,16 +183,19 @@ final class OfficeSenderTest extends TestCase
         $this->assertSame($content, $this->http->calls[1]['body']);
     }
 
-    public function testBinaryDocumentIsRejectedBeforeOfficeDispatch(): void
+    public function testArbitraryBinaryDocumentIsTransferredWithoutExecution(): void
     {
         $this->sender = new HttpOfficeOutboxSender($this->repo, $this->api, $this->log,
             null, static fn(): int => self::NOW,
             static fn(string $fileId, int $maxBytes): string => "MZ\0binary");
         $this->seedTask();
         $row = $this->seedCreate(['media' => [['type' => 'document', 'file_id' => 'DF', 'mime_type' => 'text/plain']]]);
-        $this->assertFalse($this->sender->send($row));
-        $this->assertSame([], $this->http->calls);
-        $this->assertSame('failed', $this->repo->findOutboxByKey('vb--1001-600')['status']);
+        $content = "MZ\0binary";
+        $this->http->push(201, ['task_id' => 'vb-file', 'status' => 'pending_media'])
+            ->push(200, ['sha256' => hash('sha256', $content), 'ready' => true]);
+        $this->assertTrue($this->sender->send($row));
+        $this->assertSame($content, $this->http->calls[1]['body']);
+        $this->assertSame('sent', $this->repo->findOutboxByKey('vb--1001-600')['status']);
     }
 
     public function testReplyImageIsIncludedInTheOfficeTask(): void

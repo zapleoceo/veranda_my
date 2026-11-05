@@ -212,11 +212,6 @@ final class HttpOfficeOutboxSender implements OfficeOutboxSenderInterface
             if (!is_array($item) || !in_array($item['type'] ?? '', ['photo', 'document'], true)) {
                 continue;
             }
-            $declared = (string) ($item['mime_type'] ?? '');
-            if (($item['type'] ?? '') === 'document' && !str_starts_with($declared, 'image/')
-                && !in_array($declared, ['text/plain', 'text/csv', 'application/json'], true)) {
-                continue;
-            }
             $fileId = (string) ($item['file_id'] ?? '');
             if ($fileId === '' || $this->downloadImage === null) {
                 throw new TelegramFileException('image downloader unavailable', false);
@@ -225,32 +220,25 @@ final class HttpOfficeOutboxSender implements OfficeOutboxSenderInterface
                 continue;
             }
             $content = ($this->downloadImage)($fileId, self::MAX_IMAGE_BYTES);
-            $mime = (new \finfo(FILEINFO_MIME_TYPE))->buffer($content);
-            if (($item['type'] ?? '') === 'document'
-                && in_array($declared, ['text/plain', 'text/csv', 'application/json'], true)
-                && in_array($mime, ['text/plain', 'text/csv', 'application/json'], true)) {
-                if (in_array($declared, ['text/csv', 'application/json'], true)) {
-                    $mime = $declared;
-                }
-                if (strlen($content) > 65536 || !mb_check_encoding($content, 'UTF-8')
-                    || preg_match('/[\x00-\x08\x0b\x0c\x0e-\x1f]/', $content)) {
-                    throw new TelegramFileException('invalid UTF-8 document or size exceeds 65536', false);
-                }
-                if ($mime === 'application/json') {
-                    json_decode($content, true);
-                    if (json_last_error() !== JSON_ERROR_NONE) {
-                        throw new TelegramFileException('invalid JSON document', false);
-                    }
-                }
-                $result[$fileId] = ['mime' => $mime, 'size' => strlen($content),
-                                    'sha256' => hash('sha256', $content), 'content' => $content];
-                continue;
+            if ($content === '' || strlen($content) > self::MAX_IMAGE_BYTES) {
+                throw new TelegramFileException('file empty or exceeds 4 MiB', false);
             }
-            $dimensions = @getimagesizefromstring($content);
-            if (!in_array($mime, ['image/jpeg', 'image/png', 'image/webp'], true)
-                || $content === '' || strlen($content) > self::MAX_IMAGE_BYTES
-                || $dimensions === false || $dimensions[0] * $dimensions[1] > 16_000_000) {
-                throw new TelegramFileException('unsupported or oversized image', false);
+            $mime = (new \finfo(FILEINFO_MIME_TYPE))->buffer($content);
+            if (!is_string($mime) || strlen($mime) > 128
+                || !preg_match('~^[a-z0-9.+-]+/[a-z0-9.+-]+$~D', $mime)) {
+                $mime = 'application/octet-stream';
+            }
+            $image = in_array($mime, ['image/jpeg', 'image/png', 'image/webp'], true);
+            if (($item['type'] ?? '') === 'photo' || $image) {
+                $dimensions = @getimagesizefromstring($content);
+                if (!$image || $dimensions === false
+                    || $dimensions[0] * $dimensions[1] > 16_000_000) {
+                    throw new TelegramFileException('invalid or oversized image', false);
+                }
+            }
+            $total = array_sum(array_column($result, 'size')) + strlen($content);
+            if (count($result) >= 4 || $total > 8 * 1024 * 1024) {
+                throw new TelegramFileException('task exceeds four files or 8 MiB', false);
             }
             $result[$fileId] = ['mime' => $mime, 'size' => strlen($content),
                                 'sha256' => hash('sha256', $content), 'content' => $content];
