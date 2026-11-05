@@ -179,7 +179,10 @@ final class HttpOfficeOutboxSender implements OfficeOutboxSenderInterface
                 $image = $images[$fileId];
                 $lastUpload = $this->api->uploadImage((string) $resp->data['task_id'], $index,
                                                       $image['mime'], $image['content']);
-                if (!$lastUpload->ok() || ($lastUpload->data['sha256'] ?? null) !== $image['sha256']) {
+                $ready = $lastUpload->data['ready'] ?? null;
+                $accepted = ($lastUpload->status === 200 && $ready === true)
+                    || ($lastUpload->status === 202 && $ready === false);
+                if (!$accepted || ($lastUpload->data['sha256'] ?? null) !== $image['sha256']) {
                     return $this->failOrRetry($row, $lastUpload, 'Image was not delivered to Office');
                 }
             }

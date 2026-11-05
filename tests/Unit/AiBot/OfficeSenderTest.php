@@ -182,6 +182,29 @@ final class OfficeSenderTest extends TestCase
         $this->assertSame(590, $body['context']['reply_to']['id']);
     }
 
+    public function testTwoImagesAcceptPendingReceiptBeforeFinalReadyReceipt(): void
+    {
+        $png = base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAAEElEQVR4nGP8zwACTGCSAQANHQEDgslx/wAAAABJRU5ErkJggg==', true);
+        $this->sender = new HttpOfficeOutboxSender($this->repo, $this->api, $this->log,
+            null, static fn(): int => self::NOW,
+            static fn(string $fileId, int $maxBytes): string => $png);
+        $this->seedTask();
+        $row = $this->seedCreate(['media' => [
+            ['type' => 'photo', 'file_id' => 'P1'],
+            ['type' => 'photo', 'file_id' => 'P2'],
+        ]]);
+        $digest = hash('sha256', $png);
+        $this->http->push(201, ['task_id' => 'vb-images', 'status' => 'pending_media'])
+            ->push(202, ['task_id' => 'vb-images', 'index' => 0,
+                         'sha256' => $digest, 'ready' => false])
+            ->push(200, ['task_id' => 'vb-images', 'index' => 1,
+                         'sha256' => $digest, 'ready' => true]);
+
+        $this->assertTrue($this->sender->send($row));
+        $this->assertCount(3, $this->http->calls);
+        $this->assertSame('sent', $this->repo->findOutboxByKey('vb--1001-600')['status']);
+    }
+
     public function testLostImageUploadResponseDoesNotMarkTaskSent(): void
     {
         $png = base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAAEElEQVR4nGP8zwACTGCSAQANHQEDgslx/wAAAABJRU5ErkJggg==', true);
