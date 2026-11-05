@@ -17,6 +17,7 @@ use App\AiBot\OfficeWiring;
 use App\AiBot\TelegramPermissionAuthorizer;
 use App\AiBot\UserFinanceAuthorizer;
 use App\Infrastructure\TelegramBotClient;
+use App\Infrastructure\TelegramFileException;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\AbstractLogger;
 use Tests\Unit\AiBot\Fakes\GrantTable;
@@ -116,7 +117,7 @@ final class OfficeSenderTest extends TestCase
         $this->seedTask();
         $row = $this->seedCreate(['thread_id' => 5, 'context' => ['reply_to' => ['message_id' => 590, 'user_id' => null,
             'text' => 'цитата', 'media' => [['type' => 'voice', 'file_id' => 'F']]]],
-            'media' => [['type' => 'photo', 'file_id' => 'PF', 'file_unique_id' => '', 'mime_type' => 'image/jpeg', 'file_size' => 10, 'width' => 4, 'height' => 3]]]);
+            'media' => [['type' => 'voice', 'file_id' => 'PF', 'file_unique_id' => '', 'mime_type' => 'audio/ogg', 'file_size' => 10, 'width' => 4, 'height' => 3]]]);
         $this->http->push(201, ['task_id' => 'vb-abc', 'revision' => 40, 'status' => 'open']);
 
         $this->assertTrue($this->sender->send($row));
@@ -128,7 +129,7 @@ final class OfficeSenderTest extends TestCase
         $this->assertSame(['channel' => 'telegram', 'chat' => '-1001', 'message' => 600, 'from_id' => 777, 'thread' => 5], $body['origin']);
         $this->assertSame(['channel' => 'telegram', 'chat' => '-1001', 'reply_to' => 600, 'thread' => 5], $body['result_recipient']);
         $this->assertSame(['reply_to' => ['id' => 590, 'text' => 'цитата', 'media' => 'voice']], $body['context']);
-        $this->assertSame([['type' => 'photo', 'file_id' => 'PF', 'mime' => 'image/jpeg', 'size' => 10, 'w' => 4, 'h' => 3]], $body['attachments']);
+        $this->assertSame([['type' => 'voice', 'file_id' => 'PF', 'mime' => 'audio/ogg', 'size' => 10, 'w' => 4, 'h' => 3]], $body['attachments']);
         $this->assertSame('91', $body['causation_id']);
         $this->assertSame('Bearer ' . self::TOKEN, $this->http->calls[0]['headers']['Authorization']);
         $this->assertSame('https://vera.test/office/v1/tasks', $this->http->calls[0]['url']);
@@ -138,6 +139,95 @@ final class OfficeSenderTest extends TestCase
         $this->assertSame(40, $t['office_revision']);
         $this->assertSame('waiting_executor', $t['status']);
         $this->assertSame('sent', $this->repo->findOutboxByKey('vb--1001-600')['status']);
+    }
+
+    public function testImageIsUploadedAndReadyBeforeOutboxIsSent(): void
+    {
+        $png = base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAAEElEQVR4nGP8zwACTGCSAQANHQEDgslx/wAAAABJRU5ErkJggg==', true);
+        $this->sender = new HttpOfficeOutboxSender($this->repo, $this->api, $this->log,
+            null, static fn(): int => self::NOW,
+            static fn(string $fileId, int $maxBytes): string => $png);
+        $this->seedTask();
+        $row = $this->seedCreate(['media' => [['type' => 'photo', 'file_id' => 'PF']]]);
+        $digest = hash('sha256', $png);
+        $this->http->push(201, ['task_id' => 'vb-image', 'revision' => 0, 'status' => 'pending_media'])
+            ->push(200, ['task_id' => 'vb-image', 'index' => 0, 'sha256' => $digest, 'ready' => true]);
+
+        $this->assertTrue($this->sender->send($row));
+        $body = json_decode((string) $this->http->calls[0]['body'], true);
+        $this->assertSame($digest, $body['attachments'][0]['sha256']);
+        $this->assertSame(strlen($png), $body['attachments'][0]['size']);
+        $this->assertSame('image/png', $body['attachments'][0]['mime']);
+        $this->assertSame('PUT', $this->http->calls[1]['method']);
+        $this->assertSame('https://vera.test/office/v1/tasks/vb-image/images/0', $this->http->calls[1]['url']);
+        $this->assertSame($png, $this->http->calls[1]['body']);
+        $this->assertSame('sent', $this->repo->findOutboxByKey('vb--1001-600')['status']);
+    }
+
+    public function testReplyImageIsIncludedInTheOfficeTask(): void
+    {
+        $png = base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAAEElEQVR4nGP8zwACTGCSAQANHQEDgslx/wAAAABJRU5ErkJggg==', true);
+        $this->sender = new HttpOfficeOutboxSender($this->repo, $this->api, $this->log,
+            null, static fn(): int => self::NOW,
+            static fn(string $fileId, int $maxBytes): string => $png);
+        $this->seedTask();
+        $row = $this->seedCreate(['context' => ['reply_to' => ['message_id' => 590,
+            'media' => [['type' => 'photo', 'file_id' => 'REPLY-PHOTO']]]]]);
+        $this->http->push(201, ['task_id' => 'vb-image', 'status' => 'pending_media'])
+            ->push(200, ['task_id' => 'vb-image', 'sha256' => hash('sha256', $png), 'ready' => true]);
+
+        $this->assertTrue($this->sender->send($row));
+        $body = json_decode((string) $this->http->calls[0]['body'], true);
+        $this->assertSame('REPLY-PHOTO', $body['attachments'][0]['file_id']);
+        $this->assertSame(590, $body['context']['reply_to']['id']);
+    }
+
+    public function testLostImageUploadResponseDoesNotMarkTaskSent(): void
+    {
+        $png = base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAAEElEQVR4nGP8zwACTGCSAQANHQEDgslx/wAAAABJRU5ErkJggg==', true);
+        $this->sender = new HttpOfficeOutboxSender($this->repo, $this->api, $this->log,
+            null, static fn(): int => self::NOW,
+            static fn(string $fileId, int $maxBytes): string => $png);
+        $this->seedTask();
+        $row = $this->seedCreate(['media' => [['type' => 'photo', 'file_id' => 'PF']]]);
+        $this->http->push(201, ['task_id' => 'vb-image', 'status' => 'pending_media'])
+            ->pushError(new OfficeTransportException('lost response'));
+        $this->assertFalse($this->sender->send($row));
+        $this->assertSame('pending', $this->repo->findOutboxByKey('vb--1001-600')['status']);
+
+        $this->http->push(200, ['task_id' => 'vb-image', 'status' => 'pending_media'])
+            ->push(200, ['task_id' => 'vb-image', 'sha256' => hash('sha256', $png), 'ready' => true]);
+        $this->assertTrue($this->sender->send($this->repo->findOutboxByKey('vb--1001-600')));
+        $this->assertSame('sent', $this->repo->findOutboxByKey('vb--1001-600')['status']);
+    }
+
+    public function testInvalidImageFailsVisiblyWithoutOpeningATextOnlyTask(): void
+    {
+        $this->sender = new HttpOfficeOutboxSender($this->repo, $this->api, $this->log,
+            null, static fn(): int => self::NOW,
+            static fn(string $fileId, int $maxBytes): string => 'invalid image bytes');
+        $this->seedTask();
+        $row = $this->seedCreate(['media' => [['type' => 'photo', 'file_id' => 'PF']]]);
+
+        $this->assertFalse($this->sender->send($row));
+        $this->assertSame('failed', $this->repo->findOutboxByKey('vb--1001-600')['status']);
+        $this->assertSame('failed', $this->repo->findTaskByKey('vb--1001-600')['status']);
+        $this->assertSame([], $this->http->calls);
+    }
+
+    public function testTemporaryImageDownloadFailureKeepsOutboxPending(): void
+    {
+        $this->sender = new HttpOfficeOutboxSender($this->repo, $this->api, $this->log,
+            null, static fn(): int => self::NOW,
+            static function (string $fileId, int $maxBytes): string {
+                throw new TelegramFileException('temporary network failure');
+            });
+        $this->seedTask();
+        $row = $this->seedCreate(['media' => [['type' => 'photo', 'file_id' => 'PF']]]);
+
+        $this->assertFalse($this->sender->send($row));
+        $this->assertSame('pending', $this->repo->findOutboxByKey('vb--1001-600')['status']);
+        $this->assertSame([], $this->http->calls);
     }
 
     public function testTitleAndBodyLimits(): void

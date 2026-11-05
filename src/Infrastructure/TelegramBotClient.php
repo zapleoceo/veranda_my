@@ -225,6 +225,51 @@ class TelegramBotClient
         return (isset($result['ok']) && $result['ok']) ? ($result['result'] ?? null) : null;
     }
 
+    public function downloadImage(string $fileId, int $maxBytes): string
+    {
+        $meta = $this->_call('getFile', ['file_id' => $fileId]);
+        if (empty($meta['ok'])) {
+            throw new TelegramFileException('Telegram image metadata unavailable');
+        }
+        $path = (string) ($meta['result']['file_path'] ?? '');
+        if (!preg_match('~^[A-Za-z0-9_./-]{1,256}$~D', $path)
+            || str_contains($path, '..') || str_starts_with($path, '/')) {
+            throw new TelegramFileException('Telegram image path invalid', false);
+        }
+        if ((int) ($meta['result']['file_size'] ?? 0) > $maxBytes) {
+            throw new TelegramFileException('Telegram image exceeds limit', false);
+        }
+        $url = "https://api.telegram.org/file/bot{$this->token}/{$path}";
+        $ch = curl_init($url);
+        if ($ch === false) {
+            throw new TelegramFileException('Telegram image transport unavailable');
+        }
+        $data = '';
+        curl_setopt_array($ch, [
+            CURLOPT_FOLLOWLOCATION => false,
+            CURLOPT_RETURNTRANSFER => false,
+            CURLOPT_TIMEOUT => 20,
+            CURLOPT_CONNECTTIMEOUT => 5,
+            CURLOPT_PROTOCOLS => CURLPROTO_HTTPS,
+            CURLOPT_SSL_VERIFYPEER => true,
+            CURLOPT_WRITEFUNCTION => static function ($handle, string $part) use (&$data, $maxBytes): int {
+                if (strlen($data) + strlen($part) > $maxBytes) {
+                    return 0;
+                }
+                $data .= $part;
+                return strlen($part);
+            },
+        ]);
+        TelegramDns::applyIfTelegram($ch, $url);
+        $ok = curl_exec($ch);
+        $status = (int) curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
+        curl_close($ch);
+        if ($ok === false || $status !== 200 || $data === '') {
+            throw new TelegramFileException('Telegram image download failed');
+        }
+        return $data;
+    }
+
     public function setWebhook(string $url, string $secret = ''): bool
     {
         $params = [

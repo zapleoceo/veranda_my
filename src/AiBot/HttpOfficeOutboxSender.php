@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\AiBot;
 
+use App\Infrastructure\TelegramFileException;
 use Psr\Log\LoggerInterface;
 
 /**
@@ -20,6 +21,7 @@ final class HttpOfficeOutboxSender implements OfficeOutboxSenderInterface
     private const BACKOFF_MAX = 3600;
     private const REFRESH_PAGES = 3;
     private const DEFER_MAX_AGE = 86400;
+    private const MAX_IMAGE_BYTES = 4 * 1024 * 1024;
 
     private bool $halted = false;
     /** @var \Closure(): int */
@@ -32,6 +34,7 @@ final class HttpOfficeOutboxSender implements OfficeOutboxSenderInterface
         private readonly LoggerInterface $logger,
         private readonly ?\Closure $notify = null,
         ?\Closure $clock = null,
+        private readonly ?\Closure $downloadImage = null,
     ) {
         $this->clock = $clock ?? static fn(): int => time();
     }
@@ -61,6 +64,16 @@ final class HttpOfficeOutboxSender implements OfficeOutboxSenderInterface
             $this->logger->warning('aibot.office.send.network', ['key' => $key, 'err' => $e->getMessage()]);
             $this->retryLater($outboxRow, null, 'network');
             return false;
+        } catch (TelegramFileException $e) {
+            $this->logger->warning($e->retryable ? 'aibot.office.image.retry' : 'aibot.office.image.failed',
+                ['key' => $key, 'reason' => $e->getMessage()]);
+            if (!$e->retryable) {
+                return $this->fail($outboxRow,
+                    $this->repo->findTaskByKey((string) $outboxRow['task_key']),
+                    'image_invalid', 'Изображение не удалось передать в Office.');
+            }
+            $this->retryLater($outboxRow, null, 'image_unavailable');
+            return false;
         }
     }
 
@@ -70,7 +83,7 @@ final class HttpOfficeOutboxSender implements OfficeOutboxSenderInterface
      * @param array<string,mixed> $p payload_json строки outbox
      * @return array<string,mixed>
      */
-    public static function buildCreate(array $p): array
+    public static function buildCreate(array $p, array $imageInfo = []): array
     {
         $chat = (string) ($p['chat_id'] ?? '');
         $msg = (int) ($p['origin_message_id'] ?? 0);
@@ -113,7 +126,7 @@ final class HttpOfficeOutboxSender implements OfficeOutboxSenderInterface
             }
         }
         $atts = [];
-        foreach (array_slice(is_array($p['media'] ?? null) ? $p['media'] : [], 0, 10) as $m) {
+        foreach (self::mediaItems($p) as $m) {
             if (!is_array($m) || (string) ($m['file_id'] ?? '') === '') {
                 continue;
             }
@@ -131,6 +144,15 @@ final class HttpOfficeOutboxSender implements OfficeOutboxSenderInterface
             }
             $atts[] = $a; // url / url_expires_at намеренно не шлём
         }
+        foreach ($atts as &$att) {
+            $fileId = (string) $att['file_id'];
+            if (isset($imageInfo[$fileId])) {
+                $att['mime'] = $imageInfo[$fileId]['mime'];
+                $att['size'] = $imageInfo[$fileId]['size'];
+                $att['sha256'] = $imageInfo[$fileId]['sha256'];
+            }
+        }
+        unset($att);
         if ($atts !== []) {
             $req['attachments'] = $atts;
         }
@@ -144,8 +166,27 @@ final class HttpOfficeOutboxSender implements OfficeOutboxSenderInterface
     /** @param array<string,mixed> $row @param array<string,mixed> $p */
     private function create(array $row, array $p): bool
     {
-        $resp = $this->api->createTask(self::buildCreate($p));
+        $images = $this->prepareImages($p);
+        $request = self::buildCreate($p, $images);
+        $resp = $this->api->createTask($request);
         if ($resp->ok() && is_string($resp->data['task_id'] ?? null) && $resp->data['task_id'] !== '') {
+            $lastUpload = null;
+            foreach (($request['attachments'] ?? []) as $index => $attachment) {
+                $fileId = (string) ($attachment['file_id'] ?? '');
+                if (!isset($images[$fileId])) {
+                    continue;
+                }
+                $image = $images[$fileId];
+                $lastUpload = $this->api->uploadImage((string) $resp->data['task_id'], $index,
+                                                      $image['mime'], $image['content']);
+                if (!$lastUpload->ok() || ($lastUpload->data['sha256'] ?? null) !== $image['sha256']) {
+                    return $this->failOrRetry($row, $lastUpload, 'Image was not delivered to Office');
+                }
+            }
+            if ($images !== [] && ($lastUpload?->data['ready'] ?? false) !== true) {
+                $this->retryLater($row, null, 'image_not_ready');
+                return false;
+            }
             $taskKey = (string) $row['task_key'];
             $local = $this->repo->findTaskByKey($taskKey);
             $fields = ['office_task_id' => $resp->data['task_id'], 'office_revision' => (int) ($resp->data['revision'] ?? 0)];
@@ -160,6 +201,66 @@ final class HttpOfficeOutboxSender implements OfficeOutboxSenderInterface
     }
 
     /** @param array<string,mixed> $row @param array<string,mixed> $p */
+    /** @return array<string,array{mime:string,size:int,sha256:string,content:string}> */
+    private function prepareImages(array $payload): array
+    {
+        $result = [];
+        foreach (self::mediaItems($payload) as $item) {
+            if (!is_array($item) || !in_array($item['type'] ?? '', ['photo', 'document'], true)
+                || (($item['type'] ?? '') === 'document'
+                    && !str_starts_with((string) ($item['mime_type'] ?? ''), 'image/'))) {
+                continue;
+            }
+            $fileId = (string) ($item['file_id'] ?? '');
+            if ($fileId === '' || $this->downloadImage === null) {
+                throw new TelegramFileException('image downloader unavailable', false);
+            }
+            if (isset($result[$fileId])) {
+                continue;
+            }
+            $content = ($this->downloadImage)($fileId, self::MAX_IMAGE_BYTES);
+            $mime = (new \finfo(FILEINFO_MIME_TYPE))->buffer($content);
+            $dimensions = @getimagesizefromstring($content);
+            if (!in_array($mime, ['image/jpeg', 'image/png', 'image/webp'], true)
+                || $content === '' || strlen($content) > self::MAX_IMAGE_BYTES
+                || $dimensions === false || $dimensions[0] * $dimensions[1] > 16_000_000) {
+                throw new TelegramFileException('unsupported or oversized image', false);
+            }
+            $result[$fileId] = ['mime' => $mime, 'size' => strlen($content),
+                                'sha256' => hash('sha256', $content), 'content' => $content];
+        }
+        return $result;
+    }
+
+    /** @return list<array<string,mixed>> */
+    private static function mediaItems(array $payload): array
+    {
+        $current = is_array($payload['media'] ?? null) ? $payload['media'] : [];
+        $reply = $payload['context']['reply_to']['media'] ?? [];
+        $reply = is_array($reply) ? $reply : [];
+        $reply = array_values(array_filter($reply, static fn($item): bool =>
+            is_array($item) && (($item['type'] ?? '') === 'photo'
+                || (($item['type'] ?? '') === 'document'
+                    && str_starts_with((string) ($item['mime_type'] ?? ''), 'image/')))));
+        $result = [];
+        $seen = [];
+        foreach (array_merge($current, $reply) as $item) {
+            if (!is_array($item) || ($item['file_id'] ?? '') === '') {
+                continue;
+            }
+            $fileId = (string) $item['file_id'];
+            if (isset($seen[$fileId])) {
+                continue;
+            }
+            $result[] = $item;
+            $seen[$fileId] = true;
+            if (count($result) === 10) {
+                break;
+            }
+        }
+        return $result;
+    }
+
     private function answer(array $row, array $p): bool
     {
         $taskKey = (string) $row['task_key'];
