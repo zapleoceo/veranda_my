@@ -40,6 +40,23 @@ final class OfficeApiClient
         return $this->call('POST', '/office/v1/tasks/' . rawurlencode($taskId) . '/delivered', ['revision' => $revision]);
     }
 
+    public function uploadImage(string $taskId, int $index, string $mime, string $content): OfficeApiResponse
+    {
+        $path = '/office/v1/tasks/' . rawurlencode($taskId) . '/images/' . $index;
+        $headers = ['Authorization' => 'Bearer ' . $this->config->token(),
+                    'Accept' => 'application/json', 'Content-Type' => $mime];
+        try {
+            $r = $this->transport->send('PUT', $this->config->baseUrl . $path,
+                                        $headers, $content, max($this->timeoutSeconds, 30));
+        } catch (OfficeTransportException $e) {
+            throw new OfficeTransportException(str_replace($this->config->token(), '***', $e->getMessage()));
+        }
+        $data = json_decode($r['body'], true);
+        $ra = $r['headers']['retry-after'] ?? null;
+        return new OfficeApiResponse((int) $r['status'], is_array($data) ? $data : [],
+            $ra !== null && ctype_digit(trim($ra)) ? min(3600, max(1, (int) $ra)) : null);
+    }
+
     /** @param array<string,mixed>|null $payload */
     private function call(string $method, string $path, ?array $payload): OfficeApiResponse
     {

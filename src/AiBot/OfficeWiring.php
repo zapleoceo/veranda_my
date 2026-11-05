@@ -36,7 +36,9 @@ final class OfficeWiring
             $thread = ($task['thread_id'] ?? null) !== null ? (int) $task['thread_id'] : null;
             $bot->withChatId((string) $task['chat_id'])->sendMessageWithKeyboard($text, [], $thread, (int) $task['origin_message_id']);
         };
-        return new HttpOfficeOutboxSender($repo, $client, $logger, $notify);
+        $download = $bot === null ? null : static fn(string $fileId, int $maxBytes): string =>
+            $bot->downloadImage($fileId, $maxBytes);
+        return new HttpOfficeOutboxSender($repo, $client, $logger, $notify, null, $download);
     }
 
     public static function poller(
