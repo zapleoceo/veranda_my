@@ -164,6 +164,40 @@ final class OfficeSenderTest extends TestCase
         $this->assertSame('sent', $this->repo->findOutboxByKey('vb--1001-600')['status']);
     }
 
+    public function testUtf8DocumentIsDeliveredWithDigest(): void
+    {
+        $content = "Office file verification: FILE-20261105-K8\n";
+        $this->sender = new HttpOfficeOutboxSender($this->repo, $this->api, $this->log,
+            null, static fn(): int => self::NOW,
+            static fn(string $fileId, int $maxBytes): string => $content);
+        $this->seedTask();
+        $row = $this->seedCreate(['context' => ['reply_to' => ['message_id' => 590,
+            'media' => [['type' => 'document', 'file_id' => 'DF', 'mime_type' => 'text/plain']]]]]);
+        $digest = hash('sha256', $content);
+        $this->http->push(201, ['task_id' => 'vb-file', 'revision' => 0, 'status' => 'pending_media'])
+            ->push(200, ['sha256' => $digest, 'ready' => true]);
+        $this->assertTrue($this->sender->send($row));
+        $body = $this->http->bodies()[0];
+        $this->assertSame($digest, $body['attachments'][0]['sha256']);
+        $this->assertSame('text/plain', $body['attachments'][0]['mime']);
+        $this->assertSame($content, $this->http->calls[1]['body']);
+    }
+
+    public function testArbitraryBinaryDocumentIsTransferredWithoutExecution(): void
+    {
+        $this->sender = new HttpOfficeOutboxSender($this->repo, $this->api, $this->log,
+            null, static fn(): int => self::NOW,
+            static fn(string $fileId, int $maxBytes): string => "MZ\0binary");
+        $this->seedTask();
+        $row = $this->seedCreate(['media' => [['type' => 'document', 'file_id' => 'DF', 'mime_type' => 'text/plain']]]);
+        $content = "MZ\0binary";
+        $this->http->push(201, ['task_id' => 'vb-file', 'status' => 'pending_media'])
+            ->push(200, ['sha256' => hash('sha256', $content), 'ready' => true]);
+        $this->assertTrue($this->sender->send($row));
+        $this->assertSame($content, $this->http->calls[1]['body']);
+        $this->assertSame('sent', $this->repo->findOutboxByKey('vb--1001-600')['status']);
+    }
+
     public function testReplyImageIsIncludedInTheOfficeTask(): void
     {
         $png = base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAAEElEQVR4nGP8zwACTGCSAQANHQEDgslx/wAAAABJRU5ErkJggg==', true);

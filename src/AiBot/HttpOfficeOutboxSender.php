@@ -209,9 +209,7 @@ final class HttpOfficeOutboxSender implements OfficeOutboxSenderInterface
     {
         $result = [];
         foreach (self::mediaItems($payload) as $item) {
-            if (!is_array($item) || !in_array($item['type'] ?? '', ['photo', 'document'], true)
-                || (($item['type'] ?? '') === 'document'
-                    && !str_starts_with((string) ($item['mime_type'] ?? ''), 'image/'))) {
+            if (!is_array($item) || !in_array($item['type'] ?? '', ['photo', 'document'], true)) {
                 continue;
             }
             $fileId = (string) ($item['file_id'] ?? '');
@@ -222,12 +220,25 @@ final class HttpOfficeOutboxSender implements OfficeOutboxSenderInterface
                 continue;
             }
             $content = ($this->downloadImage)($fileId, self::MAX_IMAGE_BYTES);
+            if ($content === '' || strlen($content) > self::MAX_IMAGE_BYTES) {
+                throw new TelegramFileException('file empty or exceeds 4 MiB', false);
+            }
             $mime = (new \finfo(FILEINFO_MIME_TYPE))->buffer($content);
-            $dimensions = @getimagesizefromstring($content);
-            if (!in_array($mime, ['image/jpeg', 'image/png', 'image/webp'], true)
-                || $content === '' || strlen($content) > self::MAX_IMAGE_BYTES
-                || $dimensions === false || $dimensions[0] * $dimensions[1] > 16_000_000) {
-                throw new TelegramFileException('unsupported or oversized image', false);
+            if (!is_string($mime) || strlen($mime) > 128
+                || !preg_match('~^[a-z0-9.+-]+/[a-z0-9.+-]+$~D', $mime)) {
+                $mime = 'application/octet-stream';
+            }
+            $image = in_array($mime, ['image/jpeg', 'image/png', 'image/webp'], true);
+            if (($item['type'] ?? '') === 'photo' || $image) {
+                $dimensions = @getimagesizefromstring($content);
+                if (!$image || $dimensions === false
+                    || $dimensions[0] * $dimensions[1] > 16_000_000) {
+                    throw new TelegramFileException('invalid or oversized image', false);
+                }
+            }
+            $total = array_sum(array_column($result, 'size')) + strlen($content);
+            if (count($result) >= 4 || $total > 8 * 1024 * 1024) {
+                throw new TelegramFileException('task exceeds four files or 8 MiB', false);
             }
             $result[$fileId] = ['mime' => $mime, 'size' => strlen($content),
                                 'sha256' => hash('sha256', $content), 'content' => $content];
@@ -242,9 +253,7 @@ final class HttpOfficeOutboxSender implements OfficeOutboxSenderInterface
         $reply = $payload['context']['reply_to']['media'] ?? [];
         $reply = is_array($reply) ? $reply : [];
         $reply = array_values(array_filter($reply, static fn($item): bool =>
-            is_array($item) && (($item['type'] ?? '') === 'photo'
-                || (($item['type'] ?? '') === 'document'
-                    && str_starts_with((string) ($item['mime_type'] ?? ''), 'image/')))));
+            is_array($item) && in_array($item['type'] ?? '', ['photo', 'document'], true)));
         $result = [];
         $seen = [];
         foreach (array_merge($current, $reply) as $item) {
