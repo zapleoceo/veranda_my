@@ -170,6 +170,16 @@ export class State {
         this._s.cart[idx].comment = String(comment || '');
         this._emit();
     }
+    /**
+     * Same as setLineComment, but without notifying subscribers — used while
+     * the operator types, so the cart does not re-render and the textarea
+     * keeps its focus on mobile.
+     */
+    patchLineComment(idx, comment) {
+        if (idx < 0 || idx >= this._s.cart.length) return;
+        this._s.cart[idx].comment = String(comment || '');
+        this._persist();
+    }
     removeLine(idx) {
         if (idx < 0 || idx >= this._s.cart.length) return;
         this._s.cart.splice(idx, 1);
