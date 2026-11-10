@@ -61,6 +61,7 @@ final class I18n
             // ─── Russian (canonical / fallback) ──────────────────
             'ru' => [
                 'title'             => 'Заказ Менеджера',
+                'langNext'          => 'Переключить на',
                 'locationDefault'   => 'Стол',
                 'searchPh'          => 'Поиск по меню',
                 'searchClear'       => 'Очистить поиск',
@@ -76,6 +77,10 @@ final class I18n
                 'cartEmpty'         => 'Корзина пуста',
                 'commentLabel'      => 'Комментарий к заказу',
                 'commentPh'         => 'Например, «без лука»',
+                'qtyLess'           => 'Меньше',
+                'qtyMore'           => 'Больше',
+                'itemComment'       => 'Комментарий к позиции',
+                'itemCommentPh'     => 'Комментарий к позиции',
                 'total'             => 'Итого',
                 'place'             => 'Подтвердить заказ',
                 'close'             => 'Закрыть',
@@ -106,6 +111,7 @@ final class I18n
             // ─── English ──────────────────────────────────────────
             'en' => [
                 'title'             => 'Manager Order',
+                'langNext'          => 'Switch to',
                 'locationDefault'   => 'Table',
                 'searchPh'          => 'Search the menu',
                 'searchClear'       => 'Clear search',
@@ -121,6 +127,10 @@ final class I18n
                 'cartEmpty'         => 'Cart is empty',
                 'commentLabel'      => 'Order comment',
                 'commentPh'         => 'e.g. “no onions, please”',
+                'qtyLess'           => 'Less',
+                'qtyMore'           => 'More',
+                'itemComment'       => 'Item comment',
+                'itemCommentPh'     => 'Item comment',
                 'total'             => 'Total',
                 'place'             => 'Place order',
                 'close'             => 'Close',
@@ -151,6 +161,7 @@ final class I18n
             // ─── Vietnamese ───────────────────────────────────────
             'vi' => [
                 'title'             => 'Đơn hàng quản lý',
+                'langNext'          => 'Chuyển sang',
                 'locationDefault'   => 'Bàn',
                 'searchPh'          => 'Tìm trong thực đơn',
                 'searchClear'       => 'Xóa tìm kiếm',
@@ -166,6 +177,10 @@ final class I18n
                 'cartEmpty'         => 'Giỏ hàng trống',
                 'commentLabel'      => 'Ghi chú đơn',
                 'commentPh'         => 'Ví dụ «không hành»',
+                'qtyLess'           => 'Bớt',
+                'qtyMore'           => 'Thêm',
+                'itemComment'       => 'Ghi chú món',
+                'itemCommentPh'     => 'Ghi chú món',
                 'total'             => 'Tổng',
                 'place'             => 'Đặt hàng',
                 'close'             => 'Đóng',

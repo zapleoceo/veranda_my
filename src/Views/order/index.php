@@ -34,16 +34,16 @@ $h = static fn($s) => htmlspecialchars((string)$s, ENT_QUOTES | ENT_SUBSTITUTE, 
             </svg>
             <span class="no-location-label" id="noLocationLabel"><?= $h($t['pickTable']) ?></span>
         </button>
-        <!-- Language switcher (replaces the static "Новый заказ" title).
-             Anchor reload — each click writes the cookie via the controller
-             and bounces back with the new language slice. -->
-        <nav class="no-langsw" aria-label="Language">
-            <?php foreach (['ru', 'en', 'vi'] as $code): ?>
-                <a href="?lang=<?= $h($code) ?>"
-                   class="no-langsw__btn <?= $lang === $code ? 'is-active' : '' ?>"
-                   data-lang="<?= $h($code) ?>"><?= $h(strtoupper($code)) ?></a>
-            <?php endforeach; ?>
-        </nav>
+        <?php
+        // One button: shows the current language, a tap switches to the next
+        // one (RU → EN → VI → RU). Anchor reload — the controller persists the
+        // choice to the cookie and renders the new language slice.
+        $langCycle = ['ru' => 'en', 'en' => 'vi', 'vi' => 'ru'];
+        $nextLang  = $langCycle[$lang] ?? 'ru';
+        ?>
+        <a class="no-lang" href="?lang=<?= $h($nextLang) ?>"
+           aria-label="<?= $h(strtoupper($lang)) ?> — <?= $h($t['langNext']) ?> <?= $h(strtoupper($nextLang)) ?>"
+           title="<?= $h($t['langNext']) ?> <?= $h(strtoupper($nextLang)) ?>"><?= $h(strtoupper($lang)) ?></a>
         <button type="button" class="no-iconbtn" id="noMenuRefreshBtn" aria-label="<?= $h($t['refreshMenu']) ?>" title="<?= $h($t['refreshMenu']) ?>">
             <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M21 2v6h-6"/>
