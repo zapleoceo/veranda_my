@@ -28,8 +28,8 @@ declare(strict_types=1);
         <h3>Итоговый баланс</h3>
         <div class="pd3-card__actions">
             <button type="button" class="pd3-pill pd3-pill--upld" id="pd3BalancesUpldBtn"
-                    title="Скорректировать баланс Андрея в Poster (Факт. − Poster)"
-                    data-help-abs="UPLD — создаёт корректирующую транзакцию в Poster на разницу между Факт. и Poster по строке Андрей. Доступна только когда есть ненулевая разница."
+                    title="Скорректировать баланс СС в Poster (Факт. − Poster)"
+                    data-help-abs="UPLD — создаёт корректирующую транзакцию в Poster на разницу между Факт. и Poster по строке СС. Доступна только когда есть ненулевая разница."
                     aria-label="UPLD" disabled>UPLD</button>
             <button type="button" class="pd3-pill" id="pd3BalancesTelegramBtn"
                     title="Отправить скриншот в Telegram"
@@ -63,7 +63,7 @@ declare(strict_types=1);
         </thead>
         <tbody>
             <?php foreach ([
-                ['key' => 'andrey',  'label' => 'Андрей'],
+                ['key' => 'andrey',  'label' => 'СС'],
                 ['key' => 'vietnam', 'label' => 'Вьет.'],
                 ['key' => 'cash',    'label' => 'Касса'],
                 ['key' => 'stash',   'label' => 'Заначка'],
