@@ -50,3 +50,5 @@ Thumbs.db
 # поверхность в docroot.
 /node_modules/
 /locks/
+
+payday3/balance_shots/

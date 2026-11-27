@@ -62,6 +62,7 @@ declare(strict_types=1);
         <?php require __DIR__ . '/partials/finance_transfers.php'; ?>
         <?php require __DIR__ . '/partials/balances.php'; ?>
     </section>
+    <?php require __DIR__ . '/partials/shots.php'; ?>
     <?php require __DIR__ . '/partials/modals.php'; ?>
 </div>
 

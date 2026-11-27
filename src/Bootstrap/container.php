@@ -84,6 +84,8 @@ use App\Payday3\Http\Actions\SettingsAction;
 use App\Payday3\Http\Actions\InDataAction;
 use App\Payday3\Http\Actions\FinanceTransfersAction;
 use App\Payday3\Http\Actions\BalanceScreenshotAction;
+use App\Payday3\Http\Actions\BalanceShotsAction;
+use App\Payday3\Http\Actions\BalanceShotFileAction;
 use App\Payday3\Http\Actions\BalanceSyncPlanAction;
 use App\Payday3\Http\Actions\BalanceSyncCommitAction;
 use App\Payday3\Contracts\BalanceSyncServiceInterface;
@@ -427,7 +429,10 @@ return [
     BalanceScreenshotAction::class => fn($c) => new BalanceScreenshotAction(
         $c->get(TelegramNotifierInterface::class),
         $c->get(LoggerInterface::class),
+        new \App\Payday3\Services\BalanceShotStore(\App\Payday3\Services\BalanceShotStore::defaultDir()),
     ),
+    BalanceShotsAction::class     => fn() => new BalanceShotsAction(new \App\Payday3\Services\BalanceShotStore(\App\Payday3\Services\BalanceShotStore::defaultDir())),
+    BalanceShotFileAction::class  => fn() => new BalanceShotFileAction(new \App\Payday3\Services\BalanceShotStore(\App\Payday3\Services\BalanceShotStore::defaultDir())),
 
     // ─── Balance UPLD flow (Факт. − Poster → finance.createTransactions)
     BalanceSyncServiceInterface::class => fn($c) => new BalanceSyncService(

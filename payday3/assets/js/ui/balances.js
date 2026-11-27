@@ -307,6 +307,18 @@ async function runUpld(state) {
 
 // ─── Telegram screenshot ───────────────────────────────────────
 
+// Дата и время по Вьетнаму — печатаются прямо на карточке, чтобы попасть в снимок.
+const STAMP_FMT = new Intl.DateTimeFormat('ru-RU', {
+    timeZone: 'Asia/Ho_Chi_Minh',
+    day: '2-digit', month: '2-digit', year: 'numeric',
+    hour: '2-digit', minute: '2-digit',
+});
+
+function updateStamp() {
+    const el = document.getElementById('pd3BalStamp');
+    if (el) el.textContent = 'Снимок: ' + STAMP_FMT.format(new Date()) + ' (Вьетнам)';
+}
+
 async function sendBalancesToTelegram(state) {
     const card = document.getElementById('pd3Balances');
     if (!card) return;
@@ -322,6 +334,8 @@ async function sendBalancesToTelegram(state) {
         if (!saved.ok) {
             throw new Error('не сохранено (' + saved.error + '), снимок не отправлен');
         }
+        // Ставим время в момент снимка, чтобы оно было на PNG.
+        updateStamp();
 
         const html2canvas = await loadHtml2Canvas();
 
@@ -352,6 +366,7 @@ async function sendBalancesToTelegram(state) {
             setStatus('Отправка…');
             await api.post('/payday3/api/balances/telegram', { image: dataUrl });
             setStatus('Отправлено в Telegram', 'ok');
+            document.dispatchEvent(new CustomEvent('pd3:shot-saved'));
         } finally {
             for (const { inp, fake } of swaps) {
                 fake.remove();
@@ -369,6 +384,7 @@ async function sendBalancesToTelegram(state) {
  */
 export function initBalances({ state, onChanged = () => {} }) {
     notifyChanged = onChanged;
+    updateStamp();
     // notify:false when the caller already refreshes itself (finance card
     // after its own create) — avoids a redundant second card load.
     const reload = ({ notify = true } = {}) => reloadPoster().then(() => {

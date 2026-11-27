@@ -35,6 +35,8 @@ use App\Payday3\Http\Actions\SettingsAction;
 use App\Payday3\Http\Actions\InDataAction;
 use App\Payday3\Http\Actions\FinanceTransfersAction;
 use App\Payday3\Http\Actions\BalanceScreenshotAction;
+use App\Payday3\Http\Actions\BalanceShotsAction;
+use App\Payday3\Http\Actions\BalanceShotFileAction;
 use App\Payday3\Http\Actions\BalanceSyncPlanAction;
 use App\Payday3\Http\Actions\BalanceSyncCommitAction;
 use App\Payday3\Http\Actions\PosterTransactionCreateAction;
@@ -283,6 +285,9 @@ $app->group('/payday3', function (RouteCollectorProxy $g) {
         $api->post(  '/balances',                                    ActualBalanceAction::class);
         // Send a screenshot of the balance card to Telegram (sendPhoto).
         $api->post(  '/balances/telegram',                           BalanceScreenshotAction::class);
+        // Saved screenshots: list for the bottom gallery, and the image files.
+        $api->get(   '/balances/shots',                              BalanceShotsAction::class);
+        $api->get(   '/balances/shots/{name:[0-9]{8}_[0-9]{6}_(?:[0-9]{6}_)?[0-9a-f]{6}\.(?:jpg|png)}', BalanceShotFileAction::class);
         // UPLD: push Факт.−Poster delta as a finance.createTransactions
         // correction. Two-step: plan returns a nonce + preview, commit
         // validates the nonce (<5 min TTL) and fires the API call.

@@ -56,6 +56,22 @@ declare(strict_types=1);
                                placeholder="пусто = без темы">
                     </label>
                 </div>
+                <p class="pd3-settings__hint">
+                    Ежедневный снимок «Итоговый баланс» в 08:00 (Вьетнам) — отправляется
+                    последний сохранённый снимок. Пустое поле = не отправлять.
+                </p>
+                <div class="pd3-form__row">
+                    <label class="pd3-field">
+                        <span>08:00 — chat_id (или t.me URL)</span>
+                        <input type="text" name="daily_telegram_chat_id" autocomplete="off"
+                               placeholder="-1002884053196">
+                    </label>
+                    <label class="pd3-field">
+                        <span>08:00 — message_thread_id</span>
+                        <input type="text" name="daily_telegram_message_thread_id" autocomplete="off"
+                               placeholder="3653">
+                    </label>
+                </div>
             </details>
 
             <details class="pd3-settings__group" open>

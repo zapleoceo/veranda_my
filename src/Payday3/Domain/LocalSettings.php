@@ -39,6 +39,10 @@ final class LocalSettings
         public readonly int    $accountStashId = 11,
         // «Касса» — was hard-coded as 2 in PosterBalanceService (payday2).
         public readonly int    $accountCashId = 2,
+        // Second group for the 08:00 daily balance screenshot (Vietnam
+        // time). Empty chat = daily send disabled.
+        public readonly string $dailyChatId = '',
+        public readonly string $dailyThreadId = '',
     ) {}
 
     /**
@@ -73,6 +77,8 @@ final class LocalSettings
             customCategoryNames:  [],
             accountStashId:       11,
             accountCashId:        2,
+            dailyChatId:          '-1002884053196',
+            dailyThreadId:        '3653',
         );
     }
 
@@ -82,6 +88,8 @@ final class LocalSettings
         return [
             'telegram_chat_id'           => $this->telegramChatId,
             'telegram_message_thread_id' => $this->telegramThreadId,
+            'daily_telegram_chat_id'           => $this->dailyChatId,
+            'daily_telegram_message_thread_id' => $this->dailyThreadId,
             'service_user_id'            => $this->serviceUserId,
             'accounts' => [
                 'andrey'  => $this->accountAndreyId,
