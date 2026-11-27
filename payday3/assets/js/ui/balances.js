@@ -16,6 +16,7 @@
 import { api }                  from '../api.js';
 import { esc, fmtVnd, parseVnd as parse } from './format.js';
 import { coalesce }             from './coalesce.js';
+import { createActualGate }     from './actualGate.js';
 import { withBusy, setStatus as setStatusOf } from './busy.js';
 import { splitDateTime }        from './rowCreateTx.js';
 import { loadHtml2Canvas }      from './html2canvasLoader.js';
@@ -124,27 +125,44 @@ const reloadPoster = coalesce(withBusy(document.getElementById('pd3BalancesReloa
     }
 }));
 
+/** true — значения загружены и поля можно сохранять; false — загрузка упала. */
 async function loadActual(state) {
+    actualGate.startLoading();
+    let data;
     try {
-        const data = await api.get('/payday3/api/balances?date=' + encodeURIComponent(targetDate(state)));
-        for (const k of ROW_KEYS) {
-            const input = document.getElementById('pd3BalActual_' + k);
-            const v = data?.['bal_' + k] ?? null;
-            if (input) input.value = fmt(v);
-            // Sync the sentinels so a save doesn't see the initial
-            // undefined vs null as a "change" and insert a ghost null-row
-            // before the user has touched anything (which would then mask
-            // older real data via the latestFor DESC query).
-            lastSavedKeys[k] = v;
-        }
-        // total is computed client-side; seed its sentinel too so a
-        // beforeunload during page load can't write null for it.
-        lastSavedKeys['total'] = data?.['bal_total'] ?? null;
-        lastSentKeys = { ...lastSavedKeys };
-        refreshDiffs(posterCache);
+        data = await api.get('/payday3/api/balances?date=' + encodeURIComponent(targetDate(state)));
     } catch (e) {
+        actualGate.markFailed();
         setStatus('Факт: ' + (e.message || 'error'), 'error');
+        return false;
     }
+    for (const k of ROW_KEYS) {
+        const input = document.getElementById('pd3BalActual_' + k);
+        const v = data?.['bal_' + k] ?? null;
+        if (input) input.value = fmt(v);
+        // Sync the sentinels so a save doesn't see the initial
+        // undefined vs null as a "change" and insert a ghost null-row
+        // before the user has touched anything (which would then mask
+        // older real data via the latestFor DESC query).
+        lastSavedKeys[k] = v;
+    }
+    // total is computed client-side; seed its sentinel too so a
+    // beforeunload during page load can't write null for it.
+    lastSavedKeys['total'] = data?.['bal_total'] ?? null;
+    lastSentKeys = { ...lastSavedKeys };
+    actualGate.markReady();
+    refreshDiffs(posterCache);
+    return true;
+}
+
+/**
+ * Значения «Факт.» нужны на сервере до любого сохранения или снимка.
+ * Ждём текущую загрузку, а если она упала — пробуем ещё раз.
+ */
+function ensureActualLoaded(state) {
+    if (actualGate.ready) return Promise.resolve(true);
+    if (actualGate.isLoading) return actualGate.whenSettled();
+    return loadActual(state);
 }
 
 // ─── Auto-save plumbing ────────────────────────────────────────
@@ -165,11 +183,15 @@ let notifyChanged = () => {};
 let lastSavedKeys = {};   // what the server confirmed
 let lastSentKeys  = {};   // what is on its way (≥ lastSavedKeys)
 let saveTimer = 0;
+const actualGate = createActualGate();   // поля «Факт.» загружены?
 
 /** Current inputs → POST body + whether it differs from what was sent. */
 function collectSave(state) {
     const date = targetDate(state);
     const body = { target_date: date };
+    // Before the load the inputs are empty, which would read as null for
+    // every row — never send that (see actualGate.js).
+    if (!actualGate.ready) return { date, body, changed: false };
     let changed = false;
     for (const k of KEYS) {
         const input = document.getElementById('pd3BalActual_' + k);
@@ -182,9 +204,16 @@ function collectSave(state) {
 
 const keysOf = (body) => Object.fromEntries(KEYS.map((k) => [k, body['bal_' + k]]));
 
+/**
+ * @returns {Promise<{ok: true} | {ok: false, error: string}>}
+ *   ok:true — всё, что было на экране, подтверждено сервером (или менять нечего).
+ */
 const saveActualNow = coalesce(async (state) => {
+    if (!actualGate.ready) {
+        return { ok: false, error: 'Факт. ещё не загружен' };
+    }
     const { date, body, changed } = collectSave(state);
-    if (!changed) return;
+    if (!changed) return { ok: true };
     lastSentKeys = keysOf(body);
     setStatus('Сохраняю…');
     try {
@@ -192,9 +221,12 @@ const saveActualNow = coalesce(async (state) => {
         lastSavedKeys = keysOf(body);
         notifyChanged();
         setStatus('Сохранено в ' + date, 'ok');
+        return { ok: true };
     } catch (e) {
         lastSentKeys = { ...lastSavedKeys };   // retry on the next commit
-        setStatus('Ошибка: ' + (e.message || 'error'), 'error');
+        const error = e.message || 'error';
+        setStatus('Ошибка: ' + error, 'error');
+        return { ok: false, error };
     }
 });
 
@@ -280,8 +312,16 @@ async function sendBalancesToTelegram(state) {
     if (!card) return;
     setStatus('Готовлю снимок…');
     try {
-        // Make sure any pending blur-save is committed first.
-        await saveActualNow(state);
+        // Снимок — это то, что сохранено на сервере. Сначала поля должны
+        // загрузиться (иначе снимок пустой), потом подтвердиться сохранение.
+        // Если что-то из этого не вышло — не отправляем и говорим почему.
+        if (!(await ensureActualLoaded(state))) {
+            throw new Error('Факт. не загружен, снимок не отправлен');
+        }
+        const saved = await saveActualNow(state);
+        if (!saved.ok) {
+            throw new Error('не сохранено (' + saved.error + '), снимок не отправлен');
+        }
 
         const html2canvas = await loadHtml2Canvas();
 

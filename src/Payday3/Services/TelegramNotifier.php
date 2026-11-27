@@ -89,15 +89,20 @@ final class TelegramNotifier implements TelegramNotifierInterface
     // ─── internals ──────────────────────────────────────────────
 
 
-    /** @return array{0:string,1:?string}  resolved chat / thread, settings as fallback */
+    /**
+     * @return array{0:string,1:?string}  resolved chat / thread
+     *
+     * Если чат передан явно, тема — тоже от вызывающего: null значит «без
+     * темы». Иначе вторая группа с пустой темой получала тему первого чата.
+     * Настройки подставляются только когда чат не передан вовсе.
+     */
     private function resolveTarget(?string $chatId, ?string $threadId): array
     {
-        if ($chatId === null || $threadId === null) {
-            $cfg = $this->settings->load();
-            $chatId   = $chatId   ?? $cfg->telegramChatId;
-            $threadId = $threadId ?? $cfg->telegramThreadId;
+        if ($chatId !== null) {
+            return [$chatId, $threadId];
         }
-        return [$chatId, $threadId];
+        $cfg = $this->settings->load();
+        return [$cfg->telegramChatId, $threadId ?? $cfg->telegramThreadId];
     }
 
     /** Materialise raw bytes into a tmp file with the right extension; returns the path or null. */

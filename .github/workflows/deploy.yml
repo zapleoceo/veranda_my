@@ -125,6 +125,7 @@ jobs:
               --exclude ".cache/" \
               --exclude "vendor/" \
               --exclude "logs/" \
+              --exclude "payday3/balance_shots/" \
               --exclude ".git/" \
               --exclude ".github/" \
               --exclude "owner_tools/" \
