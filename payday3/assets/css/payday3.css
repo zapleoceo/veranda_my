@@ -1430,3 +1430,32 @@ html.pd3-scale-1-5 .pd3-modal-host { zoom: 1.5; }
 .pd3-pill.pd3-pill--ok    { color: #30a46c; }
 .pd3-card__actions .pd3-pill.pd3-pill--alert:hover { color: #e5484d; }
 .pd3-card__actions .pd3-pill.pd3-pill--ok:hover    { color: #30a46c; }
+
+/* ── Снимки баланса (галерея внизу страницы) ─────────────── */
+.pd3-shots { margin-top: 16px; }
+.pd3-shots__grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 12px;
+    padding: 12px;
+}
+.pd3-shot { margin: 0; }
+.pd3-shot img {
+    display: block;
+    width: 100%;
+    height: auto;
+    border-radius: 6px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.pd3-shot figcaption { font-size: 12px; margin-top: 4px; opacity: 0.8; }
+.pd3-shot--latest img { border-color: #22c55e; box-shadow: 0 0 0 1px #22c55e; }
+.pd3-shot__badge {
+    display: inline-block; margin-left: 6px; padding: 1px 6px;
+    border-radius: 999px; background: #22c55e; color: #052e16; font-weight: 600;
+}
+.pd3-shots__empty { padding: 12px; margin: 0; }
+
+.pd3-bal-stamp {
+    font-size: 13px; font-weight: 600; padding: 6px 12px 0;
+    opacity: 0.85; white-space: nowrap;
+}

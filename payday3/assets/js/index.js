@@ -30,6 +30,7 @@ import { BANK_TABLE, BANK_SCROLL, SEPAY_TBODY } from './ui/bankTable.js';
 import { initModals, modalHost } from './ui/modals.js';
 import { initOutMode } from './out/bootstrap.js';
 import { initBalances } from './ui/balances.js';
+import { initShots } from './ui/shots.js';
 import { makeInLoader, initSepayHide } from './in/bootstrap.js';
 import { initFinanceTransfers } from './ui/financeTransfers.js';
 import { initCreateTx } from './ui/createTx.js';
@@ -121,6 +122,7 @@ const incomeLinks = initIncomeLinks({ state, onChanged: repaint });
 // after finance.createTransactions succeeds.
 // onChanged: Факт. saved / Poster ↻ / UPLD → the Grab row amount moves.
 const balances = initBalances({ state, onChanged: () => finance.reload() });
+initShots();
 // Same modal host as the toolbar buttons (set up by initModals above).
 initCreateTx({
     state,

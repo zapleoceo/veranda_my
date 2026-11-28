@@ -6,6 +6,7 @@ namespace App\Payday3\Http\Actions;
 
 use App\Payday3\Contracts\TelegramNotifierInterface;
 use App\Payday3\Http\JsonResponder;
+use App\Payday3\Services\BalanceShotStore;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
 use Psr\Log\LoggerInterface;
@@ -30,6 +31,7 @@ final class BalanceScreenshotAction
     public function __construct(
         private readonly TelegramNotifierInterface $tg,
         private readonly ?LoggerInterface          $log = null,
+        private readonly ?BalanceShotStore         $store = null,
     ) {}
 
     public function __invoke(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
@@ -66,6 +68,13 @@ final class BalanceScreenshotAction
         $bytes = self::decodeImage($img);   // throws InvalidArgumentException → 400
 
         $mime   = self::sniffMime($bytes);
+        // Keep every shot, even when Telegram refuses it — the gallery at
+        // the bottom of the page and the 08:00 daily send read from here.
+        try {
+            $this->store?->save($bytes, $mime);
+        } catch (\Throwable $e) {
+            $this->log?->warning('payday3 balance shot not saved', ['error' => $e->getMessage()]);
+        }
         $result = $this->tg->sendPhoto($bytes, $mime, 'Итоговый баланс');
         if (!($result['ok'] ?? false)) {
             $err = (string)($result['error'] ?? 'Telegram error');

@@ -44,6 +44,12 @@ final class LocalSettingsCodec
             // read any more — see LocalSettings docblock.
             accountStashId:       self::positiveInt($acc['stash'] ?? null, $d->accountStashId),
             accountCashId:        self::positiveInt($acc['cash']  ?? null, $d->accountCashId),
+            // Empty is a valid saved value (= daily send off), so use the
+            // stored string as-is when the key exists.
+            dailyChatId:          array_key_exists('daily_telegram_chat_id', $raw)
+                                       ? trim((string)$raw['daily_telegram_chat_id']) : $d->dailyChatId,
+            dailyThreadId:        array_key_exists('daily_telegram_message_thread_id', $raw)
+                                       ? trim((string)$raw['daily_telegram_message_thread_id']) : $d->dailyThreadId,
         );
     }
 
@@ -57,6 +63,8 @@ final class LocalSettingsCodec
         return [
             'telegram_chat_id'           => self::normaliseChatId($payload['telegram_chat_id'] ?? ''),
             'telegram_message_thread_id' => trim((string)($payload['telegram_message_thread_id'] ?? '')),
+            'daily_telegram_chat_id'           => self::normaliseChatId($payload['daily_telegram_chat_id'] ?? ''),
+            'daily_telegram_message_thread_id' => trim((string)($payload['daily_telegram_message_thread_id'] ?? '')),
             'service_user_id'            => (int)($payload['service_user_id'] ?? 0),
             'accounts' => [
                 'andrey'  => (int)($accIn['andrey']  ?? 0),
@@ -83,6 +91,14 @@ final class LocalSettingsCodec
         $thread = isset($p['telegram_message_thread_id']) ? trim((string)$p['telegram_message_thread_id']) : '';
         if (mb_strlen($thread) > 32) {
             return 'telegram_message_thread_id слишком длинный.';
+        }
+        $dailyChat = isset($p['daily_telegram_chat_id']) ? trim((string)$p['daily_telegram_chat_id']) : '';
+        if (mb_strlen($dailyChat) > 80) {
+            return 'daily_telegram_chat_id слишком длинный.';
+        }
+        $dailyThread = isset($p['daily_telegram_message_thread_id']) ? trim((string)$p['daily_telegram_message_thread_id']) : '';
+        if (mb_strlen($dailyThread) > 32) {
+            return 'daily_telegram_message_thread_id слишком длинный.';
         }
         $svc = isset($p['service_user_id']) ? (int)$p['service_user_id'] : 0;
         if ($svc <= 0 || $svc > 999_999_999) {

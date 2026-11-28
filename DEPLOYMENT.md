@@ -98,6 +98,14 @@ crontab -l   # проверка
 | `reservations_daily_reminder.log` | вывод legacy `scripts/reservations/daily_booking_reminder.php` |
 | `/var/www/veranda_my_usr/data/logs/veranda.my-frontend.error.log` | nginx + php-fpm ошибки web-запросов |
 
+### 6a) Ежедневный снимок «Итоговый баланс» (payday3)
+
+- Скрипт: [`cron/payday3_daily_shot.php`](cron/payday3_daily_shot.php). Берёт последний снимок из `payday3/balance_shots/` и шлёт его в группу из настроек (`daily`), подпись — «Итоговый баланс».
+- Расписание: **каждый час**, строка `0 * * * *` в [`cron/crontab.txt`](cron/crontab.txt). Скрипт сам отправляет только в **08:00 по Asia/Ho_Chi_Minh** и не чаще раза в день (маркер `payday3/balance_shots/.daily_YYYYmmdd`). Поэтому расписание не зависит от летнего времени сервера.
+- `CRON_TZ` не использовать: на сервере он не действует. Часовой пояс задан в коде.
+- **При выкатке:** на сервере должна стоять ровно эта строка для скрипта, а не старое `0 3 * * *` (то есть 03:00 Kyiv). Летом 03:00 Kyiv — это 07:00 ICT, и отправки не будет вовсе.
+- Архив `payday3/balance_shots/` исключён из обоих rsync (`--exclude`), поэтому `--delete` его не трогает.
+
 ### 7) WhatsApp listener (pm2 + systemd)
 
 `wa_listener/` — Node.js-сервис, который держит WhatsApp Web-сессию через

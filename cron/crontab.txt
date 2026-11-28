@@ -22,3 +22,9 @@
 
 # Office sender (@Veranda_aibot -> Vera). НЕ ВКЛЮЧЕНО: нужны OFFICE_API_URL + OFFICE_SERVICE_TOKEN в .env и решение владельца.
 #* * * * * /opt/php82/bin/php /var/www/veranda_my_usr/data/www/veranda.my/cron/office_poll.php >> /var/www/veranda_my_usr/data/www/veranda.my/office_poll.log 2>&1
+
+# Ежедневный снимок «Итоговый баланс» во вторую группу. Запускается КАЖДЫЙ ЧАС:
+# сам скрипт отправляет только в 08:00 по Asia/Ho_Chi_Minh и не чаще раза в день.
+# CRON_TZ не используем: на сервере (Europe/Kyiv, летом UTC+3) он не действует,
+# а часовой пояс скрипта задан в коде. Поэтому расписание не зависит от летнего времени.
+0 * * * * /opt/php82/bin/php /var/www/veranda_my_usr/data/www/veranda.my/cron/payday3_daily_shot.php >> /var/www/veranda_my_usr/data/www/veranda.my/payday3_daily_shot.log 2>&1

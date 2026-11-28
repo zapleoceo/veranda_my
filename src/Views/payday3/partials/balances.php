@@ -52,6 +52,9 @@ declare(strict_types=1);
             </button>
         </div>
     </header>
+    <!-- Дата и время снимка: видны в карточке и попадают в PNG (html2canvas).
+         Текст выставляет balances.js — время по Вьетнаму, в момент снимка. -->
+    <div class="pd3-bal-stamp" id="pd3BalStamp">—</div>
     <table class="pd3-table pd3-bal-table">
         <thead>
             <tr>

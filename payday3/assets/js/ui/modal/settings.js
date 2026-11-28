@@ -38,6 +38,8 @@ async function load() {
         settings = data || {};
         form.elements['telegram_chat_id'].value           = settings.telegram_chat_id || '';
         form.elements['telegram_message_thread_id'].value = settings.telegram_message_thread_id || '';
+        form.elements['daily_telegram_chat_id'].value           = settings.daily_telegram_chat_id || '';
+        form.elements['daily_telegram_message_thread_id'].value = settings.daily_telegram_message_thread_id || '';
         form.elements['service_user_id'].value            = settings.service_user_id || '';
         const acc = settings.accounts || {};
         for (const k of ACCOUNT_KEYS) {
@@ -130,6 +132,8 @@ async function save(event) {
     const body = {
         telegram_chat_id:           fd.get('telegram_chat_id'),
         telegram_message_thread_id: fd.get('telegram_message_thread_id'),
+        daily_telegram_chat_id:           fd.get('daily_telegram_chat_id') || '',
+        daily_telegram_message_thread_id: fd.get('daily_telegram_message_thread_id') || '',
         service_user_id:            Number(fd.get('service_user_id')) || 0,
         accounts,
         balance_sinc_account_id:    Number(fd.get('balance_sinc_account_id')) || 0,
